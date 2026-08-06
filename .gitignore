@@ -1,0 +1,35 @@
+# ROS / catkin generated directories
+build/
+devel/
+install/
+log/
+.catkin_tools/
+.catkin_workspace
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Makefile
+
+# Python generated files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Runtime data and logs
+*.bag
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
