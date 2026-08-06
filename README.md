@@ -60,7 +60,9 @@ roslaunch diff_planner run_sim_single.launch
 
 
 ### 3. 单机预设点飞行：
-在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 文件中 **test1** 下设置期望途经点，**test_back** 下设置返程目标点，之后通过以下指令执行任务：
+在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 的 `waypoints`
+列表中配置航点坐标、悬停时间和云台角度；可选的 `test_back`
+用于配置返程点。之后通过以下指令执行任务：
 ```
 cd Diff-Planner
 source devel/setup.zsh
@@ -69,7 +71,9 @@ cd Diff-Planner #新建终端
 ./sh_files/pub_trigger.sh #开始执行任务 或在rviz中用2D Nav Goal插件在地图任意位置点击也能开始执行任务
 ./sh_files/back.sh #开始返程规划
 ```
-注：通过修改 **[multipointplan_sim.launch](src/user_command/multipoint/launch/multipointplan_sim.launch)** 中的 **fligt_type** 可实现多种指点规划方式，如自定义到达每个途经点过程中的飞机yaw角，控制到达每个途经点后的停留时间等，详见 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 顶部注释。
+注：仿真启动文件使用 dry-run 云台后端，不会向 A8 mini 发送网络命令。
+实机下与达妙载板网口的连接和调试方法见
+**[A8 mini 航点连续录像任务](A8mini/README.md)**。
 
 ### 4. 集群预设点飞行：
 在 **[run_sim_swarm.launch](src/diff_planner/plan_manage/launch/sim/run_sim_swarm.launch)** 中设置每架无人机的目标点 **target0_x/y/z**，之后通过以下指令执行任务：
@@ -83,6 +87,11 @@ cd Diff-Planner #新建终端
 
 
 ## 实机运行教程
+
+### A8 mini 连续录像航点任务
+
+A8 mini 通过达妙载板网口接入机载电脑时，可使用新增的航点—悬停—云台握手流程。配置、网络参数和测试方法见 [A8mini/README.md](A8mini/README.md)。
+
 ### 0.深度相机内参替换
 若要使用**视觉定位**下规划，需要先在 **[run_exp_single_vio.launch](src/diff_planner/plan_manage/launch/exp/run_exp_single_vio.launch)** 中替换深度相机内参 **cx/cy/fx/fy**，内参查看方式：
 ```

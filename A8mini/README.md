@@ -1,0 +1,100 @@
+# A8 mini 航点连续录像任务
+
+完整的代码实现、参数、编译运行和故障排查说明见
+[《A8 mini 功能实现与使用说明》](A8mini功能实现与使用说明.md)。
+
+本实现用于以下接线：A8 mini 的以太网口接入达妙载板，载板把相机网络接到机载电脑。云台控制不经过 PX4 UART；Python ROS 节点直接使用思翼以太网 SDK 的 UDP 协议。
+
+## 网络准备
+
+A8 mini 默认参数：
+
+- 控制地址：`192.168.144.25:37260/UDP`
+
+A8 mini 属于手册中的旧地址机型，常见 RTSP 地址为 `rtsp://192.168.144.25:8554/main.264`；不同出厂批次或改过配置的设备应以机身标签和调参助手显示为准。本任务只使用 UDP 控制地址，不依赖 RTSP。
+
+给机载电脑连接达妙载板的网卡配置一个不冲突的同网段静态地址，例如 `192.168.144.30/24`。执行任务前先确认：
+
+```bash
+ping 192.168.144.25
+```
+
+如果相机 IP 已在思翼调参助手中修改，启动时同时传入实际地址，例如：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch camera_ip:=192.168.144.26
+```
+
+## 相机准备
+
+在 UniGCS 或思翼调参助手中提前插入并格式化 TF 卡、配置录像分辨率，并开启“开机自动录制”。ROS 节点不会发送拍照、开始录像或停止录像命令。
+
+## 构建与运行
+
+```bash
+catkin_make -DROS_EDITION=ROS1
+source devel/setup.bash
+roslaunch multipoint multipointplan_exp_lio.launch
+```
+
+VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_single_lio.sh` 会启动 LIO 版本，并同时启动 A8 mini 云台节点。
+
+任务仍沿用原工程的安全触发方式：遥控器 8 通道从中位拨到上位，或发送一次：
+
+```bash
+rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
+```
+
+航点在 `src/user_command/multipoint/config/points.yaml` 中配置。
+
+## 运行逻辑
+
+`multipointplan` 同时满足位置误差和速度阈值并持续稳定 `arrival_stable_sec` 后，进入航点悬停。`hover_sec` 到时发布：
+
+```text
+/mission/gimbal_task  std_msgs/Float64MultiArray
+[waypoint_id, yaw_deg, pitch_deg, settle_sec]
+```
+
+Python 节点依次发送：
+
+1. `0x0C / 03`：云台锁定模式；
+2. `0x0E`：绝对 yaw、pitch（0.1° 精度）；
+3. 等待 `move_wait_sec`（默认 2 秒）；
+4. 保持 `settle_sec`；
+5. 发布 `/mission/gimbal_done`。
+
+飞行节点只接受当前航点相同编号的完成消息。在等待期间不会发布下一个 `/goal`；若完成消息丢失，会重发云台任务。Python 节点会对已完成编号去重并重新回复。
+
+默认把时间对应关系写入：
+
+```text
+/tmp/a8mini_mission_timestamps.csv
+```
+
+可通过 launch 参数 `mission_csv_path` 修改位置。文件列为：
+
+```text
+waypoint_id,arrived_time,gimbal_done_time,yaw,pitch
+```
+
+## 不带飞机的检查
+
+仿真 launch 使用 `dry_run` 云台后端，不会访问相机：
+
+```bash
+roslaunch multipoint multipointplan_sim.launch
+```
+
+实机网络单独测试可以只启动 Python 节点并发布一个任务：
+
+```bash
+rosrun multipoint a8mini_gimbal_node.py
+rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
+  "data: [1, 0.0, -45.0, 2.0]"
+rostopic echo /mission/gimbal_done
+```
+
+若 UDP 姿态命令未收到合法 ACK，节点不会发布完成消息，飞机会保持当前航点。此时检查网卡地址、相机 IP、载板网线和相机是否完成上电初始化。
+
+协议帧格式、命令编号、CRC 和默认控制端口来自[思翼云台相机外部 SDK 协议 V0.1.1](https://siyi.biz/siyi_file/A8%20mini/SIYI_Gimbal_Camera_External_SDK_Protocol_Update_Log%20V0.1.1.pdf)。

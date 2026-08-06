@@ -1,28 +1,22 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>multipoint</name>
-  <version>0.0.0</version>
-  <description>The multipoint package</description>
+  <version>0.1.0</version>
+  <description>Waypoint mission controller with SIYI A8 mini Ethernet gimbal coordination.</description>
 
   <maintainer email="cky@todo.todo">cky</maintainer>
-
-  <license>TODO</license>
+  <license>GPL-3.0</license>
 
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
-  <build_depend>message_generation</build_depend>
-  <build_export_depend>roscpp</build_export_depend>
-  <build_export_depend>rospy</build_export_depend>
-  <build_depend>quadrotor_msgs</build_depend>
-  
 
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>message_runtime</exec_depend>
+  <depend>geometry_msgs</depend>
+  <depend>mavros_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>quadrotor_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>yaml-cpp</depend>
 
-
-  <export>
-
-  </export>
+  <export/>
 </package>

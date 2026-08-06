@@ -1,16 +1,39 @@
 <launch>
-    <arg name="odom_topic" value="/vins/imu_propagate" />
-    <arg name="next_distance" value="0.7" />
-    <arg name="fligt_type" value="1" />   <!-- 1到4代表4种控制模式 -->
-    <arg name="start_plan" value="1" />   <!-- 1表示启动多点规划，0表示不启动 -->
-    <arg name="back_plan" value="1" />   <!-- 1表示启动回城多点规划，0表示不启动 -->
-   
+    <arg name="odom_topic" default="/vins/imu_propagate" />
+    <arg name="yaml_path" default="$(find multipoint)/config/points.yaml" />
+    <arg name="next_distance" default="0.7" />
+    <arg name="velocity_tolerance" default="0.2" />
+    <arg name="arrival_stable_sec" default="0.5" />
+    <arg name="gimbal_retry_sec" default="6.0" />
+    <arg name="start_plan" default="1" />
+    <arg name="back_plan" default="1" />
+    <arg name="enable_rc" default="true" />
+    <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps.csv" />
+
+    <arg name="start_gimbal_node" default="true" />
+    <arg name="camera_ip" default="192.168.144.25" />
+    <arg name="camera_port" default="37260" />
+    <arg name="gimbal_move_wait_sec" default="2.0" />
+
     <node pkg="multipoint" name="multipointplan" type="multipointplan" output="screen">
-        <remap from="odom_topic" to="$(arg odom_topic)"/>
-        <param name="yaml_path" value="$(find multipoint)/config/points.yaml" />
-        <param name="next_distance" value="$(arg next_distance)"/>
-        <param name="fligt_type" value="$(arg fligt_type)"/>
-        <param name="start_plan" value="$(arg start_plan)"/>
-        <param name="back_plan" value="$(arg back_plan)"/>
+        <remap from="odom_topic" to="$(arg odom_topic)" />
+        <param name="yaml_path" value="$(arg yaml_path)" />
+        <param name="position_tolerance" value="$(arg next_distance)" />
+        <param name="velocity_tolerance" value="$(arg velocity_tolerance)" />
+        <param name="arrival_stable_sec" value="$(arg arrival_stable_sec)" />
+        <param name="gimbal_retry_sec" value="$(arg gimbal_retry_sec)" />
+        <param name="start_plan" value="$(arg start_plan)" />
+        <param name="back_plan" value="$(arg back_plan)" />
+        <param name="enable_rc" value="$(arg enable_rc)" />
+        <param name="mission_csv_path" value="$(arg mission_csv_path)" />
     </node>
+
+    <group if="$(arg start_gimbal_node)">
+        <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen">
+            <param name="camera_ip" value="$(arg camera_ip)" />
+            <param name="camera_port" value="$(arg camera_port)" />
+            <param name="move_wait_sec" value="$(arg gimbal_move_wait_sec)" />
+            <param name="dry_run" value="false" />
+        </node>
+    </group>
 </launch>
