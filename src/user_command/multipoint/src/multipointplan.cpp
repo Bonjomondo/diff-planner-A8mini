@@ -28,6 +28,12 @@ enum MissionState
     FINISHED
 };
 
+enum GimbalMode
+{
+    GIMBAL_ANGLE = 0,
+    GIMBAL_RANGE = 1
+};
+
 enum RC_EIGHT_STATE
 {
     RC_EIGHT_UP = 999,
@@ -43,8 +49,11 @@ struct Waypoint
     double z;
     double hover_sec;
     double gimbal_yaw_deg;
+    double gimbal_yaw_min_deg;
+    double gimbal_yaw_max_deg;
     double gimbal_pitch_deg;
     double gimbal_settle_sec;
+    GimbalMode gimbal_mode;
     bool run_gimbal;
 };
 
@@ -122,6 +131,11 @@ private:
         return std::isfinite(value);
     }
 
+    static const char *gimbalModeName(GimbalMode mode)
+    {
+        return mode == GIMBAL_RANGE ? "range" : "angle";
+    }
+
     void validateWaypoint(const Waypoint &waypoint, std::set<uint32_t> *ids) const
     {
         if (waypoint.id == 0 || !ids->insert(waypoint.id).second)
@@ -130,6 +144,7 @@ private:
         }
         if (!finite(waypoint.x) || !finite(waypoint.y) || !finite(waypoint.z) ||
             !finite(waypoint.hover_sec) || !finite(waypoint.gimbal_yaw_deg) ||
+            !finite(waypoint.gimbal_yaw_min_deg) || !finite(waypoint.gimbal_yaw_max_deg) ||
             !finite(waypoint.gimbal_pitch_deg) || !finite(waypoint.gimbal_settle_sec))
         {
             throw std::runtime_error("Waypoint fields must be finite numbers");
@@ -142,9 +157,18 @@ private:
         }
         // A8 mini limits from the supplied user manual.
         if (waypoint.gimbal_yaw_deg < -135.0 || waypoint.gimbal_yaw_deg > 135.0 ||
+            waypoint.gimbal_yaw_min_deg < -135.0 ||
+            waypoint.gimbal_yaw_min_deg > 135.0 ||
+            waypoint.gimbal_yaw_max_deg < -135.0 ||
+            waypoint.gimbal_yaw_max_deg > 135.0 ||
             waypoint.gimbal_pitch_deg < -90.0 || waypoint.gimbal_pitch_deg > 25.0)
         {
             throw std::runtime_error("A8 mini gimbal angle is outside its controllable range");
+        }
+        if (waypoint.gimbal_yaw_min_deg >= waypoint.gimbal_yaw_max_deg)
+        {
+            throw std::runtime_error(
+                "gimbal_yaw_min_deg must be less than gimbal_yaw_max_deg");
         }
     }
 
@@ -167,8 +191,8 @@ private:
         {
             const YAML::Node &node = waypoints[i];
             if (!node.IsMap() || !node["id"] || !node["x"] || !node["y"] || !node["z"] ||
-                !node["hover_sec"] || !node["gimbal_yaw_deg"] ||
-                !node["gimbal_pitch_deg"] || !node["gimbal_settle_sec"])
+                !node["hover_sec"] || !node["gimbal_pitch_deg"] ||
+                !node["gimbal_settle_sec"])
             {
                 std::ostringstream error;
                 error << "Waypoint " << i << " is missing one or more required fields";
@@ -188,7 +212,37 @@ private:
             waypoint.y = node["y"].as<double>();
             waypoint.z = node["z"].as<double>();
             waypoint.hover_sec = node["hover_sec"].as<double>();
-            waypoint.gimbal_yaw_deg = node["gimbal_yaw_deg"].as<double>();
+            waypoint.gimbal_mode = GIMBAL_ANGLE;
+            if (node["gimbal_mode"])
+            {
+                const std::string mode = node["gimbal_mode"].as<std::string>();
+                if (mode == "angle")
+                {
+                    waypoint.gimbal_mode = GIMBAL_ANGLE;
+                }
+                else if (mode == "range" || mode == "sweep")
+                {
+                    waypoint.gimbal_mode = GIMBAL_RANGE;
+                }
+                else
+                {
+                    throw std::runtime_error(
+                        "gimbal_mode must be 'angle' or 'range' ('sweep' is also accepted)");
+                }
+            }
+            if (waypoint.gimbal_mode == GIMBAL_ANGLE && !node["gimbal_yaw_deg"])
+            {
+                throw std::runtime_error(
+                    "gimbal_yaw_deg is required when gimbal_mode is 'angle'");
+            }
+            waypoint.gimbal_yaw_deg =
+                node["gimbal_yaw_deg"] ? node["gimbal_yaw_deg"].as<double>() : 0.0;
+            waypoint.gimbal_yaw_min_deg = node["gimbal_yaw_min_deg"]
+                                               ? node["gimbal_yaw_min_deg"].as<double>()
+                                               : -135.0;
+            waypoint.gimbal_yaw_max_deg = node["gimbal_yaw_max_deg"]
+                                               ? node["gimbal_yaw_max_deg"].as<double>()
+                                               : 135.0;
             waypoint.gimbal_pitch_deg = node["gimbal_pitch_deg"].as<double>();
             waypoint.gimbal_settle_sec = node["gimbal_settle_sec"].as<double>();
             waypoint.run_gimbal = true;
@@ -196,9 +250,12 @@ private:
             mission_waypoints_.push_back(waypoint);
 
             ROS_INFO("Loaded waypoint %u: position [%.2f, %.2f, %.2f], hover %.2f s, "
-                     "gimbal [yaw %.1f, pitch %.1f], settle %.2f s",
+                     "gimbal [mode %s, yaw %.1f, range %.1f..%.1f, pitch %.1f], "
+                     "settle %.2f s",
                      waypoint.id, waypoint.x, waypoint.y, waypoint.z, waypoint.hover_sec,
-                     waypoint.gimbal_yaw_deg, waypoint.gimbal_pitch_deg,
+                     gimbalModeName(waypoint.gimbal_mode),
+                     waypoint.gimbal_yaw_deg, waypoint.gimbal_yaw_min_deg,
+                     waypoint.gimbal_yaw_max_deg, waypoint.gimbal_pitch_deg,
                      waypoint.gimbal_settle_sec);
         }
 
@@ -219,8 +276,11 @@ private:
                 waypoint.z = return_points[i][2].as<double>();
                 waypoint.hover_sec = 0.0;
                 waypoint.gimbal_yaw_deg = 0.0;
+                waypoint.gimbal_yaw_min_deg = -135.0;
+                waypoint.gimbal_yaw_max_deg = 135.0;
                 waypoint.gimbal_pitch_deg = 0.0;
                 waypoint.gimbal_settle_sec = 0.0;
+                waypoint.gimbal_mode = GIMBAL_ANGLE;
                 waypoint.run_gimbal = false;
                 return_waypoints_.push_back(waypoint);
             }
@@ -372,11 +432,14 @@ private:
     {
         const Waypoint &waypoint = active_waypoints_.at(current_index_);
         std_msgs::Float64MultiArray task;
-        task.data.reserve(4);
+        task.data.reserve(7);
         task.data.push_back(static_cast<double>(waypoint.id));
         task.data.push_back(waypoint.gimbal_yaw_deg);
         task.data.push_back(waypoint.gimbal_pitch_deg);
         task.data.push_back(waypoint.gimbal_settle_sec);
+        task.data.push_back(static_cast<double>(waypoint.gimbal_mode));
+        task.data.push_back(waypoint.gimbal_yaw_min_deg);
+        task.data.push_back(waypoint.gimbal_yaw_max_deg);
         gimbal_task_pub_.publish(task);
         last_gimbal_publish_time_ = ros::Time::now();
 
@@ -386,8 +449,11 @@ private:
         }
         else
         {
-            ROS_INFO("Published gimbal task for waypoint %u: yaw %.1f, pitch %.1f, settle %.2f s",
-                     waypoint.id, waypoint.gimbal_yaw_deg, waypoint.gimbal_pitch_deg,
+            ROS_INFO("Published gimbal task for waypoint %u: mode %s, yaw %.1f, "
+                     "range %.1f..%.1f, pitch %.1f, settle %.2f s",
+                     waypoint.id, gimbalModeName(waypoint.gimbal_mode),
+                     waypoint.gimbal_yaw_deg, waypoint.gimbal_yaw_min_deg,
+                     waypoint.gimbal_yaw_max_deg, waypoint.gimbal_pitch_deg,
                      waypoint.gimbal_settle_sec);
         }
     }
@@ -441,7 +507,8 @@ private:
             ROS_ERROR("Cannot open mission CSV: %s", mission_csv_path_.c_str());
             return;
         }
-        mission_csv_ << "waypoint_id,arrived_time,gimbal_done_time,yaw,pitch\n";
+        mission_csv_ << "waypoint_id,arrived_time,gimbal_done_time,yaw,pitch,gimbal_mode,"
+                        "yaw_min,yaw_max\n";
         mission_csv_.flush();
         ROS_INFO("Mission timestamps will be written to %s", mission_csv_path_.c_str());
     }
@@ -455,7 +522,10 @@ private:
         }
         mission_csv_ << waypoint.id << ',' << std::fixed << std::setprecision(3)
                      << arrived.toSec() << ',' << done.toSec() << ','
-                     << waypoint.gimbal_yaw_deg << ',' << waypoint.gimbal_pitch_deg << '\n';
+                     << waypoint.gimbal_yaw_deg << ',' << waypoint.gimbal_pitch_deg << ','
+                     << gimbalModeName(waypoint.gimbal_mode) << ','
+                     << waypoint.gimbal_yaw_min_deg << ',' << waypoint.gimbal_yaw_max_deg
+                     << '\n';
         mission_csv_.flush();
     }
 

@@ -18,6 +18,10 @@ CMD_GIMBAL_MODE = 0x0C
 CMD_REQUEST_ATTITUDE = 0x0D
 CMD_SET_ATTITUDE = 0x0E
 LOCK_MODE = 3
+GIMBAL_MODE_ANGLE = 0
+GIMBAL_MODE_RANGE = 1
+A8MINI_YAW_MIN_DEG = -135.0
+A8MINI_YAW_MAX_DEG = 135.0
 
 
 class SiyiProtocolError(RuntimeError):
@@ -172,12 +176,17 @@ class A8MiniGimbalNode:
         self.command_timeout_sec = float(rospy.get_param("~command_timeout_sec", 0.6))
         self.command_retries = int(rospy.get_param("~command_retries", 3))
         self.move_wait_sec = float(rospy.get_param("~move_wait_sec", 2.0))
+        self.range_move_wait_sec = float(rospy.get_param("~range_move_wait_sec", 4.0))
         self.max_settle_sec = float(rospy.get_param("~max_settle_sec", 60.0))
         self.dry_run = bool(rospy.get_param("~dry_run", False))
 
         if self.command_timeout_sec <= 0.0 or self.command_retries <= 0:
             raise ValueError("command timeout and retry count must be positive")
-        if self.move_wait_sec < 0.0 or self.max_settle_sec < 0.0:
+        if (
+            self.move_wait_sec < 0.0
+            or self.range_move_wait_sec < 0.0
+            or self.max_settle_sec < 0.0
+        ):
             raise ValueError("gimbal timing parameters cannot be negative")
         if not 1 <= self.camera_port <= 65535:
             raise ValueError("camera_port must be in the range 1..65535")
@@ -218,20 +227,46 @@ class A8MiniGimbalNode:
 
     @staticmethod
     def _parse_task(msg):
-        if len(msg.data) != 4:
-            raise ValueError("gimbal_task must contain exactly four values")
+        if len(msg.data) not in (4, 5, 7):
+            raise ValueError("gimbal_task must contain four, five, or seven values")
         if not all(math.isfinite(value) for value in msg.data):
             raise ValueError("gimbal_task values must be finite")
 
-        raw_id, yaw_deg, pitch_deg, settle_sec = msg.data
+        raw_id, yaw_deg, pitch_deg, settle_sec = msg.data[:4]
+        raw_mode = msg.data[4] if len(msg.data) >= 5 else GIMBAL_MODE_ANGLE
+        if len(msg.data) == 7:
+            raw_mode, yaw_min_deg, yaw_max_deg = msg.data[4:7]
+        else:
+            yaw_min_deg = A8MINI_YAW_MIN_DEG
+            yaw_max_deg = A8MINI_YAW_MAX_DEG
         waypoint_id = int(raw_id)
         if raw_id != waypoint_id or not 1 <= waypoint_id <= 0xFFFFFFFF:
             raise ValueError("waypoint_id must be a positive UInt32 integer")
-        if not -135.0 <= yaw_deg <= 135.0:
+        gimbal_mode = int(raw_mode)
+        if raw_mode != gimbal_mode or gimbal_mode not in (
+            GIMBAL_MODE_ANGLE,
+            GIMBAL_MODE_RANGE,
+        ):
+            raise ValueError("gimbal mode must be 0 (angle) or 1 (range)")
+        if not A8MINI_YAW_MIN_DEG <= yaw_deg <= A8MINI_YAW_MAX_DEG:
             raise ValueError("yaw is outside the A8 mini range [-135, 135]")
+        if not A8MINI_YAW_MIN_DEG <= yaw_min_deg <= A8MINI_YAW_MAX_DEG:
+            raise ValueError("yaw_min is outside the A8 mini range [-135, 135]")
+        if not A8MINI_YAW_MIN_DEG <= yaw_max_deg <= A8MINI_YAW_MAX_DEG:
+            raise ValueError("yaw_max is outside the A8 mini range [-135, 135]")
+        if yaw_min_deg >= yaw_max_deg:
+            raise ValueError("yaw_min must be less than yaw_max")
         if not -90.0 <= pitch_deg <= 25.0:
             raise ValueError("pitch is outside the A8 mini range [-90, 25]")
-        return waypoint_id, float(yaw_deg), float(pitch_deg), float(settle_sec)
+        return (
+            waypoint_id,
+            gimbal_mode,
+            float(yaw_deg),
+            float(pitch_deg),
+            float(settle_sec),
+            float(yaw_min_deg),
+            float(yaw_max_deg),
+        )
 
     def gimbal_task_callback(self, msg):
         try:
@@ -240,7 +275,7 @@ class A8MiniGimbalNode:
             rospy.logerr_throttle(5.0, "Rejected gimbal task: {}".format(error))
             return
 
-        waypoint_id, _, _, settle_sec = task
+        waypoint_id, _, _, _, settle_sec, _, _ = task
         if settle_sec < 0.0 or settle_sec > self.max_settle_sec:
             rospy.logerr_throttle(
                 5.0,
@@ -266,17 +301,42 @@ class A8MiniGimbalNode:
             except queue.Empty:
                 continue
 
-            waypoint_id, yaw_deg, pitch_deg, settle_sec = task
+            (
+                waypoint_id,
+                gimbal_mode,
+                yaw_deg,
+                pitch_deg,
+                settle_sec,
+                yaw_min_deg,
+                yaw_max_deg,
+            ) = task
             succeeded = False
             try:
-                rospy.loginfo(
-                    "Executing waypoint %d gimbal task: yaw %.1f, pitch %.1f, settle %.2f s",
-                    waypoint_id,
-                    yaw_deg,
-                    pitch_deg,
-                    settle_sec,
-                )
-                current_angles = self.set_gimbal_angle(yaw_deg, pitch_deg)
+                if gimbal_mode == GIMBAL_MODE_RANGE:
+                    rospy.loginfo(
+                        "Executing waypoint %d gimbal range task: yaw %.1f to %.1f, "
+                        "pitch %.1f, settle %.2f s",
+                        waypoint_id,
+                        yaw_min_deg,
+                        yaw_max_deg,
+                        pitch_deg,
+                        settle_sec,
+                    )
+                    current_angles = self.sweep_gimbal_range(
+                        pitch_deg, yaw_min_deg, yaw_max_deg
+                    )
+                else:
+                    rospy.loginfo(
+                        "Executing waypoint %d gimbal angle task: yaw %.1f, pitch %.1f, "
+                        "settle %.2f s",
+                        waypoint_id,
+                        yaw_deg,
+                        pitch_deg,
+                        settle_sec,
+                    )
+                    current_angles = self.set_gimbal_angle(yaw_deg, pitch_deg)
+                    rospy.sleep(self.move_wait_sec)
+
                 if current_angles is not None:
                     rospy.loginfo(
                         "A8 mini accepted target; ACK attitude yaw %.1f, pitch %.1f",
@@ -284,7 +344,6 @@ class A8MiniGimbalNode:
                         current_angles[1],
                     )
 
-                rospy.sleep(self.move_wait_sec)
                 rospy.sleep(settle_sec)
                 if rospy.is_shutdown():
                     return
@@ -320,6 +379,19 @@ class A8MiniGimbalNode:
         # Leave a short gap because the lock-mode command has no protocol ACK.
         time.sleep(0.05)
         return self.client.set_attitude(yaw_deg, pitch_deg)
+
+    def sweep_gimbal_range(self, pitch_deg, yaw_min_deg, yaw_max_deg):
+        """Sweep the configured A8 mini yaw range while holding pitch."""
+        current_angles = None
+        for yaw_deg in (yaw_min_deg, yaw_max_deg):
+            current_angles = self.set_gimbal_angle(yaw_deg, pitch_deg)
+            rospy.loginfo(
+                "Gimbal range endpoint commanded: yaw %.1f, pitch %.1f",
+                yaw_deg,
+                pitch_deg,
+            )
+            rospy.sleep(self.range_move_wait_sec)
+        return current_angles
 
     def publish_done(self, waypoint_id):
         self.done_pub.publish(UInt32(data=waypoint_id))

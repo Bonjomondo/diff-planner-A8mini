@@ -61,8 +61,11 @@ roslaunch diff_planner run_sim_single.launch
 
 ### 3. 单机预设点飞行：
 在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 的 `waypoints`
-列表中配置航点坐标、悬停时间和云台角度；可选的 `test_back`
-用于配置返程点。之后通过以下指令执行任务：
+列表中配置航点坐标、悬停时间和云台动作；`gimbal_mode: angle` 转到指定
+角度，`gimbal_mode: range` 按 `gimbal_yaw_min_deg` 和
+`gimbal_yaw_max_deg` 扫描指定水平范围。另有
+`coverage_5x5.yaml` 和 `coverage_20x20.yaml` 两份 2.5 m 间距蛇形覆盖任务；
+可选的 `test_back` 用于配置返程点。之后通过以下指令执行任务：
 ```
 cd Diff-Planner
 source devel/setup.zsh

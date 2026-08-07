@@ -83,7 +83,7 @@ enum MissionState
 
 飞行端具体实现了：
 
-- 从新版 `points.yaml` 读取航点位置、悬停时间、云台角度和稳定时间；
+- 从 YAML 读取航点位置、悬停时间、云台动作模式、角度和稳定时间；
 - 检查航点 ID 是否为唯一的正 UInt32 整数；
 - 检查数值是否有效，并检查 A8 mini 角度范围；
 - 同时使用位置误差和速度判断到点；
@@ -109,6 +109,7 @@ src/user_command/multipoint/scripts/a8mini_gimbal_node.py
 - 通过 `192.168.144.25:37260/UDP` 访问 A8 mini；
 - 使用 `0x0C / 03` 把云台切到锁定模式；
 - 使用 `0x0E` 发送绝对 yaw/pitch，角度单位是 `0.1°`；
+- 支持指定角度和可配置起止角度的水平范围扫描两种动作；
 - 校验 A8 mini 返回帧的长度、CRC 和命令字；
 - UDP 超时重试，默认超时 `0.6 s`，重试 3 次；
 - 用工作线程执行云台任务，避免阻塞 ROS 订阅回调；
@@ -129,7 +130,7 @@ pitch:  -90° ~ 25°
 
 | 话题 | 类型 | 方向 | 作用 |
 |---|---|---|---|
-| `/mission/gimbal_task` | `std_msgs/Float64MultiArray` | 飞行端 → 云台端 | 发送 `[id, yaw, pitch, settle_sec]` |
+| `/mission/gimbal_task` | `std_msgs/Float64MultiArray` | 飞行端 → 云台端 | 发送 `[id, yaw, pitch, settle_sec, mode, yaw_min, yaw_max]`；`0=angle`，`1=range` |
 | `/mission/gimbal_done` | `std_msgs/UInt32` | 云台端 → 飞行端 | 通知当前航点云台任务完成 |
 | `/goal` | `geometry_msgs/PoseStamped` | `multipointplan` → Diff-Planner | 发布当前航点 |
 | `odom_topic` | `nav_msgs/Odometry` | 定位端 → `multipointplan` | 判断位置误差和飞行速度 |
@@ -153,6 +154,7 @@ waypoints:
     y: 0.0
     z: 1.5
     hover_sec: 2.0
+    gimbal_mode: angle
     gimbal_yaw_deg: 0.0
     gimbal_pitch_deg: -45.0
     gimbal_settle_sec: 2.0
@@ -162,7 +164,9 @@ waypoints:
     y: 1.0
     z: 1.5
     hover_sec: 2.0
-    gimbal_yaw_deg: 60.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -90.0
+    gimbal_yaw_max_deg: 90.0
     gimbal_pitch_deg: -35.0
     gimbal_settle_sec: 2.0
 ```
@@ -174,11 +178,25 @@ waypoints:
 | `id` | 航点唯一编号，必须为正整数 |
 | `x/y/z` | `world` 坐标系下的航点位置，单位为米 |
 | `hover_sec` | 稳定到点后，发布云台任务前的悬停时间 |
-| `gimbal_yaw_deg` | 云台水平目标角度 |
+| `gimbal_mode` | `angle` 转到指定角度；`range` 在配置的起止角度间扫描；省略时为 `angle` |
+| `gimbal_yaw_deg` | `angle` 模式的水平目标角度；`range` 模式可省略 |
+| `gimbal_yaw_min_deg` | `range` 模式起始角度，默认 `-135°` |
+| `gimbal_yaw_max_deg` | `range` 模式结束角度，默认 `+135°` |
 | `gimbal_pitch_deg` | 云台俯仰目标角度，向下为负 |
 | `gimbal_settle_sec` | 云台转动等待结束后，继续保持该方向的时间 |
 
 `gimbal_settle_sec` 当前限制为 `0 ~ 60 s`。
+范围字段必须满足 `-135 <= gimbal_yaw_min_deg < gimbal_yaw_max_deg <= 135`。
+
+项目还提供两份 2.5 m 航点间距的蛇形覆盖任务：
+
+```text
+src/user_command/multipoint/config/coverage_5x5.yaml    # 5 m × 5 m，9 个点
+src/user_command/multipoint/config/coverage_20x20.yaml  # 20 m × 20 m，81 个点
+```
+
+它们覆盖 `x/y=0~边长`，默认 `z=1.0 m`、pitch `-45°`，每个点都执行
+`gimbal_mode: range`。实际飞行前应按场地原点、飞行高度和安全余量调整坐标。
 
 如果需要使用原工程的返程触发，可以增加：
 
@@ -356,6 +374,16 @@ rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
 
 每个航点 ID 在 Python 节点的一次运行周期内只执行一次。如果想用相同 ID 再次测试实际转动，请重启 `a8mini_gimbal_node.py`，或者换一个新的航点 ID。
 
+`-90°～+90°` 范围扫描测试（第五项 `1` 表示 `range`）：
+
+```bash
+rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
+  "data: [2, 0.0, -45.0, 1.0, 1.0, -90.0, 90.0]"
+```
+
+旧的四项消息仍按 `angle` 模式解析；旧的五项 `range` 消息采用默认
+`-135°～+135°` 范围。
+
 ### 6.2 不连接 A8 mini 的 dry-run 测试
 
 需要测试整个 ROS 握手逻辑，但不希望操作真实云台时：
@@ -494,6 +522,7 @@ LIO/VIO 实机 launch 支持下列参数：
 | `camera_ip` | `192.168.144.25` | A8 mini IP |
 | `camera_port` | `37260` | A8 mini UDP 控制端口 |
 | `gimbal_move_wait_sec` | `2.0` | 发送角度后的固定转动等待时间 |
+| `gimbal_range_move_wait_sec` | `4.0` | 范围扫描到每个端点预留的转动时间 |
 
 例如，同时修改 IP、到点距离和 CSV 位置：
 
@@ -528,9 +557,9 @@ Waypoint 1 gimbal stable, ros_time=...
 格式：
 
 ```csv
-waypoint_id,arrived_time,gimbal_done_time,yaw,pitch
-1,1754364005.200,1754364009.300,0.000,-45.000
-2,1754364018.500,1754364022.600,60.000,-35.000
+waypoint_id,arrived_time,gimbal_done_time,yaw,pitch,gimbal_mode,yaw_min,yaw_max
+1,1754364005.200,1754364009.300,0.000,-45.000,angle,-135.000,135.000
+2,1754364018.500,1754364027.600,0.000,-35.000,range,-90.000,90.000
 ```
 
 `arrived_time` 是飞行端确认稳定到点的 ROS 时间，`gimbal_done_time` 是飞行端收到云台完成消息的 ROS 时间。可以使用这两个时间对应连续录像中的航点片段。
@@ -647,6 +676,7 @@ echo $CMAKE_PREFIX_PATH
 - Python 语法检查；
 - launch XML 检查；
 - YAML 配置解析检查；
+- 5 m × 5 m（9 点）和 20 m × 20 m（81 点）蛇形路径间距检查；
 - SIYI 锁定模式和绝对角度官方示例帧字节校验；
 - ROS 状态机联调：航点 1 到达后发布云台任务，收到 `gimbal_done=1` 后正确发布航点 2；
 - CSV 到点和云台完成时间写入检查；
@@ -659,3 +689,50 @@ echo $CMAKE_PREFIX_PATH
 - [A8 mini 云台相机用户手册](./A8%20mini云台相机用户手册.pdf)；
 - [达妙科技 DM-ORIN NX V2.X 载板使用说明书](./达妙科技DM-ORIN%20NX%20V2.X使用说明书V1.0.pdf)；
 - [SIYI 云台相机外部 SDK 协议 V0.1.1](https://siyi.biz/siyi_file/A8%20mini/SIYI_Gimbal_Camera_External_SDK_Protocol_Update_Log%20V0.1.1.pdf)。
+
+
+
+
+
+你现在运行 `./sh_files/run_single_lio.sh` 时，实际使用的是默认的 `points.yaml`。
+
+入口在 [run_single_lio.sh](/Users/a111/Documents/UAV/diff-planner-A8mini/sh_files/run_single_lio.sh:15)：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch & sleep 2;
+```
+
+因为没传 `yaml_path`，所以使用 launch 文件里的默认值：
+
+```xml
+<arg name="yaml_path" default="$(find multipoint)/config/points.yaml" />
+```
+
+要切换 5×5 任务，把脚本第 15 行改成：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch \
+  yaml_path:=$(rospack find multipoint)/config/coverage_5x5.yaml & sleep 2;
+```
+
+要切换 20×20：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch \
+  yaml_path:=$(rospack find multipoint)/config/coverage_20x20.yaml & sleep 2;
+```
+
+使用普通航点：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch \
+  yaml_path:=$(rospack find multipoint)/config/points.yaml & sleep 2;
+```
+
+改完以后仍然照常运行：
+
+```bash
+./sh_files/run_single_lio.sh
+```
+
+然后使用遥控器触发即可。配置文件只在 `multipointplan` 节点启动时读取，因此切换 YAML 后需要重启脚本或至少重启该节点，运行过程中修改不会立即生效。

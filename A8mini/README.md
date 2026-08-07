@@ -45,7 +45,26 @@ VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_singl
 rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
 ```
 
-航点在 `src/user_command/multipoint/config/points.yaml` 中配置。
+航点在 `src/user_command/multipoint/config/points.yaml` 中配置。`gimbal_mode`
+支持 `angle`（转到 `gimbal_yaw_deg` 指定角度）和 `range`（保持配置的
+pitch，从 `gimbal_yaw_min_deg` 扫到 `gimbal_yaw_max_deg`）两种模式；
+两个范围字段省略时默认 `-135°` 和 `+135°`，`gimbal_mode` 省略时按旧
+配置的 `angle` 处理。
+
+已提供两份可直接切换的蛇形覆盖任务，所有相邻航点均相隔 2.5 m，且每点
+执行一次 `range` 扫描：
+
+```text
+config/coverage_5x5.yaml     # 9 个航点
+config/coverage_20x20.yaml   # 81 个航点
+```
+
+例如，LIO 实机使用 5 m × 5 m 任务：
+
+```bash
+roslaunch multipoint multipointplan_exp_lio.launch \
+  yaml_path:=$(rospack find multipoint)/config/coverage_5x5.yaml
+```
 
 ## 运行逻辑
 
@@ -53,16 +72,24 @@ rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
 
 ```text
 /mission/gimbal_task  std_msgs/Float64MultiArray
-[waypoint_id, yaw_deg, pitch_deg, settle_sec]
+[waypoint_id, yaw_deg, pitch_deg, settle_sec, mode, yaw_min_deg, yaw_max_deg]
 ```
 
-Python 节点依次发送：
+`mode=0` 为指定角度，`mode=1` 为范围扫描。云台节点仍接受原来的四项
+和五项消息；四项消息视为 `mode=0`，没有携带范围的五项消息采用
+`-135°～+135°`。
+
+指定角度模式下，Python 节点依次发送：
 
 1. `0x0C / 03`：云台锁定模式；
 2. `0x0E`：绝对 yaw、pitch（0.1° 精度）；
 3. 等待 `move_wait_sec`（默认 2 秒）；
 4. 保持 `settle_sec`；
 5. 发布 `/mission/gimbal_done`。
+
+范围模式下会依次向配置的 min/max 发送绝对角度命令，两端使用同一个
+`gimbal_pitch_deg`，每段默认预留 4 秒转动时间。范围必须满足
+`-135 <= min < max <= 135`。
 
 飞行节点只接受当前航点相同编号的完成消息。在等待期间不会发布下一个 `/goal`；若完成消息丢失，会重发云台任务。Python 节点会对已完成编号去重并重新回复。
 
@@ -75,7 +102,7 @@ Python 节点依次发送：
 可通过 launch 参数 `mission_csv_path` 修改位置。文件列为：
 
 ```text
-waypoint_id,arrived_time,gimbal_done_time,yaw,pitch
+waypoint_id,arrived_time,gimbal_done_time,yaw,pitch,gimbal_mode,yaw_min,yaw_max
 ```
 
 ## 不带飞机的检查
@@ -93,6 +120,13 @@ rosrun multipoint a8mini_gimbal_node.py
 rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
   "data: [1, 0.0, -45.0, 2.0]"
 rostopic echo /mission/gimbal_done
+```
+
+测试 `-90°～+90°` 范围扫描时发布七项消息，第五项 `1` 表示 `range`：
+
+```bash
+rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
+  "data: [2, 0.0, -45.0, 1.0, 1.0, -90.0, 90.0]"
 ```
 
 若 UDP 姿态命令未收到合法 ACK，节点不会发布完成消息，飞机会保持当前航点。此时检查网卡地址、相机 IP、载板网线和相机是否完成上电初始化。

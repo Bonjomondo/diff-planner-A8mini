@@ -27,6 +27,7 @@
     <group if="$(arg start_gimbal_node)">
         <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen">
             <param name="move_wait_sec" value="2.0" />
+            <param name="range_move_wait_sec" value="4.0" />
             <param name="dry_run" value="true" />
         </node>
     </group>

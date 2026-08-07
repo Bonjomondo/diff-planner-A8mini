@@ -14,6 +14,7 @@
     <arg name="camera_ip" default="192.168.144.25" />
     <arg name="camera_port" default="37260" />
     <arg name="gimbal_move_wait_sec" default="2.0" />
+    <arg name="gimbal_range_move_wait_sec" default="4.0" />
 
     <node pkg="multipoint" name="multipointplan" type="multipointplan" output="screen">
         <remap from="odom_topic" to="$(arg odom_topic)" />
@@ -33,6 +34,7 @@
             <param name="camera_ip" value="$(arg camera_ip)" />
             <param name="camera_port" value="$(arg camera_port)" />
             <param name="move_wait_sec" value="$(arg gimbal_move_wait_sec)" />
+            <param name="range_move_wait_sec" value="$(arg gimbal_range_move_wait_sec)" />
             <param name="dry_run" value="false" />
         </node>
     </group>
