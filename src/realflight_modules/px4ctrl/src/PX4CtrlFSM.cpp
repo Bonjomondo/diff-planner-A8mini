@@ -257,7 +257,8 @@ void PX4CtrlFSM::process()
 			state = AUTO_HOVER;
 			set_hov_with_odom();
 			des = get_hover_des();
-			ROS_INFO("[px4ctrl] From AUTO_LAND to AUTO_HOVER(L2)!");
+			ROS_WARN("[px4ctrl] AUTO_LAND -> AUTO_HOVER because the RC command-mode "
+					 "switch is OFF; RC hover/manual landing control is active.");
 		}
 		else if (!get_landed())
 		{

@@ -6,6 +6,14 @@
 
 ### Fixed
 
+- 修复降落时轨迹服务器仍以 100 Hz 持续发布 `PositionCommand`，
+  导致 `px4ctrl` 无法从 `CMD_CTRL` 进入 `AUTO_HOVER` 的问题。轨迹
+  服务器现在会在收到 LAND 后立即禁用指令输出并清除旧轨迹，
+  收到 TAKEOFF 后才解锁并等待新轨迹；任务节点另以锁存的 `/planning/stop`
+  保证自动和手动两种降落路径都会停止轨迹输出。
+- 改进 `px4ctrl` 的降落中止日志，明确指出关闭 RC command-mode
+  开关会使 `AUTO_LAND` 退回 RC 悬停控制。手动接管后，任务节点
+  会停止重发 LAND，避免自动降落与手动降落反复抢占状态。
 - 修复 `points.yaml` 中重复声明顶层 `waypoints` 键的问题。两个列表现已合并为
   一个序列，航点 1 和航点 2 都会被任务节点加载。
 - 修复遥控器 8 通道只有严格经过 `UP -> MIDDLE -> DOWN` 才能触发降落的问题。

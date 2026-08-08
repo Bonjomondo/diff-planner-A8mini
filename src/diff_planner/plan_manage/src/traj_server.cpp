@@ -2,6 +2,7 @@
 #include <traj_utils/PolyTraj.h>
 #include <optimizer/poly_traj_utils.hpp>
 #include <quadrotor_msgs/PositionCommand.h>
+#include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
@@ -18,6 +19,7 @@ quadrotor_msgs::PositionCommand cmd;
 #define TURN_YAW_TO_CENTER_AT_END 0
 
 bool receive_traj_ = false;
+bool landing_requested_ = false;
 boost::shared_ptr<poly_traj::Trajectory> traj_;
 double traj_duration_;
 ros::Time start_time_;
@@ -37,8 +39,48 @@ void heartbeatCallback(std_msgs::EmptyPtr msg)
   heartbeat_time_ = ros::Time::now();
 }
 
+void stopCommandOutput(const char *reason)
+{
+  if (!landing_requested_)
+  {
+    ROS_WARN("[traj_server] %s received: stop publishing PositionCommand and clear "
+             "the active trajectory.", reason);
+  }
+  landing_requested_ = true;
+  receive_traj_ = false;
+  receive_yaw_ = false;
+}
+
+void planningStopCallback(const std_msgs::EmptyConstPtr &)
+{
+  stopCommandOutput("planning stop");
+}
+
+void takeoffLandCallback(const quadrotor_msgs::TakeoffLandConstPtr &msg)
+{
+  if (msg->takeoff_land_cmd == quadrotor_msgs::TakeoffLand::LAND)
+  {
+    stopCommandOutput("LAND");
+    return;
+  }
+
+  if (msg->takeoff_land_cmd == quadrotor_msgs::TakeoffLand::TAKEOFF)
+  {
+    if (landing_requested_)
+    {
+      ROS_INFO("[traj_server] TAKEOFF received: position-command output unlocked; "
+               "waiting for a new trajectory.");
+    }
+    landing_requested_ = false;
+    receive_traj_ = false;
+  }
+}
+
 void yawCallback(const quadrotor_msgs::PositionCommandPtr msg)
 {
+  if (landing_requested_)
+    return;
+
   receive_yaw_ = true;
   receive_yaw_time_ = ros::Time::now();
   yaw_custom_ = msg->yaw;
@@ -47,6 +89,12 @@ void yawCallback(const quadrotor_msgs::PositionCommandPtr msg)
 
 void polyTrajCallback(traj_utils::PolyTrajPtr msg)
 {
+  if (landing_requested_)
+  {
+    ROS_WARN_THROTTLE(2.0, "[traj_server] Ignore trajectory while LAND is active.");
+    return;
+  }
+
   if (msg->order != 5)
   {
     ROS_ERROR("[traj_server] Only support trajectory order equals 5 now!");
@@ -184,6 +232,11 @@ void publish_cmd(Vector3d p, Vector3d v, Vector3d a, Vector3d j, double y, doubl
 
 void cmdCallback(const ros::TimerEvent &e)
 {
+  // LAND has priority over every queued or newly generated trajectory. px4ctrl only
+  // leaves CMD_CTRL after PositionCommand has been silent for msg_timeout/cmd.
+  if (landing_requested_)
+    return;
+
   /* no publishing before receive traj_ and have heartbeat */
   if (heartbeat_time_.toSec() <= 1e-5)
   {
@@ -339,6 +392,10 @@ int main(int argc, char **argv)
   ros::Subscriber poly_traj_sub = nh.subscribe("planning/trajectory", 10, polyTrajCallback);
   ros::Subscriber yaw_sub = nh.subscribe("/planning/yaw", 10, yawCallback);
   ros::Subscriber heartbeat_sub = nh.subscribe("heartbeat", 10, heartbeatCallback);
+  ros::Subscriber planning_stop_sub =
+      nh.subscribe("/planning/stop", 10, planningStopCallback);
+  ros::Subscriber takeoff_land_sub =
+      nh.subscribe("/px4ctrl/takeoff_land", 10, takeoffLandCallback);
   
   pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
 

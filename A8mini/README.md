@@ -135,6 +135,9 @@ rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
 
 需要排查航点、遥控器拨杆、降落或云台问题时，使用调试启动脚本代替普通脚本：
 
+本次降落故障的完整日志证据、根因和复测标准见
+[降落失败 Bug/问题分析](./%E9%99%8D%E8%90%BD%E5%A4%B1%E8%B4%A5Bug%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90.md)。
+
 ```bash
 source devel/setup.zsh
 ./sh_files/run_single_lio_debug.sh
@@ -145,7 +148,7 @@ source devel/setup.zsh
 
 - `console.log`：全部启动命令和 ROS 节点控制台输出；
 - `ros/`：由 `ROS_LOG_DIR` 收集的各 ROS 节点日志；
-- `flight_debug.bag`：RC 输入、降落命令、PX4 状态、里程计、控制指令、
+- `flight_debug.bag`：RC 输入、规划停止/降落命令、PX4 状态、里程计、控制指令、
   航点、轨迹和云台握手等关键话题；
 - `key_events.log`：从控制台日志自动提取的拨杆、航点、云台和降落事件；
 - `points.yaml.snapshot`、launch 和启动脚本快照；
@@ -160,9 +163,13 @@ grep -E "RC channel 8|LAND|AUTO_LAND|Reject AUTO_LAND|Published waypoint|mission
 rosbag info flight_logs/YYYYMMDD_HHMMSS/flight_debug.bag
 ```
 
-通道 8 进入 DOWN 后，航点任务会被取消并锁存降落请求。节点每秒重发一次
-LAND，使 `px4ctrl` 即使第一次仍处于 `CMD_CTRL` 而拒绝降落，也能在转入
-`AUTO_HOVER` 后接受。为避免落地后误触发再次起飞，降落锁存在节点重启前
-不会解除。
+通道 8 进入 DOWN 后，航点任务会被取消并锁存降落请求；轨迹服务器同时停止
+发布 `PositionCommand`。在 `px4ctrl` 的 0.5 秒指令超时后，控制器会从
+`CMD_CTRL` 转入 `AUTO_HOVER`，任务节点每秒重发的 LAND 随即触发
+`AUTO_LAND`。需要自动降落时，保持 `px4ctrl` 的 mode 和 command-mode 两个
+遥控开关开启。需要改为手动降落时，可将第 6 通道拨出 command-mode；任务节点
+会停止继续重发 LAND，`px4ctrl` 稳定转入 RC 悬停控制，此后可用油门杆下降并按
+正常手动流程落地、停桨。无论选择哪种方式，轨迹位置指令都会保持停止。为避免
+落地后误触发再次起飞，降落锁存在节点重启前不会解除。
 
 协议帧格式、命令编号、CRC 和默认控制端口来自[思翼云台相机外部 SDK 协议 V0.1.1](https://siyi.biz/siyi_file/A8%20mini/SIYI_Gimbal_Camera_External_SDK_Protocol_Update_Log%20V0.1.1.pdf)。

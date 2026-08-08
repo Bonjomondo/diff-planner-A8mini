@@ -6,6 +6,7 @@
 #include <mavros_msgs/RCIn.h>
 #include <nav_msgs/Odometry.h>
 #include <quadrotor_msgs/TakeoffLand.h>
+#include <std_msgs/Empty.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <std_msgs/UInt32.h>
 
@@ -69,7 +70,8 @@ public:
           mission_uses_gimbal_(true),
           rc_eight_pre_(RC_EIGHT_DOWN),
           rc_initialized_(false),
-          landing_latched_(false)
+          landing_latched_(false),
+          automatic_landing_(false)
     {
         pnh_.param<std::string>("yaml_path", yaml_path_, std::string());
         pnh_.param<std::string>("goal_frame_id", goal_frame_id_, "world");
@@ -98,6 +100,7 @@ public:
             nh_.advertise<std_msgs::Float64MultiArray>("/mission/gimbal_task", 10);
         takeoff_land_pub_ =
             nh_.advertise<quadrotor_msgs::TakeoffLand>("/px4ctrl/takeoff_land", 10);
+        planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
         startcommand_pub_ =
             nh_.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
         backcommand_pub_ =
@@ -375,7 +378,7 @@ private:
     void timerCallback(const ros::TimerEvent &)
     {
         const ros::Time now = ros::Time::now();
-        if (landing_latched_ &&
+        if (landing_latched_ && automatic_landing_ &&
             (now - last_land_publish_time_).toSec() >= land_command_retry_sec_)
         {
             publishLandingCommand(true);
@@ -612,13 +615,29 @@ private:
         }
     }
 
-    void requestLanding()
+    void requestLanding(bool automatic)
     {
         state_ = FINISHED;
         closeMissionCsv();
         landing_latched_ = true;
+        automatic_landing_ = automatic;
         last_land_publish_time_ = ros::Time(0);
-        publishLandingCommand(false);
+
+        // Stop the trajectory command source for both automatic and manual landing.
+        // This is separate from LAND because manual RC takeover must not keep receiving
+        // automatic LAND retries.
+        std_msgs::Empty stop;
+        planning_stop_pub_.publish(stop);
+
+        if (automatic_landing_)
+        {
+            publishLandingCommand(false);
+        }
+        else
+        {
+            ROS_WARN("RC channel 8: manual LAND selected because channel 6 is out of "
+                     "command mode; planner stopped and automatic LAND retry disabled");
+        }
     }
 
     void rcCallback(const mavros_msgs::RCInConstPtr &msg)
@@ -630,6 +649,9 @@ private:
         }
 
         const uint16_t raw_input = msg->channels[7];
+        // Keep this threshold identical to RC_Data_t::GEAR_SHIFT_VALUE in px4ctrl:
+        // gear=(PWM-1000)/1000 > 0.75 means command mode.
+        const bool px4ctrl_command_mode = msg->channels[5] > 1750;
         const unsigned int raw_log = static_cast<unsigned int>(raw_input);
         RC_EIGHT_STATE current;
         if (!classifyRcState(raw_input, &current))
@@ -664,6 +686,12 @@ private:
 
         if (landing_latched_)
         {
+            if (automatic_landing_ && !px4ctrl_command_mode)
+            {
+                automatic_landing_ = false;
+                ROS_WARN("RC channel 6 left command mode during landing: automatic LAND "
+                         "retry stopped; RC hover/manual landing control is active");
+            }
             return;
         }
         if (current == rc_eight_pre_)
@@ -680,7 +708,7 @@ private:
         // transition that could be missed by the previous sequence-only implementation.
         if (current == RC_EIGHT_DOWN)
         {
-            requestLanding();
+            requestLanding(px4ctrl_command_mode);
         }
         else if (current == RC_EIGHT_MIDDLE && previous == RC_EIGHT_DOWN)
         {
@@ -715,6 +743,7 @@ private:
     ros::Publisher point_pub_;
     ros::Publisher gimbal_task_pub_;
     ros::Publisher takeoff_land_pub_;
+    ros::Publisher planning_stop_pub_;
     ros::Publisher startcommand_pub_;
     ros::Publisher backcommand_pub_;
     ros::Subscriber odom_sub_;
@@ -756,6 +785,7 @@ private:
     RC_EIGHT_STATE rc_eight_pre_;
     bool rc_initialized_;
     bool landing_latched_;
+    bool automatic_landing_;
     std::ofstream mission_csv_;
 };
 

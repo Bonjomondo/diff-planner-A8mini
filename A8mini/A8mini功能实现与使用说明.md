@@ -480,6 +480,13 @@ rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
 8 通道中位 → 下位：降落
 ```
 
+第 8 通道进入下位后，轨迹服务器会先停止发布位置指令。需要
+自动降落时，保持 `px4ctrl` 的 mode 和 command-mode 两个遥控开关
+开启；控制器从 `CMD_CTRL` 退回 `AUTO_HOVER` 后，锁存并重发的 LAND
+命令会启动降落。需要切换为手动降落时，将第 6 通道拨出
+command-mode；任务节点会停止 LAND 重试，`px4ctrl` 稳定转入 RC 悬停
+控制，此后使用油门杆下降并按正常手动流程落地、停桨。
+
 不同遥控器的 PWM 方向可能相反，必须先通过以下命令确认实际数值：
 
 ```bash

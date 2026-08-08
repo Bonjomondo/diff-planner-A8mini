@@ -41,7 +41,7 @@ cleanup_debug_run() {
     if [[ -n "${RUN_PID}" ]] && kill -0 "${RUN_PID}" 2>/dev/null; then
         kill -INT "${RUN_PID}" 2>/dev/null
     fi
-    grep -E "RC channel 8|TAKEOFF|LAND|AUTO_HOVER|AUTO_LAND|CMD_CTRL|Loaded waypoint|Published waypoint|Waypoint [0-9]+|mission finished|gimbal" \
+    grep -E "RC channel (6|8)|TAKEOFF|LAND|AUTO_HOVER|AUTO_LAND|CMD_CTRL|planning stop|traj_server|Loaded waypoint|Published waypoint|Waypoint [0-9]+|mission finished|gimbal" \
         "${LOG_DIR}/console.log" > "${LOG_DIR}/key_events.log" 2>/dev/null || true
     echo "end_time=$(date -Iseconds)" >> "${LOG_DIR}/metadata.txt"
     echo "[debug] Logs saved in: ${LOG_DIR}"
@@ -118,6 +118,7 @@ rosbag record --tcpnodelay -O "${LOG_DIR}/flight_debug.bag" \
     /goal \
     /move_base_simple/goal \
     /back_trigger \
+    /planning/stop \
     /px4ctrl/takeoff_land \
     /mission/gimbal_task \
     /mission/gimbal_done \
