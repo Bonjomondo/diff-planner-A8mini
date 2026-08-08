@@ -68,7 +68,8 @@ public:
           odom_received_(false),
           mission_uses_gimbal_(true),
           rc_eight_pre_(RC_EIGHT_DOWN),
-          rc_initialized_(false)
+          rc_initialized_(false),
+          landing_latched_(false)
     {
         pnh_.param<std::string>("yaml_path", yaml_path_, std::string());
         pnh_.param<std::string>("goal_frame_id", goal_frame_id_, "world");
@@ -78,12 +79,14 @@ public:
         pnh_.param("velocity_tolerance", velocity_tolerance_, 0.2);
         pnh_.param("arrival_stable_sec", arrival_stable_sec_, 0.5);
         pnh_.param("gimbal_retry_sec", gimbal_retry_sec_, 2.0);
+        pnh_.param("land_command_retry_sec", land_command_retry_sec_, 1.0);
         pnh_.param("start_plan", enable_start_trigger_, 1);
         pnh_.param("back_plan", enable_back_trigger_, 1);
         pnh_.param("enable_rc", enable_rc_, true);
 
         if (position_tolerance_ <= 0.0 || velocity_tolerance_ < 0.0 ||
-            arrival_stable_sec_ < 0.0 || gimbal_retry_sec_ <= 0.0)
+            arrival_stable_sec_ < 0.0 || gimbal_retry_sec_ <= 0.0 ||
+            land_command_retry_sec_ <= 0.0)
         {
             throw std::runtime_error("Invalid mission tolerance or timing parameter");
         }
@@ -298,6 +301,11 @@ private:
 
     void startCallback(const geometry_msgs::PoseStamped::ConstPtr &)
     {
+        if (landing_latched_)
+        {
+            ROS_WARN("Ignoring mission trigger because landing is latched");
+            return;
+        }
         if (state_ != FINISHED)
         {
             ROS_WARN("Ignoring start trigger because a mission is already active");
@@ -308,6 +316,11 @@ private:
 
     void backCallback(const geometry_msgs::PoseStamped::ConstPtr &)
     {
+        if (landing_latched_)
+        {
+            ROS_WARN("Ignoring return trigger because landing is latched");
+            return;
+        }
         if (return_waypoints_.empty())
         {
             ROS_ERROR("No test_back route is configured");
@@ -361,6 +374,13 @@ private:
 
     void timerCallback(const ros::TimerEvent &)
     {
+        const ros::Time now = ros::Time::now();
+        if (landing_latched_ &&
+            (now - last_land_publish_time_).toSec() >= land_command_retry_sec_)
+        {
+            publishLandingCommand(true);
+        }
+
         if (state_ == FINISHED)
         {
             return;
@@ -371,7 +391,6 @@ private:
             return;
         }
 
-        const ros::Time now = ros::Time::now();
         const Waypoint &waypoint = active_waypoints_.at(current_index_);
 
         if (state_ == FLYING)
@@ -542,6 +561,66 @@ private:
         return input > state - 100 && input < state + 100;
     }
 
+    static const char *rcStateName(RC_EIGHT_STATE state)
+    {
+        if (state == RC_EIGHT_UP)
+        {
+            return "UP";
+        }
+        if (state == RC_EIGHT_MIDDLE)
+        {
+            return "MIDDLE";
+        }
+        return "DOWN";
+    }
+
+    static bool classifyRcState(uint16_t input, RC_EIGHT_STATE *state)
+    {
+        if (isInRcState(RC_EIGHT_UP, input))
+        {
+            *state = RC_EIGHT_UP;
+            return true;
+        }
+        if (isInRcState(RC_EIGHT_MIDDLE, input))
+        {
+            *state = RC_EIGHT_MIDDLE;
+            return true;
+        }
+        if (isInRcState(RC_EIGHT_DOWN, input))
+        {
+            *state = RC_EIGHT_DOWN;
+            return true;
+        }
+        return false;
+    }
+
+    void publishLandingCommand(bool retry)
+    {
+        quadrotor_msgs::TakeoffLand command;
+        command.takeoff_land_cmd = quadrotor_msgs::TakeoffLand::LAND;
+        takeoff_land_pub_.publish(command);
+        last_land_publish_time_ = ros::Time::now();
+
+        if (retry)
+        {
+            ROS_WARN("Landing remains latched; republished LAND command so px4ctrl can "
+                     "accept it after entering AUTO_HOVER");
+        }
+        else
+        {
+            ROS_WARN("RC channel 8: LAND requested; active waypoint mission cancelled");
+        }
+    }
+
+    void requestLanding()
+    {
+        state_ = FINISHED;
+        closeMissionCsv();
+        landing_latched_ = true;
+        last_land_publish_time_ = ros::Time(0);
+        publishLandingCommand(false);
+    }
+
     void rcCallback(const mavros_msgs::RCInConstPtr &msg)
     {
         if (msg->channels.size() <= 7)
@@ -550,48 +629,84 @@ private:
             return;
         }
 
-        const uint16_t current = msg->channels[7];
+        const uint16_t raw_input = msg->channels[7];
+        const unsigned int raw_log = static_cast<unsigned int>(raw_input);
+        RC_EIGHT_STATE current;
+        if (!classifyRcState(raw_input, &current))
+        {
+            ROS_WARN_THROTTLE(2.0,
+                              "RC channel 8 raw=%u is outside UP/MIDDLE/DOWN windows",
+                              raw_log);
+            return;
+        }
+
+        ROS_INFO_THROTTLE(2.0,
+                          "RC channel 8 raw=%u state=%s previous=%s initialized=%s "
+                          "landing_latched=%s",
+                          raw_log, rcStateName(current), rcStateName(rc_eight_pre_),
+                          rc_initialized_ ? "true" : "false",
+                          landing_latched_ ? "true" : "false");
+
         if (!rc_initialized_)
         {
-            if (!isInRcState(RC_EIGHT_DOWN, current))
+            if (current != RC_EIGHT_DOWN)
             {
+                ROS_WARN_THROTTLE(5.0,
+                                  "Waiting for RC channel 8 to start in DOWN; raw=%u state=%s",
+                                  raw_log, rcStateName(current));
                 return;
             }
             rc_initialized_ = true;
             rc_eight_pre_ = RC_EIGHT_DOWN;
+            ROS_INFO("RC channel 8 initialized in DOWN (raw=%u)", raw_log);
+            return;
         }
 
-        if (isInRcState(RC_EIGHT_MIDDLE, current) && rc_eight_pre_ == RC_EIGHT_DOWN)
+        if (landing_latched_)
+        {
+            return;
+        }
+        if (current == rc_eight_pre_)
+        {
+            return;
+        }
+
+        const RC_EIGHT_STATE previous = rc_eight_pre_;
+        rc_eight_pre_ = current;
+        ROS_INFO("RC channel 8 transition %s -> %s (raw=%u)",
+                 rcStateName(previous), rcStateName(current), raw_log);
+
+        // Entering DOWN always requests landing. This also covers a direct UP -> DOWN
+        // transition that could be missed by the previous sequence-only implementation.
+        if (current == RC_EIGHT_DOWN)
+        {
+            requestLanding();
+        }
+        else if (current == RC_EIGHT_MIDDLE && previous == RC_EIGHT_DOWN)
         {
             quadrotor_msgs::TakeoffLand command;
-            command.takeoff_land_cmd = 1;
+            command.takeoff_land_cmd = quadrotor_msgs::TakeoffLand::TAKEOFF;
             takeoff_land_pub_.publish(command);
-            rc_eight_pre_ = RC_EIGHT_MIDDLE;
             ROS_INFO("RC channel 8: takeoff");
         }
-        else if (isInRcState(RC_EIGHT_UP, current) && rc_eight_pre_ == RC_EIGHT_MIDDLE)
+        else if (current == RC_EIGHT_UP && previous == RC_EIGHT_MIDDLE)
         {
             geometry_msgs::PoseStamped trigger;
             trigger.header.stamp = ros::Time::now();
             startcommand_pub_.publish(trigger);
-            rc_eight_pre_ = RC_EIGHT_UP;
             ROS_INFO("RC channel 8: start waypoint mission");
         }
-        else if (isInRcState(RC_EIGHT_MIDDLE, current) && rc_eight_pre_ == RC_EIGHT_UP)
+        else if (current == RC_EIGHT_MIDDLE && previous == RC_EIGHT_UP)
         {
             geometry_msgs::PoseStamped trigger;
             trigger.header.stamp = ros::Time::now();
             backcommand_pub_.publish(trigger);
-            rc_eight_pre_ = RC_EIGHT_MIDDLE;
             ROS_INFO("RC channel 8: return route");
         }
-        else if (isInRcState(RC_EIGHT_DOWN, current) && rc_eight_pre_ == RC_EIGHT_MIDDLE)
+        else
         {
-            quadrotor_msgs::TakeoffLand command;
-            command.takeoff_land_cmd = 2;
-            takeoff_land_pub_.publish(command);
-            rc_eight_pre_ = RC_EIGHT_DOWN;
-            ROS_INFO("RC channel 8: land");
+            ROS_WARN("RC channel 8 transition %s -> %s has no assigned action",
+                     rcStateName(previous), rcStateName(current));
         }
     }
 
@@ -624,6 +739,7 @@ private:
     ros::Time arrived_time_;
     ros::Time hover_start_time_;
     ros::Time last_gimbal_publish_time_;
+    ros::Time last_land_publish_time_;
 
     std::string yaml_path_;
     std::string goal_frame_id_;
@@ -632,12 +748,14 @@ private:
     double velocity_tolerance_;
     double arrival_stable_sec_;
     double gimbal_retry_sec_;
+    double land_command_retry_sec_;
     int enable_start_trigger_;
     int enable_back_trigger_;
     bool enable_rc_;
 
     RC_EIGHT_STATE rc_eight_pre_;
     bool rc_initialized_;
+    bool landing_latched_;
     std::ofstream mission_csv_;
 };
 

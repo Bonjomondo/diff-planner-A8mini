@@ -5,6 +5,7 @@
     <arg name="velocity_tolerance" default="0.2" />
     <arg name="arrival_stable_sec" default="0.5" />
     <arg name="gimbal_retry_sec" default="6.0" />
+    <arg name="land_command_retry_sec" default="1.0" />
     <arg name="start_plan" default="1" />
     <arg name="back_plan" default="1" />
     <arg name="enable_rc" default="true" />
@@ -23,6 +24,7 @@
         <param name="velocity_tolerance" value="$(arg velocity_tolerance)" />
         <param name="arrival_stable_sec" value="$(arg arrival_stable_sec)" />
         <param name="gimbal_retry_sec" value="$(arg gimbal_retry_sec)" />
+        <param name="land_command_retry_sec" value="$(arg land_command_retry_sec)" />
         <param name="start_plan" value="$(arg start_plan)" />
         <param name="back_plan" value="$(arg back_plan)" />
         <param name="enable_rc" value="$(arg enable_rc)" />

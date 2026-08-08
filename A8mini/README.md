@@ -131,4 +131,38 @@ rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
 
 若 UDP 姿态命令未收到合法 ACK，节点不会发布完成消息，飞机会保持当前航点。此时检查网卡地址、相机 IP、载板网线和相机是否完成上电初始化。
 
+## 实机调试日志
+
+需要排查航点、遥控器拨杆、降落或云台问题时，使用调试启动脚本代替普通脚本：
+
+```bash
+source devel/setup.zsh
+./sh_files/run_single_lio_debug.sh
+```
+
+它仍然执行原来的 `run_single_lio.sh`，但会在
+`flight_logs/YYYYMMDD_HHMMSS/` 保存：
+
+- `console.log`：全部启动命令和 ROS 节点控制台输出；
+- `ros/`：由 `ROS_LOG_DIR` 收集的各 ROS 节点日志；
+- `flight_debug.bag`：RC 输入、降落命令、PX4 状态、里程计、控制指令、
+  航点、轨迹和云台握手等关键话题；
+- `key_events.log`：从控制台日志自动提取的拨杆、航点、云台和降落事件；
+- `points.yaml.snapshot`、launch 和启动脚本快照；
+- ROS 参数、节点列表、话题列表和 Git 版本信息。
+
+飞行结束时使用 `Ctrl+C`，等待脚本打印日志目录，保证 rosbag 正常写完索引。
+快速筛选降落和航点事件：
+
+```bash
+grep -E "RC channel 8|LAND|AUTO_LAND|Reject AUTO_LAND|Published waypoint|mission finished" \
+  flight_logs/YYYYMMDD_HHMMSS/console.log
+rosbag info flight_logs/YYYYMMDD_HHMMSS/flight_debug.bag
+```
+
+通道 8 进入 DOWN 后，航点任务会被取消并锁存降落请求。节点每秒重发一次
+LAND，使 `px4ctrl` 即使第一次仍处于 `CMD_CTRL` 而拒绝降落，也能在转入
+`AUTO_HOVER` 后接受。为避免落地后误触发再次起飞，降落锁存在节点重启前
+不会解除。
+
 协议帧格式、命令编号、CRC 和默认控制端口来自[思翼云台相机外部 SDK 协议 V0.1.1](https://siyi.biz/siyi_file/A8%20mini/SIYI_Gimbal_Camera_External_SDK_Protocol_Update_Log%20V0.1.1.pdf)。
