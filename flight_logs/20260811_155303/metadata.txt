@@ -1,0 +1,12 @@
+start_time=2026-08-11T15:53:03+08:00
+workspace=/home/q/Documents/diff-planner-A8mini
+hostname=ubuntu
+kernel=Linux ubuntu 5.10.216-tegra #1 SMP PREEMPT Mon Jan 26 23:28:09 PST 2026 aarch64 aarch64 aarch64 GNU/Linux
+git_commit=6212b1f331b05abc1f21146b3d35e76dc3d29224
+ros_distro=noetic
+ros_master_uri=http://localhost:11311
+
+git_status:
+?? flight_logs/20260811_155200/
+?? flight_logs/20260811_155303/
+end_time=2026-08-11T16:01:14+08:00

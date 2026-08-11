@@ -1,0 +1,13 @@
+/a8mini_gimbal
+/drone_0_diff_planner_node
+/drone_0_traj_server
+/ekf
+/laserMapping
+/livox_lidar_publisher2
+/mavros
+/multipointplan
+/px4ctrl
+/record_1786435288596888955
+/rosout
+/rostopic_9676_1786435301253
+/rviz

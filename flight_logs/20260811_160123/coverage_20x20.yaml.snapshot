@@ -1,0 +1,900 @@
+# 20 m × 20 m 蛇形覆盖任务。覆盖范围：x=0~20.0 m，y=0~20.0 m。
+# 相邻航点间距均为 2.5 m；飞行高度为 1.0 m，可按现场条件统一修改 z。
+# 每个航点到达并悬停后，云台保持 pitch=-45°，水平扫描 -135°~+135°。
+# range 模式下 gimbal_yaw_deg 不参与执行；可修改每个点的 gimbal_yaw_min_deg/max_deg。
+
+waypoints:
+  - id: 1
+    x: 0.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 2
+    x: 2.5
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 3
+    x: 5.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 4
+    x: 7.5
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 5
+    x: 10.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 6
+    x: 12.5
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 7
+    x: 15.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 8
+    x: 17.5
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 9
+    x: 20.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 10
+    x: 20.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 11
+    x: 17.5
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 12
+    x: 15.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 13
+    x: 12.5
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 14
+    x: 10.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 15
+    x: 7.5
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 16
+    x: 5.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 17
+    x: 2.5
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 18
+    x: 0.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 19
+    x: 0.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 20
+    x: 2.5
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 21
+    x: 5.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 22
+    x: 7.5
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 23
+    x: 10.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 24
+    x: 12.5
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 25
+    x: 15.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 26
+    x: 17.5
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 27
+    x: 20.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 28
+    x: 20.0
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 29
+    x: 17.5
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 30
+    x: 15.0
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 31
+    x: 12.5
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 32
+    x: 10.0
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 33
+    x: 7.5
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 34
+    x: 5.0
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 35
+    x: 2.5
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 36
+    x: 0.0
+    y: 7.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 37
+    x: 0.0
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 38
+    x: 2.5
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 39
+    x: 5.0
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 40
+    x: 7.5
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 41
+    x: 10.0
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 42
+    x: 12.5
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 43
+    x: 15.0
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 44
+    x: 17.5
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 45
+    x: 20.0
+    y: 10.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 46
+    x: 20.0
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 47
+    x: 17.5
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 48
+    x: 15.0
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 49
+    x: 12.5
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 50
+    x: 10.0
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 51
+    x: 7.5
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 52
+    x: 5.0
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 53
+    x: 2.5
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 54
+    x: 0.0
+    y: 12.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 55
+    x: 0.0
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 56
+    x: 2.5
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 57
+    x: 5.0
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 58
+    x: 7.5
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 59
+    x: 10.0
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 60
+    x: 12.5
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 61
+    x: 15.0
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 62
+    x: 17.5
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 63
+    x: 20.0
+    y: 15.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 64
+    x: 20.0
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 65
+    x: 17.5
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 66
+    x: 15.0
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 67
+    x: 12.5
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 68
+    x: 10.0
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 69
+    x: 7.5
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 70
+    x: 5.0
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 71
+    x: 2.5
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 72
+    x: 0.0
+    y: 17.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 73
+    x: 0.0
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 74
+    x: 2.5
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 75
+    x: 5.0
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 76
+    x: 7.5
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 77
+    x: 10.0
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 78
+    x: 12.5
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 79
+    x: 15.0
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 80
+    x: 17.5
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 81
+    x: 20.0
+    y: 20.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+# 可选返航路线；返航点不执行云台动作。
+test_back:
+  - [0.0, 0.0, 1.0]

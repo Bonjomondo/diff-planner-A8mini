@@ -1,0 +1,22 @@
+diff --git a/src/user_command/multipoint/config/points.yaml b/src/user_command/multipoint/config/points.yaml
+index b347f47..5eb53a4 100644
+--- a/src/user_command/multipoint/config/points.yaml
++++ b/src/user_command/multipoint/config/points.yaml
+@@ -62,6 +62,17 @@ waypoints:
+     gimbal_yaw_max_deg: 135.0
+     gimbal_pitch_deg: 0.0
+     gimbal_settle_sec: 2.0
++
++  - id: 3
++    x: 3.5
++    y: -1.0
++    z: 1.0
++    hover_sec: 2.0
++    gimbal_mode: range
++    gimbal_yaw_min_deg: -135.0
++    gimbal_yaw_max_deg: 135.0
++    gimbal_pitch_deg: 0.0
++    gimbal_settle_sec: 2.0
+ # 可选返航路线，收到返航触发后按列表顺序执行：
+ # - 每个元素的格式为 [x, y, z]，单位为米，坐标系与 waypoints 相同。
+ # - 返航点不执行悬停和云台动作。
