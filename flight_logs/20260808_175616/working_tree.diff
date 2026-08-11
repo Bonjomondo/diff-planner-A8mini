@@ -1,0 +1,12 @@
+diff --git a/.gitignore b/.gitignore
+index 4d3081a..e08c98e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -22,7 +22,6 @@ __pycache__/
+ # Runtime data and logs
+ *.bag
+ *.log
+-/flight_logs/
+ 
+ # IDE and editor files
+ .vscode/

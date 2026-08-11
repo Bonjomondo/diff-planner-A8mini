@@ -1,0 +1,108 @@
+# 5 m × 5 m 蛇形覆盖任务。覆盖范围：x=0~5.0 m，y=0~5.0 m。
+# 相邻航点间距均为 2.5 m；飞行高度为 1.0 m，可按现场条件统一修改 z。
+# 每个航点到达并悬停后，云台保持 pitch=-45°，水平扫描 -135°~+135°。
+# range 模式下 gimbal_yaw_deg 不参与执行；可修改每个点的 gimbal_yaw_min_deg/max_deg。
+
+waypoints:
+  - id: 1
+    x: 0.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 2
+    x: 2.5
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 3
+    x: 5.0
+    y: 0.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 4
+    x: 5.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 5
+    x: 2.5
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 6
+    x: 0.0
+    y: 2.5
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 7
+    x: 0.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 8
+    x: 2.5
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+  - id: 9
+    x: 5.0
+    y: 5.0
+    z: 1.0
+    hover_sec: 1.0
+    gimbal_mode: range
+    gimbal_yaw_min_deg: -135.0
+    gimbal_yaw_max_deg: 135.0
+    gimbal_pitch_deg: -45.0
+    gimbal_settle_sec: 1.0
+
+# 可选返航路线；返航点不执行云台动作。
+test_back:
+  - [0.0, 0.0, 1.0]

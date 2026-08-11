@@ -22,7 +22,7 @@ __pycache__/
 # Runtime data and logs
 *.bag
 *.log
-/flight_logs/
+# flight_logs/
 
 # IDE and editor files
 .vscode/

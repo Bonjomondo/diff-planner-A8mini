@@ -1,0 +1,11 @@
+Type: geometry_msgs/PoseStamped
+
+Publishers: 
+ * /multipointplan (http://ubuntu:39233/)
+ * /rviz (http://ubuntu:34715/)
+
+Subscribers: 
+ * /record_1786181837964036470 (http://ubuntu:46135/)
+ * /drone_0_diff_planner_node (http://ubuntu:34435/)
+
+

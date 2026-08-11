@@ -1,0 +1,494 @@
+a8mini_gimbal:
+  camera_ip: 192.168.144.25
+  camera_port: 37260
+  dry_run: false
+  move_wait_sec: 2.0
+  range_move_wait_sec: 4.0
+cmdline_file_path: livox_test.lvx
+cmdline_str: ARMCNCP0036571
+common:
+  imu_topic: /mavros/imu/data
+  lid_topic: /livox/lidar
+  time_sync_en: false
+cube_side_length: 1000
+data_src: 0
+drone_0_diff_planner_node:
+  fsm:
+    emergency_time: 1.0
+    enable_stuck_detect: true
+    fail_safe: true
+    flight_type: 1
+    mondify_final_goal: true
+    planning_horizon: 7.5
+    realworld_experiment: true
+    thresh_replan_time: 1.0
+    waypoint0_x: 8.0
+    waypoint0_y: 0.0
+    waypoint0_z: 1.0
+    waypoint1_x: 0.0
+    waypoint1_y: 0.0
+    waypoint1_z: 1.0
+    waypoint2_x: 0.0
+    waypoint2_y: 30.0
+    waypoint2_z: 1.0
+    waypoint3_x: -30.0
+    waypoint3_y: 0.0
+    waypoint3_z: 1.0
+    waypoint4_x: 0.0
+    waypoint4_y: 0.0
+    waypoint4_z: 1.0
+    waypoint_num: 2
+  grid_map:
+    cx: 319.31427001953125
+    cy: 239.09725952148438
+    depth_filter_margin: 2
+    depth_filter_maxdist: 5.0
+    depth_filter_mindist: 0.2
+    depth_filter_tolerance: 0.15
+    enable_virtual_wall: true
+    fading_time: 1000.0
+    frame_id: world
+    fx: 386.2706298828125
+    fy: 386.2706298828125
+    ground_height: -0.01
+    k_depth_scaling_factor: 1000.0
+    local_update_range_x: 5.5
+    local_update_range_y: 5.5
+    local_update_range_z: 2.0
+    max_ray_length: 4.5
+    min_ray_length: 0.1
+    obstacles_inflation: 0.3
+    p_hit: 0.65
+    p_max: 0.9
+    p_min: 0.12
+    p_miss: 0.35
+    p_occ: 0.8
+    pose_type: 2
+    resolution: 0.15
+    show_occ_time: false
+    skip_pixel: 2
+    use_depth_filter: true
+    virtual_ceil: 3.0
+    virtual_ground: -0.1
+    visualization_truncate_height: 1.9
+  manager:
+    drone_id: 0
+    feasibility_tolerance: 0.05
+    max_acc: 3.0
+    max_jer: 20.0
+    max_vel: 0.5
+    planning_horizon: 7.5
+    polyTraj_piece_length: 1.5
+    use_multitopology_trajs: false
+  optimization:
+    acc_tolerance: 1.0
+    constraint_points_perPiece: 5
+    max_acc: 3.0
+    max_jer: 20.0
+    max_vel: 0.5
+    obstacle_clearance: 0.1
+    obstacle_clearance_soft: 0.5
+    record_opt: true
+    swarm_clearance: 0.15000000000000002
+    vel_tolerance: 1.0
+    weight_feasibility: 10000.0
+    weight_obstacle: 10000.0
+    weight_obstacle_soft: 5000.0
+    weight_sqrvariance: 10000.0
+    weight_swarm: 10000.0
+    weight_time: 10.0
+drone_0_traj_server:
+  traj_server:
+    time_forward: 1.0
+ekf:
+  Rr_i:
+  - 1
+  - 0
+  - 0
+  - 0
+  acc_cov: 0.2
+  cutoff_freq: 20.0
+  gyro_cov: 0.05
+  imu_trans_x: 0.0
+  imu_trans_y: 0.0
+  imu_trans_z: 0.0
+  offset_px: 0.0
+  offset_py: 0.0
+  offset_pz: 0.0
+  position_cov: 0.01
+  q_rp_cov: 0.01
+  q_yaw_cov: 0.01
+  rotation_imu:
+  - 1
+  - 0
+  - 0
+  - 0
+  - 1
+  - 0
+  - 0
+  - 0
+  - 1
+  scale_g: 1.0
+  tr_i:
+  - 0.0
+  - 0.0
+  - 0.0
+enable_imu_bag: true
+enable_lidar_bag: true
+esti_plane_threshold: 0.1
+feature_extract_enable: false
+filter_size_map: 0.5
+filter_size_surf: 0.5
+frame_id: livox_frame
+ivox_grid_resolution: 0.5
+ivox_nearby_type: 18
+mapping:
+  acc_cov: 0.1
+  b_acc_cov: 0.0001
+  b_gyr_cov: 0.0001
+  det_range: 100.0
+  extrinsic_R:
+  - 0.999825
+  - 0.016834
+  - -0.008137
+  - -0.017019
+  - 0.999587
+  - -0.023176
+  - 0.007744
+  - 0.023311
+  - 0.999698
+  extrinsic_T:
+  - -0.036817
+  - 0.002759
+  - 0.095866
+  extrinsic_est_en: false
+  fov_degree: 360
+  gyr_cov: 0.1
+  world_transform_R:
+  - 1
+  - 0
+  - 0
+  - 0
+  - 1
+  - 0
+  - 0
+  - 0
+  - 1
+  world_transform_T:
+  - 0.0
+  - 0.0
+  - 0.0
+  world_transform_en: true
+mavros:
+  camera:
+    frame_id: base_link
+  cmd:
+    use_comp_id_system_control: false
+  conn:
+    heartbeat_rate: 1.0
+    system_time_rate: 1.0
+    timeout: 10.0
+    timesync_rate: 10.0
+  distance_sensor:
+    hrlv_ez4_pub:
+      field_of_view: 0.0
+      frame_id: hrlv_ez4_sonar
+      id: 0
+      orientation: PITCH_270
+      send_tf: true
+      sensor_position:
+        x: 0.0
+        y: 0.0
+        z: -0.1
+    laser_1_sub:
+      id: 3
+      orientation: PITCH_270
+      subscriber: true
+    lidarlite_pub:
+      field_of_view: 0.0
+      frame_id: lidarlite_laser
+      id: 1
+      orientation: PITCH_270
+      send_tf: true
+      sensor_position:
+        x: 0.0
+        y: 0.0
+        z: -0.1
+    sonar_1_sub:
+      horizontal_fov_ratio: 1.0
+      id: 2
+      orientation: PITCH_270
+      subscriber: true
+      vertical_fov_ratio: 1.0
+  fake_gps:
+    eph: 2.0
+    epv: 2.0
+    fix_type: 3
+    geo_origin:
+      alt: 408.0
+      lat: 47.3667
+      lon: 8.55
+    gps_rate: 5.0
+    mocap_transform: true
+    satellites_visible: 5
+    tf:
+      child_frame_id: fix
+      frame_id: map
+      listen: false
+      rate_limit: 10.0
+      send: false
+    use_mocap: true
+    use_vision: false
+  fcu_protocol: v2.0
+  fcu_url: /dev/ttyACM0:57600
+  gcs_url: ''
+  global_position:
+    child_frame_id: base_link
+    frame_id: map
+    gps_uere: 1.0
+    rot_covariance: 99999.0
+    tf:
+      child_frame_id: base_link
+      frame_id: map
+      global_frame_id: earth
+      send: false
+    use_relative_alt: true
+  image:
+    frame_id: px4flow
+  imu:
+    angular_velocity_stdev: 0.0003490659 // 0.02 degrees
+    frame_id: base_link
+    linear_acceleration_stdev: 0.0003
+    magnetic_stdev: 0.0
+    orientation_stdev: 1.0
+  landing_target:
+    camera:
+      fov_x: 2.0071286398
+      fov_y: 2.0071286398
+    image:
+      height: 480
+      width: 640
+    land_target_type: VISION_FIDUCIAL
+    listen_lt: false
+    mav_frame: LOCAL_NED
+    target_size:
+      x: 0.3
+      y: 0.3
+    tf:
+      child_frame_id: camera_center
+      frame_id: landing_target
+      listen: false
+      rate_limit: 10.0
+      send: true
+  local_position:
+    frame_id: map
+    tf:
+      child_frame_id: base_link
+      frame_id: map
+      send: false
+      send_fcu: false
+  mission:
+    pull_after_gcs: true
+    use_mission_item_int: true
+  mocap:
+    use_pose: true
+    use_tf: false
+  mount:
+    debounce_s: 4.0
+    err_threshold_deg: 10.0
+    negate_measured_pitch: false
+    negate_measured_roll: false
+    negate_measured_yaw: false
+  odometry:
+    fcu:
+      map_id_des: map
+      odom_child_id_des: base_link
+      odom_parent_id_des: odom
+  plugin_blacklist:
+  - safety_area
+  - image_pub
+  - vibration
+  - distance_sensor
+  - rangefinder
+  - wheel_odometry
+  plugin_whitelist: []
+  px4flow:
+    frame_id: px4flow
+    ranger_fov: 0.118682
+    ranger_max_range: 5.0
+    ranger_min_range: 0.3
+  safety_area:
+    p1:
+      x: 1.0
+      y: 1.0
+      z: 1.0
+    p2:
+      x: -1.0
+      y: -1.0
+      z: -1.0
+  setpoint_accel:
+    send_force: false
+  setpoint_attitude:
+    reverse_thrust: false
+    tf:
+      child_frame_id: target_attitude
+      frame_id: map
+      listen: false
+      rate_limit: 50.0
+    use_quaternion: false
+  setpoint_position:
+    mav_frame: LOCAL_NED
+    tf:
+      child_frame_id: target_position
+      frame_id: map
+      listen: false
+      rate_limit: 50.0
+  setpoint_raw:
+    thrust_scaling: 1.0
+  setpoint_velocity:
+    mav_frame: LOCAL_NED
+  startup_px4_usb_quirk: false
+  sys:
+    disable_diag: false
+    min_voltage: 10.0
+  target_component_id: 1
+  target_system_id: 1
+  tdr_radio:
+    low_rssi: 40
+  time:
+    time_ref_source: fcu
+    timesync_avg_alpha: 0.6
+    timesync_mode: MAVLINK
+  vibration:
+    frame_id: base_link
+  vision_pose:
+    tf:
+      child_frame_id: vision_estimate
+      frame_id: odom
+      listen: false
+      rate_limit: 10.0
+  vision_speed:
+    listen_twist: true
+    twist_cov: true
+  wheel_odometry:
+    child_frame_id: base_link
+    count: 2
+    frame_id: odom
+    send_raw: true
+    send_twist: false
+    tf:
+      child_frame_id: base_link
+      frame_id: odom
+      send: false
+    use_rpm: false
+    vel_error: 0.1
+    wheel0:
+      radius: 0.05
+      x: 0.0
+      y: -0.15
+    wheel1:
+      radius: 0.05
+      x: 0.0
+      y: 0.15
+max_iteration: 3
+multi_topic: 0
+multipointplan:
+  arrival_stable_sec: 0.5
+  back_plan: 1
+  enable_rc: true
+  gimbal_retry_sec: 6.0
+  land_command_retry_sec: 1.0
+  mission_csv_path: /tmp/a8mini_mission_timestamps.csv
+  position_tolerance: 0.7
+  start_plan: 1
+  velocity_tolerance: 0.2
+  yaml_path: /home/q/Documents/diff-planner-A8mini/src/user_command/multipoint/config/points.yaml
+output_data_type: 0
+pcd_save:
+  interval: -1
+  pcd_save_en: false
+point_filter_num: 3
+preprocess:
+  blind: 1
+  lidar_type: 1
+  scan_line: 4
+  time_scale: 1e-9
+publish:
+  dense_publish_en: false
+  path_publish_en: true
+  scan_bodyframe_pub_en: true
+  scan_publish_en: true
+publish_freq: 10.0
+px4ctrl:
+  auto_takeoff_land:
+    enable: true
+    enable_auto_arm: true
+    no_RC: false
+    takeoff_height: 1.0
+    takeoff_land_speed: 0.2
+  ctrl_freq_max: 200.0
+  gain:
+    KAngP: 20.0
+    KAngR: 20.0
+    KAngY: 4.0
+    Kp0: 1.5
+    Kp1: 1.5
+    Kp2: 1.5
+    Kv0: 2.0
+    Kv1: 2.0
+    Kv2: 2.0
+    Kvd0: 0.0
+    Kvd1: 0.0
+    Kvd2: 0.0
+    Kvi0: 0.0
+    Kvi1: 0.0
+    Kvi2: 0.0
+  gra: 9.81
+  low_voltage: 21.0
+  mass: 1.694
+  max_angle: 80
+  max_manual_vel: 1.0
+  msg_timeout:
+    bat: 0.5
+    cmd: 0.5
+    imu: 0.5
+    odom: 0.5
+    rc: 0.5
+  pose_solver: 0
+  rc_reverse:
+    pitch: false
+    roll: false
+    throttle: true
+    yaw: false
+  rotor_drag:
+    k_thrust_horz: 0.0
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  thrust_model:
+    K1: 0.7583
+    K2: 1.6942
+    K3: 0.6786
+    accurate_thrust_model: false
+    hover_percentage: 0.42
+    noisy_imu: false
+    print_value: false
+rosdistro: 'noetic
+
+  '
+roslaunch:
+  uris:
+    host_ubuntu__32959: http://ubuntu:32959/
+    host_ubuntu__36141: http://ubuntu:36141/
+    host_ubuntu__37207: http://ubuntu:37207/
+    host_ubuntu__41703: http://ubuntu:41703/
+    host_ubuntu__42141: http://ubuntu:42141/
+    host_ubuntu__43559: http://ubuntu:43559/
+    host_ubuntu__45351: http://ubuntu:45351/
+rosversion: '1.17.4
+
+  '
+run_id: 66ca0c6e-930f-11f1-9884-4cbb47b0fa1c
+runtime_pos_log_enable: false
+user_config_path: /home/q/Documents/diff-planner-A8mini/src/livox_ros_driver2/config/MID360s_config.json
+xfer_format: 1

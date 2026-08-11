@@ -1,0 +1,11 @@
+Type: quadrotor_msgs/TakeoffLand
+
+Publishers: 
+ * /multipointplan (http://ubuntu:37425/)
+
+Subscribers: 
+ * /record_1786181770513636869 (http://ubuntu:41847/)
+ * /drone_0_traj_server (http://ubuntu:38103/)
+ * /px4ctrl (http://ubuntu:46415/)
+
+
