@@ -14,6 +14,7 @@ from std_msgs.msg import Float64MultiArray, UInt32
 
 
 SIYI_HEADER = b"\x55\x66"
+CMD_GIMBAL_ROTATION = 0x07
 CMD_GIMBAL_MODE = 0x0C
 CMD_REQUEST_ATTITUDE = 0x0D
 CMD_SET_ATTITUDE = 0x0E
@@ -22,6 +23,11 @@ GIMBAL_MODE_ANGLE = 0
 GIMBAL_MODE_RANGE = 1
 A8MINI_YAW_MIN_DEG = -135.0
 A8MINI_YAW_MAX_DEG = 135.0
+GIMBAL_SPEED_MIN = 1
+GIMBAL_SPEED_MAX = 100
+GIMBAL_TARGET_TOLERANCE_DEG = 1.0
+GIMBAL_ATTITUDE_POLL_SEC = 0.05
+GIMBAL_MOVE_TIMEOUT_SEC = 180.0
 
 
 class SiyiProtocolError(RuntimeError):
@@ -151,6 +157,19 @@ class SiyiUdpClient:
         # 0x0C mode commands intentionally have no ACK in the SIYI protocol.
         self.send_command(CMD_GIMBAL_MODE, bytes((LOCK_MODE,)), expect_ack=False)
 
+    def set_rotation_speed(self, yaw_speed, pitch_speed):
+        if not -GIMBAL_SPEED_MAX <= yaw_speed <= GIMBAL_SPEED_MAX:
+            raise ValueError("yaw_speed must be in the range -100..100")
+        if not -GIMBAL_SPEED_MAX <= pitch_speed <= GIMBAL_SPEED_MAX:
+            raise ValueError("pitch_speed must be in the range -100..100")
+
+        payload = struct.pack("<bb", yaw_speed, pitch_speed)
+        response = self.send_command(CMD_GIMBAL_ROTATION, payload, expect_ack=True)
+        if len(response) < 1:
+            raise SiyiProtocolError("set-rotation-speed ACK payload is too short")
+        if response[0] != 1:
+            raise SiyiProtocolError("gimbal rejected the rotation-speed command")
+
     def set_attitude(self, yaw_deg, pitch_deg):
         payload = struct.pack(
             "<hh", int(round(yaw_deg * 10.0)), int(round(pitch_deg * 10.0))
@@ -175,19 +194,19 @@ class A8MiniGimbalNode:
         self.camera_port = int(rospy.get_param("~camera_port", 37260))
         self.command_timeout_sec = float(rospy.get_param("~command_timeout_sec", 0.6))
         self.command_retries = int(rospy.get_param("~command_retries", 3))
-        self.move_wait_sec = float(rospy.get_param("~move_wait_sec", 2.0))
-        self.range_move_wait_sec = float(rospy.get_param("~range_move_wait_sec", 4.0))
+        raw_rotation_speed = float(rospy.get_param("~gimbal_rotation_speed", 30))
         self.max_settle_sec = float(rospy.get_param("~max_settle_sec", 60.0))
         self.dry_run = bool(rospy.get_param("~dry_run", False))
 
         if self.command_timeout_sec <= 0.0 or self.command_retries <= 0:
             raise ValueError("command timeout and retry count must be positive")
-        if (
-            self.move_wait_sec < 0.0
-            or self.range_move_wait_sec < 0.0
-            or self.max_settle_sec < 0.0
-        ):
-            raise ValueError("gimbal timing parameters cannot be negative")
+        if not math.isfinite(raw_rotation_speed) or not raw_rotation_speed.is_integer():
+            raise ValueError("gimbal_rotation_speed must be an integer")
+        self.rotation_speed = int(raw_rotation_speed)
+        if not GIMBAL_SPEED_MIN <= self.rotation_speed <= GIMBAL_SPEED_MAX:
+            raise ValueError("gimbal_rotation_speed must be in the range 1..100")
+        if self.max_settle_sec < 0.0:
+            raise ValueError("max_settle_sec cannot be negative")
         if not 1 <= self.camera_port <= 65535:
             raise ValueError("camera_port must be in the range 1..65535")
 
@@ -220,9 +239,10 @@ class A8MiniGimbalNode:
             rospy.logwarn("A8 mini gimbal node is using the dry-run backend")
         else:
             rospy.loginfo(
-                "A8 mini Ethernet SDK target is udp://%s:%d",
+                "A8 mini Ethernet SDK target is udp://%s:%d, rotation speed %d",
                 self.camera_ip,
                 self.camera_port,
+                self.rotation_speed,
             )
 
     @staticmethod
@@ -335,7 +355,6 @@ class A8MiniGimbalNode:
                         settle_sec,
                     )
                     current_angles = self.set_gimbal_angle(yaw_deg, pitch_deg)
-                    rospy.sleep(self.move_wait_sec)
 
                 if current_angles is not None:
                     rospy.loginfo(
@@ -371,13 +390,83 @@ class A8MiniGimbalNode:
     def set_gimbal_angle(self, yaw_deg, pitch_deg):
         if self.dry_run:
             rospy.loginfo(
-                "Dry run: lock mode, yaw %.1f, pitch %.1f", yaw_deg, pitch_deg
+                "Dry run: lock mode, yaw %.1f, pitch %.1f, rotation speed %d",
+                yaw_deg,
+                pitch_deg,
+                self.rotation_speed,
             )
             return None
 
         self.client.set_lock_mode()
         # Leave a short gap because the lock-mode command has no protocol ACK.
         time.sleep(0.05)
+        current_yaw, current_pitch, _ = self.client.request_attitude()
+        yaw_error = yaw_deg - current_yaw
+        pitch_error = pitch_deg - current_pitch
+        yaw_reached = abs(yaw_error) <= GIMBAL_TARGET_TOLERANCE_DEG
+        pitch_reached = abs(pitch_error) <= GIMBAL_TARGET_TOLERANCE_DEG
+        deadline = time.monotonic() + GIMBAL_MOVE_TIMEOUT_SEC
+
+        rospy.loginfo(
+            "Moving gimbal from yaw %.1f, pitch %.1f to yaw %.1f, pitch %.1f "
+            "at speed %d",
+            current_yaw,
+            current_pitch,
+            yaw_deg,
+            pitch_deg,
+            self.rotation_speed,
+        )
+
+        try:
+            while not (yaw_reached and pitch_reached):
+                if rospy.is_shutdown():
+                    raise rospy.ROSInterruptException("ROS shutdown during gimbal move")
+                if time.monotonic() >= deadline:
+                    raise SiyiProtocolError(
+                        "gimbal did not reach target within {:.0f} seconds".format(
+                            GIMBAL_MOVE_TIMEOUT_SEC
+                        )
+                    )
+
+                yaw_speed = 0
+                if not yaw_reached:
+                    yaw_speed = (
+                        self.rotation_speed if yaw_error > 0.0 else -self.rotation_speed
+                    )
+                pitch_speed = 0
+                if not pitch_reached:
+                    pitch_speed = (
+                        self.rotation_speed if pitch_error > 0.0 else -self.rotation_speed
+                    )
+                self.client.set_rotation_speed(yaw_speed, pitch_speed)
+
+                previous_yaw_error = yaw_error
+                previous_pitch_error = pitch_error
+                time.sleep(GIMBAL_ATTITUDE_POLL_SEC)
+                current_yaw, current_pitch, _ = self.client.request_attitude()
+                yaw_error = yaw_deg - current_yaw
+                pitch_error = pitch_deg - current_pitch
+
+                if not yaw_reached:
+                    yaw_reached = (
+                        abs(yaw_error) <= GIMBAL_TARGET_TOLERANCE_DEG
+                        or yaw_error * previous_yaw_error <= 0.0
+                    )
+                if not pitch_reached:
+                    pitch_reached = (
+                        abs(pitch_error) <= GIMBAL_TARGET_TOLERANCE_DEG
+                        or pitch_error * previous_pitch_error <= 0.0
+                    )
+        except BaseException:
+            try:
+                self.client.set_rotation_speed(0, 0)
+            except (OSError, SiyiProtocolError) as error:
+                rospy.logerr("Failed to stop gimbal after motion error: %s", error)
+            raise
+
+        self.client.set_rotation_speed(0, 0)
+        # Speed control has no target-angle field. Finish with an absolute-angle
+        # command to remove the small polling/stop overshoot.
         return self.client.set_attitude(yaw_deg, pitch_deg)
 
     def sweep_gimbal_range(self, pitch_deg, yaw_min_deg, yaw_max_deg):
@@ -390,7 +479,6 @@ class A8MiniGimbalNode:
                 yaw_deg,
                 pitch_deg,
             )
-            rospy.sleep(self.range_move_wait_sec)
         return current_angles
 
     def publish_done(self, waypoint_id):

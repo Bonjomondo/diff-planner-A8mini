@@ -37,6 +37,8 @@
   - ROS 参数、节点列表和话题列表。
 - 新增 `land_command_retry_sec` launch/ROS 参数，默认值为 `1.0 s`。
 - 新增 RC 通道 8 原始 PWM、识别位置、前一位置、初始化状态和降落锁存状态日志。
+- 新增全局 `gimbal_rotation_speed` 参数，默认值为 `30`，有效范围为 `1~100`。
+  yaw、pitch 以及 angle、range 动作统一使用该转速。
 
 ### Changed
 
@@ -44,6 +46,8 @@
   这是安全行为，用于防止落地后再次误触发起飞。
 - `flight_logs/` 已加入 `.gitignore`，避免飞行日志和 rosbag 进入版本控制。
 - 更新 A8 mini 使用说明，补充调试启动、日志文件及降落重试行为。
+- 云台节点改用 SIYI `0x07` 转速命令和 `0x0D` 姿态反馈移动到目标角度，
+  移除 `gimbal_move_wait_sec`、`gimbal_range_move_wait_sec` 两个固定等待参数。
 
 ### Active default mission
 

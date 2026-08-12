@@ -82,14 +82,15 @@ roslaunch multipoint multipointplan_exp_lio.launch \
 指定角度模式下，Python 节点依次发送：
 
 1. `0x0C / 03`：云台锁定模式；
-2. `0x0E`：绝对 yaw、pitch（0.1° 精度）；
-3. 等待 `move_wait_sec`（默认 2 秒）；
-4. 保持 `settle_sec`；
-5. 发布 `/mission/gimbal_done`。
+2. `0x0D`：读取当前 yaw、pitch；
+3. `0x07`：按全局 `gimbal_rotation_speed` 控制 yaw、pitch 转速，并持续读取姿态；
+4. 到达目标后发送 `0x07 / [0, 0]` 停转，再用 `0x0E` 校准最终绝对角度；
+5. 保持 `settle_sec`，然后发布 `/mission/gimbal_done`。
 
 范围模式下会依次向配置的 min/max 发送绝对角度命令，两端使用同一个
-`gimbal_pitch_deg`，每段默认预留 4 秒转动时间。范围必须满足
-`-135 <= min < max <= 135`。
+`gimbal_pitch_deg`，所有轴和所有动作共用同一个转速参数。范围必须满足
+`-135 <= min < max <= 135`。`gimbal_rotation_speed` 的有效范围是 `1~100`，
+默认 `30`；这是 SIYI 协议的相对速度档位，不是角速度单位，数值越大转得越快。
 
 飞行节点只接受当前航点相同编号的完成消息。在等待期间不会发布下一个 `/goal`；若完成消息丢失，会重发云台任务。Python 节点会对已完成编号去重并重新回复。
 

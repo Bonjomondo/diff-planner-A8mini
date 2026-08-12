@@ -33,7 +33,7 @@ A8 mini 上电，根据相机内部配置自动开始录像
     ↓
 Python 节点通过网口设置锁定模式和绝对云台角度
     ↓
-等待云台转动时间，再按 gimbal_settle_sec 保持目标方向
+按全局转速转到目标角度，再按 gimbal_settle_sec 保持目标方向
     ↓
 发布 /mission/gimbal_done
     ↓
@@ -108,7 +108,9 @@ src/user_command/multipoint/scripts/a8mini_gimbal_node.py
 - SIYI 帧头、控制字节、小端数据长度、序列号、命令字和 CRC16-CCITT 打包/解包；
 - 通过 `192.168.144.25:37260/UDP` 访问 A8 mini；
 - 使用 `0x0C / 03` 把云台切到锁定模式；
-- 使用 `0x0E` 发送绝对 yaw/pitch，角度单位是 `0.1°`；
+- 使用 `0x07` 统一控制 yaw/pitch 转速，范围是 `1~100`；
+- 使用 `0x0D` 读取实时姿态，到达目标后发送零速停转；
+- 使用 `0x0E` 校准最终绝对 yaw/pitch，角度单位是 `0.1°`；
 - 支持指定角度和可配置起止角度的水平范围扫描两种动作；
 - 校验 A8 mini 返回帧的长度、CRC 和命令字；
 - UDP 超时重试，默认超时 `0.6 s`，重试 3 次；
@@ -183,7 +185,7 @@ waypoints:
 | `gimbal_yaw_min_deg` | `range` 模式起始角度，默认 `-135°` |
 | `gimbal_yaw_max_deg` | `range` 模式结束角度，默认 `+135°` |
 | `gimbal_pitch_deg` | 云台俯仰目标角度，向下为负 |
-| `gimbal_settle_sec` | 云台转动等待结束后，继续保持该方向的时间 |
+| `gimbal_settle_sec` | 云台到达目标角度后，继续保持该方向的时间 |
 
 `gimbal_settle_sec` 当前限制为 `0 ~ 60 s`。
 范围字段必须满足 `-135 <= gimbal_yaw_min_deg < gimbal_yaw_max_deg <= 135`。
@@ -528,14 +530,17 @@ LIO/VIO 实机 launch 支持下列参数：
 | `start_gimbal_node` | `true` | 是否同时启动 Python 云台节点 |
 | `camera_ip` | `192.168.144.25` | A8 mini IP |
 | `camera_port` | `37260` | A8 mini UDP 控制端口 |
-| `gimbal_move_wait_sec` | `2.0` | 发送角度后的固定转动等待时间 |
-| `gimbal_range_move_wait_sec` | `4.0` | 范围扫描到每个端点预留的转动时间 |
+| `gimbal_rotation_speed` | `30` | 所有 yaw/pitch、angle/range 动作共用的 SIYI 转速档位，范围 `1~100` |
 
-例如，同时修改 IP、到点距离和 CSV 位置：
+`gimbal_rotation_speed` 不是角度/秒；它是 SIYI `0x07` 命令定义的相对速度值，
+数值越大转得越快。节点通过 `0x0D` 姿态反馈判断到达，不再使用固定转动等待时间。
+
+例如，同时修改 IP、云台转速、到点距离和 CSV 位置：
 
 ```bash
 roslaunch multipoint multipointplan_exp_lio.launch \
   camera_ip:=192.168.144.26 \
+  gimbal_rotation_speed:=40 \
   next_distance:=0.5 \
   mission_csv_path:=/tmp/grape_mission_01.csv
 ```
@@ -625,10 +630,11 @@ rostopic echo /goal
 如果日志出现：
 
 ```text
-SIYI command 0x0E timed out
+SIYI command 0x07 timed out
 ```
 
-说明 Python 节点没有收到有效 UDP ACK。应检查 IP、UDP 端口、防火墙、网线、A8 mini 上电状态和协议版本。
+说明 Python 节点没有收到有效 UDP ACK。`0x0D` 或 `0x0E` 超时也表示同类问题。
+应检查 IP、UDP 端口、防火墙、网线、A8 mini 上电状态和协议版本。
 
 此时 `multipointplan` 会留在 `WAITING_GIMBAL`，继续保持当前 `/goal`，并按默认 `6 s` 周期重新发布云台任务。它不会因为云台通信失败而自动飞向下一个航点。
 

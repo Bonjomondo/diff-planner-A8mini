@@ -11,6 +11,7 @@
     <arg name="enable_rc" default="false" />
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps_sim.csv" />
     <arg name="start_gimbal_node" default="true" />
+    <arg name="gimbal_rotation_speed" default="30" />
 
     <node pkg="multipoint" name="multipointplan" type="multipointplan" output="screen">
         <remap from="odom_topic" to="$(arg odom_topic)" />
@@ -28,8 +29,7 @@
 
     <group if="$(arg start_gimbal_node)">
         <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen">
-            <param name="move_wait_sec" value="2.0" />
-            <param name="range_move_wait_sec" value="4.0" />
+            <param name="gimbal_rotation_speed" value="$(arg gimbal_rotation_speed)" />
             <param name="dry_run" value="true" />
         </node>
     </group>
