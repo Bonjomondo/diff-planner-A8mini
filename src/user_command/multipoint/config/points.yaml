@@ -30,8 +30,8 @@
 #     gimbal_settle_sec: 1.0
 
 #   - id: 2
-#     x: 4.0
-#     y: 1.0
+#     x: 5.0
+#     y: 0.0
 #     z: 1.0
 #     hover_sec: 2.0
 #     gimbal_mode: angle
@@ -49,29 +49,29 @@ waypoints:
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
     gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: 0.0
+    gimbal_pitch_deg: -30.0
     gimbal_settle_sec: 2.0
 
   - id: 2
-    x: 4.0
-    y: 1.5
+    x: 7.0
+    y: 0.0
     z: 1.0
     hover_sec: 2.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
     gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: 0.0
+    gimbal_pitch_deg: -30.0
     gimbal_settle_sec: 2.0
 
   - id: 3
-    x: 3.5
-    y: -1.0
+    x: 10.0
+    y: 0.0
     z: 1.0
     hover_sec: 2.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
     gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: 0.0
+    gimbal_pitch_deg: -30.0
     gimbal_settle_sec: 2.0
 # 可选返航路线，收到返航触发后按列表顺序执行：
 # - 每个元素的格式为 [x, y, z]，单位为米，坐标系与 waypoints 相同。

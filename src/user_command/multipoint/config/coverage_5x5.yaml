@@ -7,7 +7,7 @@ waypoints:
   - id: 1
     x: 0.0
     y: 0.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -18,7 +18,7 @@ waypoints:
   - id: 2
     x: 2.5
     y: 0.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -29,7 +29,7 @@ waypoints:
   - id: 3
     x: 5.0
     y: 0.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -40,7 +40,7 @@ waypoints:
   - id: 4
     x: 5.0
     y: 2.5
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -51,7 +51,7 @@ waypoints:
   - id: 5
     x: 2.5
     y: 2.5
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -62,7 +62,7 @@ waypoints:
   - id: 6
     x: 0.0
     y: 2.5
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -73,7 +73,7 @@ waypoints:
   - id: 7
     x: 0.0
     y: 5.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -84,7 +84,7 @@ waypoints:
   - id: 8
     x: 2.5
     y: 5.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
@@ -95,7 +95,7 @@ waypoints:
   - id: 9
     x: 5.0
     y: 5.0
-    z: 1.0
+    z: 1.5
     hover_sec: 1.0
     gimbal_mode: range
     gimbal_yaw_min_deg: -135.0
