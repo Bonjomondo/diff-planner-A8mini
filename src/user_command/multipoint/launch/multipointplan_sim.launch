@@ -11,6 +11,8 @@
     <arg name="enable_rc" default="false" />
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps_sim.csv" />
     <arg name="start_gimbal_node" default="true" />
+    <arg name="enable_auto_recording" default="true" />
+    <arg name="flight_state_topic" default="/mavros/extended_state" />
 
     <node pkg="multipoint" name="multipointplan" type="multipointplan" output="screen">
         <remap from="odom_topic" to="$(arg odom_topic)" />
@@ -30,6 +32,8 @@
         <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen">
             <param name="move_wait_sec" value="2.0" />
             <param name="range_move_wait_sec" value="4.0" />
+            <param name="enable_auto_recording" value="$(arg enable_auto_recording)" />
+            <param name="flight_state_topic" value="$(arg flight_state_topic)" />
             <param name="dry_run" value="true" />
         </node>
     </group>

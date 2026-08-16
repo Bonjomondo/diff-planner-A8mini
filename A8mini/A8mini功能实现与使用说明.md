@@ -19,7 +19,9 @@ Orin NX 机载系统 / ROS1
 ## 2. 最终实现的任务流程
 
 ```text
-A8 mini 上电，根据相机内部配置自动开始录像
+A8 mini 上电，ROS 确认飞机在地面并保持录像关闭
+    ↓
+MAVROS 进入 TAKEOFF / IN_AIR，ROS 查询相机状态并开始录像
     ↓
 触发 multipointplan 航点任务
     ↓
@@ -38,6 +40,8 @@ Python 节点通过网口设置锁定模式和绝对云台角度
 发布 /mission/gimbal_done
     ↓
 multipointplan 校验航点编号，记录 CSV，然后发布下一个 /goal
+    ↓
+MAVROS 进入 LANDING 时继续录像，确认 ON_GROUND 后结束录像
 ```
 
 任务中没有以下逻辑：
@@ -46,9 +50,9 @@ multipointplan 校验航点编号，记录 CSV，然后发布下一个 /goal
 - 拍照完成反馈；
 - 照片写卡等待；
 - `take_photo` 和 `photo_wait_sec` 配置；
-- ROS 开始或停止录像命令。
+- 航点级单独录像文件。
 
-录像由 A8 mini 的“开机自动录像”功能负责，ROS 任务只负责飞航和转动云台。
+录像由 Python 节点根据 `/mavros/extended_state` 自动控制，覆盖完整的起飞、任务、下降和接地过程。相机设置中的“开机自动录像”应关闭。
 
 ## 3. 代码实现内容
 
@@ -108,6 +112,10 @@ src/user_command/multipoint/scripts/a8mini_gimbal_node.py
 - SIYI 帧头、控制字节、小端数据长度、序列号、命令字和 CRC16-CCITT 打包/解包；
 - 通过 `192.168.144.25:37260/UDP` 访问 A8 mini；
 - 使用 `0x0C / 03` 把云台切到锁定模式；
+- 使用 `0x0A` 查询 `record_sta`，使用无 ACK 的 `0x0C / 02` 切换录像并再次查询确认；
+- MAVROS 进入 `TAKEOFF` 或 `IN_AIR` 时开始录像，进入 `ON_GROUND` 时停止录像，`LANDING` 期间保持录像；
+- 对重复飞行状态幂等处理，避免切换式录像命令把状态反转；
+- TF 卡缺失、写卡数据丢失或确认超时时记录明确错误并自动重试；
 - 使用 `0x0E` 发送绝对 yaw/pitch，角度单位是 `0.1°`；
 - 支持指定角度和可配置起止角度的水平范围扫描两种动作；
 - 校验 A8 mini 返回帧的长度、CRC 和命令字；
@@ -132,6 +140,8 @@ pitch:  -90° ~ 25°
 |---|---|---|---|
 | `/mission/gimbal_task` | `std_msgs/Float64MultiArray` | 飞行端 → 云台端 | 发送 `[id, yaw, pitch, settle_sec, mode, yaw_min, yaw_max]`；`0=angle`，`1=range` |
 | `/mission/gimbal_done` | `std_msgs/UInt32` | 云台端 → 飞行端 | 通知当前航点云台任务完成 |
+| `/mavros/extended_state` | `mavros_msgs/ExtendedState` | 飞控 → 云台端 | 提供真实起飞、空中、降落和落地状态 |
+| `/mission/recording_status` | `std_msgs/Bool` | 云台端 → 用户/日志 | 最近一次已确认的录像状态；锁存发布 |
 | `/goal` | `geometry_msgs/PoseStamped` | `multipointplan` → Diff-Planner | 发布当前航点 |
 | `odom_topic` | `nav_msgs/Odometry` | 定位端 → `multipointplan` | 判断位置误差和飞行速度 |
 | `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | 用户 → `multipointplan` | 触发主航点任务 |
@@ -237,11 +247,11 @@ src/user_command/multipoint/launch/multipointplan_sim.launch
 1. 插入 TF 卡；
 2. 在相机中格式化 TF 卡；
 3. 设置录像分辨率；
-4. 开启“开机自动录像”；
+4. 关闭“开机自动录像”，避免上电到 ROS 接管之间产生多余文件；
 5. 检查 TF 卡剩余容量；
-6. 单独上电测试一次，确认确实自动生成了视频。
+6. 单独上电测试一次，确认手动开始和停止录像都能正常生成 MP4 文件。
 
-本 ROS 节点不会开始或停止录像。任务结束后应在相机端正常停止录像，或至少等待数秒再断电；不要在录像中直接拔出 TF 卡。
+SDK 的录像命令 `0x0C / 02` 是“切换”且无 ACK，不是分别定义的开始和停止。节点会用 `0x0A` 的 `record_sta` 做“查询 → 必要时切换 → 再查询确认”，因此重复状态消息不会反转录像。落地后等待日志和 `/mission/recording_status=false`，再关闭相机电源或拔出 TF 卡。
 
 ### 4.2 网络配置
 
@@ -530,6 +540,11 @@ LIO/VIO 实机 launch 支持下列参数：
 | `camera_port` | `37260` | A8 mini UDP 控制端口 |
 | `gimbal_move_wait_sec` | `2.0` | 发送角度后的固定转动等待时间 |
 | `gimbal_range_move_wait_sec` | `4.0` | 范围扫描到每个端点预留的转动时间 |
+| `enable_auto_recording` | `true` | 是否按 MAVROS 飞行状态自动控制录像 |
+| `flight_state_topic` | `/mavros/extended_state` | 起飞和落地判断使用的话题 |
+| `record_verify_timeout_sec` | `3.0` | 发送录像切换后等待状态生效的最长时间 |
+| `record_verify_poll_sec` | `0.2` | 查询 `record_sta` 的间隔 |
+| `record_retry_sec` | `2.0` | 录像控制失败后的重试间隔 |
 
 例如，同时修改 IP、到点距离和 CSV 位置：
 
@@ -586,6 +601,8 @@ rosnode list | grep -E 'multipointplan|a8mini_gimbal'
 ```bash
 rostopic info /mission/gimbal_task
 rostopic info /mission/gimbal_done
+rostopic info /mavros/extended_state
+rostopic echo /mission/recording_status
 ```
 
 检查里程计：
@@ -663,9 +680,22 @@ echo $CMAKE_PREFIX_PATH
 
 打开新终端，先 source `/opt/ros/noetic/setup.zsh`，然后只 source 本工作空间对应的 `devel/setup.zsh` 或 `devel_a8mini/setup.zsh`。
 
+### 11.7 起飞后没有开始录像
+
+先检查真实飞行状态和节点日志：
+
+```bash
+rostopic echo /mavros/extended_state
+rostopic echo /mission/recording_status
+```
+
+进入 `TAKEOFF` 或 `IN_AIR` 后应看到 `/mission/recording_status: true`。如果日志提示 `no TF card`，应断电后重新插入、格式化或更换符合手册要求的存储卡；如果 `0x0A` 超时，按网络故障排查相机 IP、网卡和 UDP 端口。录像失败会自动重试，但不会中止飞机控制或航点任务。
+
+如果日志提示 `recording with TF-card data loss`，相机虽然仍处于录像状态，但文件可能不完整，应停止实飞并检查 TF 卡。用户手册要求先格式化存储卡并把最小存储单元设为 64 KB。
+
 ## 12. 建议的首次实飞步骤
 
-1. 拆除螺旋桨或保证无人机不会解锁，先单独检查 A8 mini 自动录像。
+1. 拆除螺旋桨或保证无人机不会解锁，关闭相机“开机自动录像”，先用仿真的 `ExtendedState` 消息检查自动开始/停止和 `/mission/recording_status`。
 2. 设置机载电脑网卡 IP，确认能 ping 通 A8 mini。
 3. 单独启动 `a8mini_gimbal_node.py`，用小角度任务检查云台方向和 `gimbal_done`。
 4. 运行 `multipointplan_sim.launch`，检查航点、悬停、云台握手和 CSV 流程。
@@ -685,11 +715,13 @@ echo $CMAKE_PREFIX_PATH
 - YAML 配置解析检查；
 - 5 m × 5 m（9 点）和 20 m × 20 m（81 点）蛇形路径间距检查；
 - SIYI 锁定模式和绝对角度官方示例帧字节校验；
+- SIYI `0x0C / 02` 录像官方示例帧字节校验；
+- 录像状态查询、幂等切换、TF 卡缺失保护和落地状态映射单元测试；
 - ROS 状态机联调：航点 1 到达后发布云台任务，收到 `gimbal_done=1` 后正确发布航点 2；
 - CSV 到点和云台完成时间写入检查；
 - Python dry-run 话题联调，正确返回指定航点 ID。
 
-软件流程已打通。在真实飞行前，还需要在实际 A8 mini 上确认 UDP ACK、云台正负方向、机械限位、自动录像和无人机悬停稳定性。
+软件流程已打通。在真实飞行前，还需要在实际 A8 mini 上确认 UDP 状态查询、录像文件落盘、云台正负方向、机械限位和无人机悬停稳定性。
 
 ## 14. 相关手册和协议
 

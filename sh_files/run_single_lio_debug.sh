@@ -69,7 +69,7 @@ cleanup_debug_run() {
         cp "${MISSION_CSV_SOURCE}" "${LOG_DIR}/mission_timestamps.csv" 2>/dev/null || true
     fi
 
-    grep -E "\[startup\]|RC channel (6|8)|TAKEOFF|LAND|AUTO_HOVER|AUTO_LAND|CMD_CTRL|planning stop|traj_server|Lost heartbeat|wait ack timeout|FCU|MAVROS|Loaded waypoint|Published waypoint|Waypoint [0-9]+|mission finished|gimbal|FATAL|ERROR" \
+    grep -E "\[startup\]|RC channel (6|8)|TAKEOFF|LAND|AUTO_HOVER|AUTO_LAND|CMD_CTRL|planning stop|traj_server|Lost heartbeat|wait ack timeout|FCU|MAVROS|Loaded waypoint|Published waypoint|Waypoint [0-9]+|mission finished|gimbal|recording|FATAL|ERROR" \
         "${LOG_DIR}/console.log" > "${LOG_DIR}/key_events.log" 2>/dev/null || true
 
     {
@@ -188,6 +188,7 @@ BAG_TOPICS=(
     /px4ctrl/takeoff_land
     /mission/gimbal_task
     /mission/gimbal_done
+    /mission/recording_status
     /drone_0_planning/trajectory
     /drone_0_traj_server/heartbeat
     /diagnostics

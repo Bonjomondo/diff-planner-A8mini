@@ -10,18 +10,26 @@ import threading
 import time
 
 import rospy
-from std_msgs.msg import Float64MultiArray, UInt32
+from mavros_msgs.msg import ExtendedState
+from std_msgs.msg import Bool, Float64MultiArray, UInt32
 
 
 SIYI_HEADER = b"\x55\x66"
-CMD_GIMBAL_MODE = 0x0C
+CMD_REQUEST_SYSTEM_INFO = 0x0A
+CMD_CAMERA_FUNCTION = 0x0C
+CMD_GIMBAL_MODE = CMD_CAMERA_FUNCTION
 CMD_REQUEST_ATTITUDE = 0x0D
 CMD_SET_ATTITUDE = 0x0E
+CAMERA_FUNCTION_RECORD = 2
 LOCK_MODE = 3
 GIMBAL_MODE_ANGLE = 0
 GIMBAL_MODE_RANGE = 1
 A8MINI_YAW_MIN_DEG = -135.0
 A8MINI_YAW_MAX_DEG = 135.0
+RECORD_STATUS_STOPPED = 0
+RECORD_STATUS_RECORDING = 1
+RECORD_STATUS_NO_TF_CARD = 2
+RECORD_STATUS_DATA_LOSS = 3
 
 
 class SiyiProtocolError(RuntimeError):
@@ -72,6 +80,28 @@ def decode_packet(packet):
     }
 
 
+def recording_desired_for_landed_state(landed_state):
+    """Map MAVROS flight phases to a desired camera recording state."""
+    if landed_state == ExtendedState.LANDED_STATE_ON_GROUND:
+        return False
+    if landed_state in (
+        ExtendedState.LANDED_STATE_TAKEOFF,
+        ExtendedState.LANDED_STATE_IN_AIR,
+        ExtendedState.LANDED_STATE_LANDING,
+    ):
+        return True
+    return None
+
+
+def record_status_name(status):
+    return {
+        RECORD_STATUS_STOPPED: "stopped",
+        RECORD_STATUS_RECORDING: "recording",
+        RECORD_STATUS_NO_TF_CARD: "no TF card",
+        RECORD_STATUS_DATA_LOSS: "recording with TF-card data loss",
+    }.get(status, "unknown ({})".format(status))
+
+
 class SiyiUdpClient:
     def __init__(self, camera_ip, camera_port, timeout_sec, retries):
         self.camera_address = (camera_ip, camera_port)
@@ -80,7 +110,9 @@ class SiyiUdpClient:
         self.sequence = 0
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.settimeout(timeout_sec)
-        self.lock = threading.Lock()
+        # Recording is a toggle command, so its status-query/toggle/verify sequence
+        # must not be interleaved with another command using the same UDP socket.
+        self.lock = threading.RLock()
 
     def close(self):
         self.socket.close()
@@ -168,6 +200,65 @@ class SiyiUdpClient:
         yaw, pitch, roll = struct.unpack_from("<hhh", response, 0)
         return yaw / 10.0, pitch / 10.0, roll / 10.0
 
+    def get_recording_status(self):
+        response = self.send_command(CMD_REQUEST_SYSTEM_INFO, expect_ack=True)
+        if len(response) < 4:
+            raise SiyiProtocolError("camera-system-info response is too short")
+        status = response[3]
+        if status not in (
+            RECORD_STATUS_STOPPED,
+            RECORD_STATUS_RECORDING,
+            RECORD_STATUS_NO_TF_CARD,
+            RECORD_STATUS_DATA_LOSS,
+        ):
+            raise SiyiProtocolError(
+                "camera returned an unknown recording status: {}".format(status)
+            )
+        return status
+
+    @staticmethod
+    def _recording_status_matches(status, enabled):
+        if enabled:
+            return status in (RECORD_STATUS_RECORDING, RECORD_STATUS_DATA_LOSS)
+        return status in (RECORD_STATUS_STOPPED, RECORD_STATUS_NO_TF_CARD)
+
+    def set_recording(self, enabled, verify_timeout_sec, verify_poll_sec):
+        """Idempotently apply a recording state despite SIYI's toggle-only command."""
+        with self.lock:
+            status = self.get_recording_status()
+            if self._recording_status_matches(status, enabled):
+                return status
+            if enabled and status == RECORD_STATUS_NO_TF_CARD:
+                raise SiyiProtocolError("cannot start recording: no TF card is detected")
+
+            # SDK V0.1.1 defines 0x0C/02 as a toggle and explicitly defines no ACK.
+            self.send_command(
+                CMD_CAMERA_FUNCTION,
+                bytes((CAMERA_FUNCTION_RECORD,)),
+                expect_ack=False,
+            )
+
+            deadline = time.monotonic() + verify_timeout_sec
+            last_status = status
+            while time.monotonic() < deadline:
+                if verify_poll_sec > 0.0:
+                    time.sleep(verify_poll_sec)
+                last_status = self.get_recording_status()
+                if self._recording_status_matches(last_status, enabled):
+                    return last_status
+                if enabled and last_status == RECORD_STATUS_NO_TF_CARD:
+                    raise SiyiProtocolError(
+                        "cannot start recording: TF card was removed or is unavailable"
+                    )
+
+            raise SiyiProtocolError(
+                "recording did not become {} within {:.1f} s; last status: {}".format(
+                    "active" if enabled else "stopped",
+                    verify_timeout_sec,
+                    record_status_name(last_status),
+                )
+            )
+
 
 class A8MiniGimbalNode:
     def __init__(self):
@@ -179,6 +270,19 @@ class A8MiniGimbalNode:
         self.range_move_wait_sec = float(rospy.get_param("~range_move_wait_sec", 4.0))
         self.max_settle_sec = float(rospy.get_param("~max_settle_sec", 60.0))
         self.dry_run = bool(rospy.get_param("~dry_run", False))
+        self.enable_auto_recording = bool(
+            rospy.get_param("~enable_auto_recording", True)
+        )
+        self.flight_state_topic = rospy.get_param(
+            "~flight_state_topic", "/mavros/extended_state"
+        )
+        self.record_verify_timeout_sec = float(
+            rospy.get_param("~record_verify_timeout_sec", 3.0)
+        )
+        self.record_verify_poll_sec = float(
+            rospy.get_param("~record_verify_poll_sec", 0.2)
+        )
+        self.record_retry_sec = float(rospy.get_param("~record_retry_sec", 2.0))
 
         if self.command_timeout_sec <= 0.0 or self.command_retries <= 0:
             raise ValueError("command timeout and retry count must be positive")
@@ -190,11 +294,23 @@ class A8MiniGimbalNode:
             raise ValueError("gimbal timing parameters cannot be negative")
         if not 1 <= self.camera_port <= 65535:
             raise ValueError("camera_port must be in the range 1..65535")
+        if self.enable_auto_recording:
+            if (
+                self.record_verify_timeout_sec <= 0.0
+                or self.record_verify_poll_sec < 0.0
+                or self.record_retry_sec <= 0.0
+            ):
+                raise ValueError("recording verification and retry timings are invalid")
+            if not self.flight_state_topic:
+                raise ValueError("flight_state_topic cannot be empty")
 
         self.completed_tasks = set()
         self.pending_tasks = set()
         self.task_lock = threading.Lock()
         self.task_queue = queue.Queue()
+        self.recording_condition = threading.Condition()
+        self.recording_desired = None
+        self.recording_applied = None
         self.client = None
         if not self.dry_run:
             self.client = SiyiUdpClient(
@@ -205,6 +321,9 @@ class A8MiniGimbalNode:
             )
 
         self.done_pub = rospy.Publisher("/mission/gimbal_done", UInt32, queue_size=10)
+        self.recording_status_pub = rospy.Publisher(
+            "/mission/recording_status", Bool, queue_size=1, latch=True
+        )
         self.task_sub = rospy.Subscriber(
             "/mission/gimbal_task",
             Float64MultiArray,
@@ -214,6 +333,21 @@ class A8MiniGimbalNode:
         self.worker = threading.Thread(target=self._worker_loop, name="a8mini-gimbal-worker")
         self.worker.daemon = True
         self.worker.start()
+        self.recording_worker = None
+        self.flight_state_sub = None
+        if self.enable_auto_recording:
+            self.recording_worker = threading.Thread(
+                target=self._recording_worker_loop,
+                name="a8mini-recording-worker",
+            )
+            self.recording_worker.daemon = True
+            self.recording_worker.start()
+            self.flight_state_sub = rospy.Subscriber(
+                self.flight_state_topic,
+                ExtendedState,
+                self.flight_state_callback,
+                queue_size=10,
+            )
         rospy.on_shutdown(self.shutdown)
 
         if self.dry_run:
@@ -224,6 +358,13 @@ class A8MiniGimbalNode:
                 self.camera_ip,
                 self.camera_port,
             )
+        if self.enable_auto_recording:
+            rospy.loginfo(
+                "A8 mini automatic recording follows flight state on %s",
+                self.flight_state_topic,
+            )
+        else:
+            rospy.logwarn("A8 mini automatic recording is disabled")
 
     @staticmethod
     def _parse_task(msg):
@@ -293,6 +434,78 @@ class A8MiniGimbalNode:
                 return
             self.pending_tasks.add(waypoint_id)
         self.task_queue.put(task)
+
+    def flight_state_callback(self, msg):
+        desired = recording_desired_for_landed_state(msg.landed_state)
+        if desired is None:
+            return
+
+        with self.recording_condition:
+            if desired == self.recording_desired:
+                return
+            self.recording_desired = desired
+            self.recording_condition.notify_all()
+
+        rospy.loginfo(
+            "MAVROS landed_state=%d requests A8 mini recording %s",
+            msg.landed_state,
+            "start" if desired else "stop",
+        )
+
+    def _recording_worker_loop(self):
+        while not rospy.is_shutdown():
+            with self.recording_condition:
+                while (
+                    not rospy.is_shutdown()
+                    and (
+                        self.recording_desired is None
+                        or self.recording_desired == self.recording_applied
+                    )
+                ):
+                    self.recording_condition.wait(timeout=0.2)
+                if rospy.is_shutdown():
+                    return
+                desired = self.recording_desired
+
+            try:
+                if self.dry_run:
+                    status = (
+                        RECORD_STATUS_RECORDING if desired else RECORD_STATUS_STOPPED
+                    )
+                    rospy.loginfo(
+                        "Dry run: A8 mini recording %s",
+                        "started" if desired else "stopped",
+                    )
+                else:
+                    status = self.client.set_recording(
+                        desired,
+                        self.record_verify_timeout_sec,
+                        self.record_verify_poll_sec,
+                    )
+                    rospy.loginfo(
+                        "A8 mini recording is %s (camera status: %s)",
+                        "active" if desired else "stopped",
+                        record_status_name(status),
+                    )
+                    if status == RECORD_STATUS_DATA_LOSS:
+                        rospy.logerr(
+                            "A8 mini reports TF-card data loss while recording; "
+                            "inspect or replace the card before flight"
+                        )
+
+                with self.recording_condition:
+                    self.recording_applied = desired
+                self.recording_status_pub.publish(Bool(data=desired))
+            except (OSError, SiyiProtocolError) as error:
+                rospy.logerr(
+                    "Failed to %s A8 mini recording: %s; retrying in %.1f s",
+                    "start" if desired else "stop",
+                    error,
+                    self.record_retry_sec,
+                )
+                with self.recording_condition:
+                    if not rospy.is_shutdown():
+                        self.recording_condition.wait(timeout=self.record_retry_sec)
 
     def _worker_loop(self):
         while not rospy.is_shutdown():
@@ -397,6 +610,8 @@ class A8MiniGimbalNode:
         self.done_pub.publish(UInt32(data=waypoint_id))
 
     def shutdown(self):
+        with self.recording_condition:
+            self.recording_condition.notify_all()
         if self.client is not None:
             self.client.close()
 

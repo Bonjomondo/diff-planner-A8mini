@@ -27,7 +27,7 @@ roslaunch multipoint multipointplan_exp_lio.launch camera_ip:=192.168.144.26
 
 ## 相机准备
 
-在 UniGCS 或思翼调参助手中提前插入并格式化 TF 卡、配置录像分辨率，并开启“开机自动录制”。ROS 节点不会发送拍照、开始录像或停止录像命令。
+在 UniGCS 或思翼调参助手中提前插入并格式化 TF 卡、配置录像分辨率，并关闭“开机自动录制”。ROS 节点根据 MAVROS 的真实飞行状态控制录像：进入 `TAKEOFF` 或 `IN_AIR` 后开始录像，确认 `ON_GROUND` 后停止；`LANDING` 期间保持录像，确保下降和接地过程也被保存。
 
 ## 构建与运行
 
@@ -67,6 +67,15 @@ roslaunch multipoint multipointplan_exp_lio.launch \
 ```
 
 ## 运行逻辑
+
+Python 节点订阅 `/mavros/extended_state`。由于 SDK 的 `0x0C / 02` 是录像状态切换而不是独立的开始/停止命令，节点会先用 `0x0A` 查询 `record_sta`，仅在当前状态与目标状态不一致时发送切换命令，再轮询确认结果。重复的飞行状态不会把录像误切回去；相机缺少 TF 卡或状态确认失败时会打印错误并按 `record_retry_sec` 重试，但不会阻塞飞控回调。
+
+录像成功切换后会发布锁存话题：
+
+```text
+/mission/recording_status  std_msgs/Bool
+true = 正在录像，false = 已停止
+```
 
 `multipointplan` 同时满足位置误差和速度阈值并持续稳定 `arrival_stable_sec` 后，进入航点悬停。`hover_sec` 到时发布：
 
@@ -113,6 +122,18 @@ waypoint_id,arrived_time,gimbal_done_time,yaw,pitch,gimbal_mode,yaw_min,yaw_max
 roslaunch multipoint multipointplan_sim.launch
 ```
 
+可在仿真中检查录像状态映射：
+
+```bash
+rostopic echo /mission/recording_status
+rostopic pub -1 /mavros/extended_state mavros_msgs/ExtendedState \
+  "landed_state: 3"   # TAKEOFF，应输出 true
+rostopic pub -1 /mavros/extended_state mavros_msgs/ExtendedState \
+  "landed_state: 4"   # LANDING，保持 true
+rostopic pub -1 /mavros/extended_state mavros_msgs/ExtendedState \
+  "landed_state: 1"   # ON_GROUND，应输出 false
+```
+
 实机网络单独测试可以只启动 Python 节点并发布一个任务：
 
 ```bash
@@ -149,7 +170,7 @@ source devel/setup.zsh
 - `console.log`：全部启动命令和 ROS 节点控制台输出；
 - `ros/`：由 `ROS_LOG_DIR` 收集的各 ROS 节点日志；
 - `flight_debug.bag`：RC 输入、规划停止/降落命令、PX4 状态、里程计、控制指令、
-  航点、轨迹和云台握手等关键话题；
+  航点、轨迹、云台握手和录像状态等关键话题；
 - `key_events.log`：从控制台日志自动提取的拨杆、航点、云台和降落事件；
 - `points.yaml.snapshot`、launch 和启动脚本快照；
 - ROS 参数、节点列表、话题列表和 Git 版本信息。
@@ -171,5 +192,7 @@ rosbag info flight_logs/YYYYMMDD_HHMMSS/flight_debug.bag
 会停止继续重发 LAND，`px4ctrl` 稳定转入 RC 悬停控制，此后可用油门杆下降并按
 正常手动流程落地、停桨。无论选择哪种方式，轨迹位置指令都会保持停止。为避免
 落地后误触发再次起飞，降落锁存在节点重启前不会解除。
+
+录像停止依据实际的 `ON_GROUND`，不依据 LAND 指令，因此自动或手动降落时都会保留完整下降过程。若 `/mavros/extended_state` 中断，节点会维持最后一次确认的录像目标，不会盲目发送切换命令。可用 `enable_auto_recording:=false` 临时关闭此功能。
 
 协议帧格式、命令编号、CRC 和默认控制端口来自[思翼云台相机外部 SDK 协议 V0.1.1](https://siyi.biz/siyi_file/A8%20mini/SIYI_Gimbal_Camera_External_SDK_Protocol_Update_Log%20V0.1.1.pdf)。

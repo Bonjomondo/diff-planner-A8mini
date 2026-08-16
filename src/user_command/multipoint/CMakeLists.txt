@@ -27,6 +27,10 @@ include_directories(
 add_executable(multipointplan src/multipointplan.cpp)
 target_link_libraries(multipointplan yaml-cpp ${catkin_LIBRARIES})
 
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test/test_a8mini_gimbal_node.py)
+endif()
+
 catkin_install_python(
   PROGRAMS scripts/a8mini_gimbal_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
