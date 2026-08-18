@@ -1,107 +1,124 @@
 # 5 m × 5 m 蛇形覆盖任务。覆盖范围：x=0~5.0 m，y=0~5.0 m。
-# 相邻航点间距均为 2.5 m；飞行高度为 1.0 m，可按现场条件统一修改 z。
-# 每个航点到达并悬停后，云台保持 pitch=-45°，水平扫描 -135°~+135°。
-# range 模式下 gimbal_yaw_deg 不参与执行；可修改每个点的 gimbal_yaw_min_deg/max_deg。
+# 相邻航点间距均为 2.5 m。
+#
+# ==============================================================================
+# 航点公共变量定义（修改此处可一键同步给所有引用的航点）
+# ==============================================================================
+# 变量说明：
+# - var_z: 飞行高度（米），可按现场环境统一修改。
+# - var_hover_sec: 到达航点后悬停时间（秒）。
+# - var_gimbal_mode: 云台工作模式（'range' 为水平扇扫，'angle' 为定角）。
+# - var_yaw_min / var_yaw_max: range 模式扫描起止角度 [-135, 135]。
+# - var_pitch_deg: 云台俯仰角 [-90, 25]，-45° 为斜向前下方拍摄。
+# - var_settle_sec: 云台运动后等待画面稳定的时间（秒）。
+# ==============================================================================
+var_z: &var_z 1.5
+var_hover_sec: &var_hover_sec 1.0
+var_gimbal_mode: &var_gimbal_mode range
+var_yaw_min: &var_yaw_min -135.0
+var_yaw_max: &var_yaw_max 135.0
+var_pitch_deg: &var_pitch_deg -45.0
+var_settle_sec: &var_settle_sec 1.0
 
 waypoints:
   - id: 1
     x: 0.0
     y: 0.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 2
     x: 2.5
     y: 0.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 3
     x: 5.0
     y: 0.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 4
     x: 5.0
     y: 2.5
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 5
     x: 2.5
     y: 2.5
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 6
     x: 0.0
     y: 2.5
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 7
     x: 0.0
     y: 5.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 8
     x: 2.5
     y: 5.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 9
     x: 5.0
     y: 5.0
-    z: 1.5
-    hover_sec: 1.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -45.0
-    gimbal_settle_sec: 1.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
 # 可选返航路线；返航点不执行云台动作。
 test_back:

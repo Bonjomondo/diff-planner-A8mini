@@ -1,78 +1,62 @@
 # 航点按 waypoints 中的排列顺序依次执行。
 #
-# 每个航点的公共必填字段：
-# - id：航点编号；必须是大于 0 且互不重复的整数，用于匹配云台任务完成消息。
-# - x / y / z：航点坐标，单位为米；默认使用 world 坐标系，须与里程计坐标系一致。
-# - hover_sec：确认到达航点后、发送云台命令前的悬停时间，单位为秒，不能为负数。
-# - gimbal_pitch_deg：云台俯仰目标角度，单位为度；范围为 -90° ~ +25°，向下为负，向上为正。
-# - gimbal_settle_sec：云台完成基本转动等待后，额外等待画面稳定的时间，单位为秒；范围为 0 ~ 60。
+# ==============================================================================
+# 航点公共变量定义（修改此处可一键同步给所有引用的航点）
+# ==============================================================================
+# 变量说明：
+# - var_z: 航点飞行高度，单位为米。
+# - var_hover_sec: 确认到达航点后、发送云台命令前的悬停时间（秒）。
+# - var_gimbal_mode: 云台模式，'range' 表示水平扫描，'angle' 表示指定角度。
+# - var_yaw_min / var_yaw_max: range 模式下的扫描范围 [-135, 135]。
+# - var_pitch_deg: 云台俯仰角 [-90, 25]，向下为负，向上为正。
+# - var_settle_sec: 云台到位后等待画面稳定的时间（秒）。
 #
-# 云台模式及对应字段：
-# - gimbal_mode：angle 表示转到指定角度；range 表示保持配置的俯仰角并水平扫描。
-#   该字段可以省略，省略时按 angle 处理。
-# - angle 模式必须填写 gimbal_yaw_deg，范围为 -135° ~ +135°。
-# - range 模式可以填写 gimbal_yaw_min_deg 和 gimbal_yaw_max_deg，分别表示扫描起止角度。
-#   必须满足 -135 <= min < max <= 135；省略时分别默认为 -135° 和 +135°。
-#
-# 单个航点的执行顺序：飞到 (x, y, z) -> 悬停 hover_sec -> 转动云台
-# -> 等待云台稳定 gimbal_settle_sec -> 执行下一个航点。
-# A8 mini 横滚（roll）范围为 -30° ~ +30°，当前任务接口未配置横滚控制。
+# 使用方式：
+# - 所有使用 *var_xxx 的航点均会自动引用上方的变量值；
+# - 若某个航点需要单独配置（如特定高度），直接在该航点写具体的数值（如 z: 2.0）即可。
+# ==============================================================================
+var_z: &var_z 1.0
+var_hover_sec: &var_hover_sec 2.0
+var_gimbal_mode: &var_gimbal_mode range
+var_yaw_min: &var_yaw_min -135.0
+var_yaw_max: &var_yaw_max 135.0
+var_pitch_deg: &var_pitch_deg -30.0
+var_settle_sec: &var_settle_sec 2.0
 
-# waypoints:
-#   - id: 1
-#     x: 3.0
-#     y: 0.0
-#     z: 1.0
-#     hover_sec: 2.0
-#     gimbal_mode: angle
-#     gimbal_yaw_deg: -120.0
-#     gimbal_pitch_deg: -80.0
-#     gimbal_settle_sec: 1.0
-
-#   - id: 2
-#     x: 5.0
-#     y: 0.0
-#     z: 1.0
-#     hover_sec: 2.0
-#     gimbal_mode: angle
-#     gimbal_yaw_deg: 120.0
-#     gimbal_pitch_deg: 20.0
-#     gimbal_settle_sec: 2.0
-
-# 可直接执行的 range 示例：到达航点后保持 pitch=0°，仅做水平范围扫描。
 waypoints:
   - id: 1
     x: 3.0
     y: 0.0
-    z: 1.0
-    hover_sec: 2.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -30.0
-    gimbal_settle_sec: 2.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 2
     x: 7.0
     y: 0.0
-    z: 1.0
-    hover_sec: 2.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -30.0
-    gimbal_settle_sec: 2.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   - id: 3
     x: 10.0
     y: 0.0
-    z: 1.0
-    hover_sec: 2.0
-    gimbal_mode: range
-    gimbal_yaw_min_deg: -135.0
-    gimbal_yaw_max_deg: 135.0
-    gimbal_pitch_deg: -30.0
-    gimbal_settle_sec: 2.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
+
 # 可选返航路线，收到返航触发后按列表顺序执行：
 # - 每个元素的格式为 [x, y, z]，单位为米，坐标系与 waypoints 相同。
 # - 返航点不执行悬停和云台动作。
