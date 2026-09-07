@@ -1,3 +1,10 @@
+# 起飞自动录像：true=起飞开始、落地停止（相机 TF 卡原始视频）；false=不自动控制录像。
+enable_auto_recording: true
+# 实时识别：true=随实机任务启动 YOLO；false=不加载模型、不拉 RTSP 流。
+enable_realtime_detection: true
+# 保存实时识别视频：true=保存带框视频到机载电脑；false=只识别/显示。
+save_detection_video: false
+
 # 20 m × 20 m 蛇形覆盖任务。覆盖范围：x=0~20.0 m，y=0~20.0 m。
 # 相邻航点间距均为 2.5 m。
 #

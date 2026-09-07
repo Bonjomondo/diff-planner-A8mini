@@ -1,0 +1,1081 @@
+{
+  "run": "20260907_154114",
+  "bag": {
+    "start": "2026-09-07T15:41:19.285+08:00",
+    "end": "2026-09-07T15:46:06.004+08:00",
+    "messages": 347928,
+    "topic_counts": {
+      "/back_trigger": 1,
+      "/debugPx4ctrl": 49930,
+      "/diagnostics": 221,
+      "/drone_0_planning/trajectory": 37,
+      "/drone_0_traj_server/heartbeat": 23337,
+      "/ekf/ekf_odom": 43537,
+      "/goal": 3,
+      "/laserMapping/odometry": 2671,
+      "/mavros/battery": 27452,
+      "/mavros/extended_state": 568,
+      "/mavros/imu/data": 48124,
+      "/mavros/imu/data_raw": 47900,
+      "/mavros/local_position/odom": 8530,
+      "/mavros/rc/in": 2843,
+      "/mavros/setpoint_raw/attitude": 49931,
+      "/mavros/setpoint_raw/target_attitude": 33413,
+      "/mavros/state": 285,
+      "/mavros/timesync_status": 2868,
+      "/mission/gimbal_done": 2,
+      "/mission/gimbal_task": 2,
+      "/move_base_simple/goal": 1,
+      "/planning/stop": 1,
+      "/px4ctrl/takeoff_land": 100,
+      "/setpoints_cmd": 3501,
+      "/tf": 2668,
+      "/tf_static": 1,
+      "/traj_start_trigger": 1
+    }
+  },
+  "state_changes": [
+    {
+      "unix_sec": 1788766879.2857375,
+      "wall_time": "2026-09-07T15:41:19.285+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        false,
+        false,
+        ""
+      ]
+    },
+    {
+      "unix_sec": 1788766882.1253498,
+      "wall_time": "2026-09-07T15:41:22.125+08:00",
+      "topic": "/mavros/extended_state",
+      "value": 1
+    },
+    {
+      "unix_sec": 1788766882.6268418,
+      "wall_time": "2026-09-07T15:41:22.626+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        true,
+        false,
+        "CMODE(131072)"
+      ]
+    },
+    {
+      "unix_sec": 1788766883.6249278,
+      "wall_time": "2026-09-07T15:41:23.624+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        true,
+        false,
+        "ALTCTL"
+      ]
+    },
+    {
+      "unix_sec": 1788766971.3281982,
+      "wall_time": "2026-09-07T15:42:51.328+08:00",
+      "topic": "/px4ctrl/takeoff_land",
+      "value": 1
+    },
+    {
+      "unix_sec": 1788766971.6253545,
+      "wall_time": "2026-09-07T15:42:51.625+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        true,
+        true,
+        "OFFBOARD"
+      ]
+    },
+    {
+      "unix_sec": 1788766971.6253738,
+      "wall_time": "2026-09-07T15:42:51.625+08:00",
+      "topic": "/mavros/extended_state",
+      "value": 2
+    },
+    {
+      "unix_sec": 1788766992.7259128,
+      "wall_time": "2026-09-07T15:43:12.725+08:00",
+      "topic": "/goal",
+      "value": [
+        3.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "unix_sec": 1788767003.852926,
+      "wall_time": "2026-09-07T15:43:23.852+08:00",
+      "topic": "/mission/gimbal_task",
+      "value": [
+        1.0,
+        0.0,
+        0.0,
+        2.0,
+        1.0,
+        -135.0,
+        135.0
+      ]
+    },
+    {
+      "unix_sec": 1788767014.0788653,
+      "wall_time": "2026-09-07T15:43:34.078+08:00",
+      "topic": "/mission/gimbal_done",
+      "value": 1
+    },
+    {
+      "unix_sec": 1788767014.0794117,
+      "wall_time": "2026-09-07T15:43:34.079+08:00",
+      "topic": "/goal",
+      "value": [
+        5.0,
+        3.0,
+        1.0
+      ]
+    },
+    {
+      "unix_sec": 1788767026.7525322,
+      "wall_time": "2026-09-07T15:43:46.752+08:00",
+      "topic": "/mission/gimbal_task",
+      "value": [
+        2.0,
+        0.0,
+        0.0,
+        2.0,
+        1.0,
+        -135.0,
+        135.0
+      ]
+    },
+    {
+      "unix_sec": 1788767036.9796863,
+      "wall_time": "2026-09-07T15:43:56.979+08:00",
+      "topic": "/mission/gimbal_done",
+      "value": 2
+    },
+    {
+      "unix_sec": 1788767037.9261255,
+      "wall_time": "2026-09-07T15:43:57.926+08:00",
+      "topic": "/goal",
+      "value": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "unix_sec": 1788767064.43177,
+      "wall_time": "2026-09-07T15:44:24.431+08:00",
+      "topic": "/px4ctrl/takeoff_land",
+      "value": 2
+    },
+    {
+      "unix_sec": 1788767076.6250987,
+      "wall_time": "2026-09-07T15:44:36.625+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        true,
+        false,
+        "OFFBOARD"
+      ]
+    },
+    {
+      "unix_sec": 1788767077.1348505,
+      "wall_time": "2026-09-07T15:44:37.134+08:00",
+      "topic": "/mavros/extended_state",
+      "value": 1
+    },
+    {
+      "unix_sec": 1788767092.628655,
+      "wall_time": "2026-09-07T15:44:52.628+08:00",
+      "topic": "/mavros/state",
+      "value": [
+        true,
+        false,
+        "ALTCTL"
+      ]
+    }
+  ],
+  "detector_final": {
+    "capture": {
+      "frames_received": 5566,
+      "generation": 1,
+      "last_cap_ms": 31.93,
+      "last_reason": "none",
+      "reconnects": 0,
+      "since_last_fresh_ms": 291.01,
+      "status": "stopped"
+    },
+    "event": "detector_exit",
+    "totals": {
+      "processed": 3394,
+      "skipped_capture_frames": 2172,
+      "stale_results": 0
+    },
+    "video": null,
+    "window_max": {
+      "cap_ms": 64.44,
+      "local_age_ms": 132.05,
+      "yolo_ms": 64.7
+    }
+  },
+  "host_sample_count": 291,
+  "detector_stats_count": 109,
+  "diag_count": 110,
+  "stream_errors": {
+    "Stream timeout triggered": 0,
+    "Could not find ref": 1,
+    "Error constructing the frame RPS": 1,
+    "[STATS] RTSP:": 0,
+    "SIYI command 0x0E timed out": 0
+  },
+  "detector_samples": {
+    "fps": {
+      "n": 109,
+      "min": 2.4,
+      "median": 15.0,
+      "p95": 19.4,
+      "max": 20.5
+    },
+    "cap_ms": {
+      "n": 109,
+      "min": 2.6,
+      "median": 37.7,
+      "p95": 54.9,
+      "max": 81.0
+    },
+    "yolo_ms": {
+      "n": 109,
+      "min": 27.9,
+      "median": 44.0,
+      "p95": 63.4,
+      "max": 84.7
+    },
+    "local_age_ms": {
+      "n": 109,
+      "min": 54.9,
+      "median": 108.0,
+      "p95": 137.7,
+      "max": 181.0
+    }
+  },
+  "detector_window_peaks": {
+    "cap_ms": 133.07,
+    "yolo_ms": 97.3,
+    "local_age_ms": 200.66
+  },
+  "phases": {
+    "preflight": {
+      "fps": {
+        "n": 12,
+        "min": 13.3,
+        "median": 15.7,
+        "p95": 16.7,
+        "max": 17.2
+      },
+      "yolo_ms": {
+        "n": 12,
+        "min": 31.2,
+        "median": 44.0,
+        "p95": 49.7,
+        "max": 53.1
+      },
+      "cpu_percent": {
+        "n": 25,
+        "min": 62.6,
+        "median": 66.92,
+        "p95": 69.21,
+        "max": 73.01
+      },
+      "iowait_percent": {
+        "n": 25,
+        "min": 0.0,
+        "median": 0.13,
+        "p95": 0.13,
+        "max": 0.25
+      },
+      "eth0_rx_mbps": {
+        "n": 25,
+        "min": 1.9518610319999998,
+        "median": 2.119961304,
+        "p95": 2.204196736,
+        "max": 2.24116948
+      },
+      "gpu_percent": {
+        "n": 25,
+        "min": 35.0,
+        "median": 80.0,
+        "p95": 98.0,
+        "max": 98.0
+      },
+      "RAM_MB": {
+        "n": 25,
+        "min": 7865.0,
+        "median": 7876.0,
+        "p95": 7878.0,
+        "max": 7879.0
+      },
+      "swap_MB": {
+        "n": 25,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 25,
+        "min": 59.75,
+        "median": 60.468,
+        "p95": 61.0,
+        "max": 61.187
+      },
+      "gpu_C": {
+        "n": 25,
+        "min": 57.718,
+        "median": 58.406,
+        "p95": 58.812,
+        "max": 58.968
+      },
+      "tj_C": {
+        "n": 25,
+        "min": 60.437,
+        "median": 61.156,
+        "p95": 61.5,
+        "max": 61.625
+      }
+    },
+    "airborne": {
+      "fps": {
+        "n": 52,
+        "min": 11.4,
+        "median": 13.3,
+        "p95": 15.2,
+        "max": 16.7
+      },
+      "yolo_ms": {
+        "n": 52,
+        "min": 31.6,
+        "median": 46.5,
+        "p95": 67.8,
+        "max": 84.7
+      },
+      "cpu_percent": {
+        "n": 105,
+        "min": 66.71,
+        "median": 71.19,
+        "p95": 73.42,
+        "max": 77.53
+      },
+      "iowait_percent": {
+        "n": 105,
+        "min": 0.0,
+        "median": 0.13,
+        "p95": 0.13,
+        "max": 0.25
+      },
+      "eth0_rx_mbps": {
+        "n": 105,
+        "min": 1.351619224,
+        "median": 2.124263072,
+        "p95": 2.3508746719999998,
+        "max": 2.5791629360000004
+      },
+      "gpu_percent": {
+        "n": 105,
+        "min": 34.0,
+        "median": 76.0,
+        "p95": 98.0,
+        "max": 99.0
+      },
+      "RAM_MB": {
+        "n": 105,
+        "min": 7878.0,
+        "median": 7890.0,
+        "p95": 7896.0,
+        "max": 7901.0
+      },
+      "swap_MB": {
+        "n": 105,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 105,
+        "min": 53.406,
+        "median": 56.75,
+        "p95": 61.031,
+        "max": 61.25
+      },
+      "gpu_C": {
+        "n": 105,
+        "min": 50.937,
+        "median": 54.562,
+        "p95": 58.812,
+        "max": 59.406
+      },
+      "tj_C": {
+        "n": 105,
+        "min": 53.718,
+        "median": 57.406,
+        "p95": 61.531,
+        "max": 61.937
+      }
+    },
+    "landed": {
+      "fps": {
+        "n": 43,
+        "min": 13.0,
+        "median": 17.7,
+        "p95": 20.1,
+        "max": 20.5
+      },
+      "yolo_ms": {
+        "n": 43,
+        "min": 27.9,
+        "median": 41.7,
+        "p95": 51.8,
+        "max": 58.8
+      },
+      "cpu_percent": {
+        "n": 89,
+        "min": 47.3,
+        "median": 62.44,
+        "p95": 70.29,
+        "max": 73.85
+      },
+      "iowait_percent": {
+        "n": 89,
+        "min": 0.0,
+        "median": 0.13,
+        "p95": 0.25,
+        "max": 0.26
+      },
+      "eth0_rx_mbps": {
+        "n": 89,
+        "min": 1.3988352320000002,
+        "median": 2.126856928,
+        "p95": 2.2220181439999998,
+        "max": 2.290854136
+      },
+      "gpu_percent": {
+        "n": 88,
+        "min": 25.0,
+        "median": 67.0,
+        "p95": 98.0,
+        "max": 98.0
+      },
+      "RAM_MB": {
+        "n": 88,
+        "min": 7721.0,
+        "median": 7905.5,
+        "p95": 7920.0,
+        "max": 7942.0
+      },
+      "swap_MB": {
+        "n": 88,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 88,
+        "min": 53.531,
+        "median": 55.734,
+        "p95": 57.375,
+        "max": 57.656
+      },
+      "gpu_C": {
+        "n": 88,
+        "min": 51.062,
+        "median": 53.734,
+        "p95": 55.281,
+        "max": 55.468
+      },
+      "tj_C": {
+        "n": 88,
+        "min": 53.906,
+        "median": 56.5775,
+        "p95": 58.187,
+        "max": 58.437
+      }
+    },
+    "scan1": {
+      "fps": {
+        "n": 5,
+        "min": 11.8,
+        "median": 12.5,
+        "p95": 12.6,
+        "max": 13.2
+      },
+      "yolo_ms": {
+        "n": 5,
+        "min": 43.8,
+        "median": 50.8,
+        "p95": 53.6,
+        "max": 76.9
+      },
+      "cpu_percent": {
+        "n": 10,
+        "min": 70.41,
+        "median": 71.475,
+        "p95": 73.06,
+        "max": 74.03
+      },
+      "iowait_percent": {
+        "n": 10,
+        "min": 0.0,
+        "median": 0.13,
+        "p95": 0.13,
+        "max": 0.25
+      },
+      "eth0_rx_mbps": {
+        "n": 10,
+        "min": 1.351619224,
+        "median": 2.148525604,
+        "p95": 2.4189277519999997,
+        "max": 2.5791629360000004
+      },
+      "gpu_percent": {
+        "n": 10,
+        "min": 58.0,
+        "median": 78.5,
+        "p95": 98.0,
+        "max": 99.0
+      },
+      "RAM_MB": {
+        "n": 10,
+        "min": 7886.0,
+        "median": 7888.0,
+        "p95": 7889.0,
+        "max": 7889.0
+      },
+      "swap_MB": {
+        "n": 10,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 10,
+        "min": 57.687,
+        "median": 58.281,
+        "p95": 58.5,
+        "max": 58.656
+      },
+      "gpu_C": {
+        "n": 10,
+        "min": 55.656,
+        "median": 56.0775,
+        "p95": 56.437,
+        "max": 56.468
+      },
+      "tj_C": {
+        "n": 10,
+        "min": 58.468,
+        "median": 58.858999999999995,
+        "p95": 59.187,
+        "max": 59.343
+      }
+    },
+    "scan2": {
+      "fps": {
+        "n": 5,
+        "min": 12.9,
+        "median": 13.3,
+        "p95": 14.2,
+        "max": 15.2
+      },
+      "yolo_ms": {
+        "n": 5,
+        "min": 36.5,
+        "median": 55.4,
+        "p95": 56.4,
+        "max": 61.3
+      },
+      "cpu_percent": {
+        "n": 10,
+        "min": 69.33,
+        "median": 71.53999999999999,
+        "p95": 74.01,
+        "max": 74.35
+      },
+      "iowait_percent": {
+        "n": 10,
+        "min": 0.0,
+        "median": 0.12,
+        "p95": 0.13,
+        "max": 0.25
+      },
+      "eth0_rx_mbps": {
+        "n": 10,
+        "min": 1.646780328,
+        "median": 2.183022952,
+        "p95": 2.3863168399999997,
+        "max": 2.52136848
+      },
+      "gpu_percent": {
+        "n": 10,
+        "min": 49.0,
+        "median": 84.0,
+        "p95": 97.0,
+        "max": 99.0
+      },
+      "RAM_MB": {
+        "n": 10,
+        "min": 7888.0,
+        "median": 7892.0,
+        "p95": 7893.0,
+        "max": 7894.0
+      },
+      "swap_MB": {
+        "n": 10,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 10,
+        "min": 55.687,
+        "median": 56.062,
+        "p95": 56.343,
+        "max": 56.375
+      },
+      "gpu_C": {
+        "n": 10,
+        "min": 53.468,
+        "median": 53.858999999999995,
+        "p95": 54.062,
+        "max": 54.156
+      },
+      "tj_C": {
+        "n": 10,
+        "min": 56.343,
+        "median": 56.8435,
+        "p95": 57.125,
+        "max": 57.25
+      }
+    },
+    "all_streaming": {
+      "fps": {
+        "n": 109,
+        "min": 2.4,
+        "median": 15.0,
+        "p95": 19.4,
+        "max": 20.5
+      },
+      "yolo_ms": {
+        "n": 109,
+        "min": 27.9,
+        "median": 44.0,
+        "p95": 63.4,
+        "max": 84.7
+      },
+      "cpu_percent": {
+        "n": 222,
+        "min": 47.3,
+        "median": 68.955,
+        "p95": 72.82,
+        "max": 77.53
+      },
+      "iowait_percent": {
+        "n": 222,
+        "min": 0.0,
+        "median": 0.13,
+        "p95": 0.25,
+        "max": 0.38
+      },
+      "eth0_rx_mbps": {
+        "n": 222,
+        "min": 1.351619224,
+        "median": 2.124900264,
+        "p95": 2.284376784,
+        "max": 2.5791629360000004
+      },
+      "gpu_percent": {
+        "n": 221,
+        "min": 25.0,
+        "median": 75.0,
+        "p95": 98.0,
+        "max": 99.0
+      },
+      "RAM_MB": {
+        "n": 221,
+        "min": 7721.0,
+        "median": 7889.0,
+        "p95": 7919.0,
+        "max": 7942.0
+      },
+      "swap_MB": {
+        "n": 221,
+        "min": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      },
+      "cpu_C": {
+        "n": 221,
+        "min": 53.406,
+        "median": 56.625,
+        "p95": 60.968,
+        "max": 61.25
+      },
+      "gpu_C": {
+        "n": 221,
+        "min": 50.937,
+        "median": 54.406,
+        "p95": 58.781,
+        "max": 59.406
+      },
+      "tj_C": {
+        "n": 221,
+        "min": 53.718,
+        "median": 57.406,
+        "p95": 61.5,
+        "max": 61.937
+      }
+    }
+  },
+  "sampler_cost_ms": {
+    "n": 291,
+    "min": 61.166,
+    "median": 95.139,
+    "p95": 164.949,
+    "max": 1591.796
+  },
+  "sampler_interval_sec": {
+    "n": 290,
+    "min": 1.0002280990001964,
+    "median": 1.0003265919999649,
+    "p95": 1.0024509530003343,
+    "max": 1.5926757859997451
+  },
+  "ping_rtt_ms": {
+    "n": 286,
+    "min": 0.139,
+    "median": 0.203,
+    "p95": 1.01,
+    "max": 4.79
+  },
+  "ping_missing_sequences": [],
+  "eth0_counter_delta": {
+    "rx_bytes": 59010347,
+    "tx_bytes": 1461544,
+    "rx_errors": 0,
+    "rx_dropped": 0,
+    "tx_errors": 0,
+    "tx_dropped": 0
+  },
+  "eth0_states": [
+    [
+      "up",
+      "1",
+      "100"
+    ]
+  ],
+  "kernel_records": [
+    {
+      "wall_time": "2026-09-07T15:41:14.622+08:00",
+      "unix_sec": 1788766874.6222441,
+      "monotonic_sec": 4571.647118462,
+      "event": "started",
+      "command": [
+        "dmesg",
+        "--follow",
+        "--time-format",
+        "iso"
+      ],
+      "pid": 12291
+    },
+    {
+      "wall_time": "2026-09-07T15:41:14.622+08:00",
+      "unix_sec": 1788766874.622917,
+      "monotonic_sec": 4571.64778747,
+      "event": "output",
+      "text": "dmesg: read kernel buffer failed: Operation not permitted"
+    },
+    {
+      "wall_time": "2026-09-07T15:41:14.623+08:00",
+      "unix_sec": 1788766874.6233048,
+      "monotonic_sec": 4571.648174806,
+      "event": "reader_end",
+      "returncode": 1
+    }
+  ],
+  "flight_topic_rates": {
+    "/mavros/state": {
+      "n": 106,
+      "hz": 1.0000024364167492,
+      "max_gap_ms": 1008.1939697265625,
+      "max_gap_at": "2026-09-07T15:43:20.624+08:00"
+    },
+    "/mavros/imu/data": {
+      "n": 18060,
+      "hz": 171.17173433845045,
+      "max_gap_ms": 29.404640197753906,
+      "max_gap_at": "2026-09-07T15:43:10.652+08:00"
+    },
+    "/mavros/local_position/odom": {
+      "n": 3165,
+      "hz": 30.000056144515604,
+      "max_gap_ms": 54.90541458129883,
+      "max_gap_at": "2026-09-07T15:43:25.233+08:00"
+    },
+    "/mavros/extended_state": {
+      "n": 211,
+      "hz": 2.0000000590369833,
+      "max_gap_ms": 508.5890293121338,
+      "max_gap_at": "2026-09-07T15:44:34.629+08:00"
+    },
+    "/mavros/battery": {
+      "n": 10550,
+      "hz": 99.99141707121427,
+      "max_gap_ms": 34.26337242126465,
+      "max_gap_at": "2026-09-07T15:43:25.253+08:00"
+    },
+    "/laserMapping/odometry": {
+      "n": 1055,
+      "hz": 9.999645044885273,
+      "max_gap_ms": 141.77441596984863,
+      "max_gap_at": "2026-09-07T15:44:29.578+08:00"
+    },
+    "/ekf/ekf_odom": {
+      "n": 18059,
+      "hz": 171.17462739728944,
+      "max_gap_ms": 30.66253662109375,
+      "max_gap_at": "2026-09-07T15:43:25.257+08:00"
+    },
+    "/mavros/setpoint_raw/attitude": {
+      "n": 21090,
+      "hz": 199.89444262132622,
+      "max_gap_ms": 22.140979766845703,
+      "max_gap_at": "2026-09-07T15:44:13.252+08:00"
+    },
+    "/px4ctrl/takeoff_land": {
+      "n": 13,
+      "hz": 0.9660760442982324,
+      "max_gap_ms": 1055.8137893676758,
+      "max_gap_at": "2026-09-07T15:44:31.653+08:00"
+    },
+    "/goal": {
+      "n": 3,
+      "hz": 0.04424757937577805,
+      "max_gap_ms": 23846.71378135681,
+      "max_gap_at": "2026-09-07T15:43:34.079+08:00"
+    }
+  },
+  "mission_height_m": {
+    "n": 14183,
+    "min": 0.9126052753057481,
+    "median": 1.0099424754669182,
+    "p95": 1.0656228991237737,
+    "max": 1.0974018256444082
+  },
+  "mission_peak_speed_mps": 0.6074888632365121,
+  "positions": {
+    "return_arrived": [
+      1788767053.7017953,
+      -0.006582857859565747,
+      0.12221931444275602,
+      0.9991058787886199
+    ],
+    "land_command": [
+      1788767064.4327345,
+      -0.07071713944588624,
+      0.3066330373765776,
+      0.9800529654235048
+    ],
+    "on_ground": [
+      1788767077.134811,
+      -0.020998495997833364,
+      0.4324269252405662,
+      -0.023044391502456896
+    ]
+  },
+  "battery_in_flight": {
+    "voltage": {
+      "n": 10550,
+      "min": 21.28700065612793,
+      "median": 21.367000579833984,
+      "p95": 22.43600082397461,
+      "max": 23.32000160217285
+    },
+    "current": {
+      "n": 10550,
+      "min": -14.529999732971191,
+      "median": -13.619999885559082,
+      "p95": -2.799999952316284,
+      "max": -1.5899999141693115
+    },
+    "percentage": {
+      "n": 10550,
+      "min": 0.41999998688697815,
+      "median": 0.429999977350235,
+      "p95": 0.5600000023841858,
+      "max": 0.699999988079071
+    }
+  },
+  "processes": {
+    "12279": {
+      "name": "python3",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 6.0,
+        "median": 8.0,
+        "p95": 9.0,
+        "max": 10.0
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 13.06640625,
+        "median": 13.3984375,
+        "p95": 13.40625,
+        "max": 13.40625
+      },
+      "threads": [
+        3
+      ]
+    },
+    "13723": {
+      "name": "python3",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 28.99,
+        "median": 37.97,
+        "p95": 44.99,
+        "max": 47.98
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 3970.33984375,
+        "median": 3971.091796875,
+        "p95": 3971.1640625,
+        "max": 3971.17578125
+      },
+      "threads": [
+        6,
+        7
+      ]
+    },
+    "13846": {
+      "name": "python3",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 41.99,
+        "median": 55.98,
+        "p95": 67.98,
+        "max": 77.97
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 150.9765625,
+        "median": 153.20703125,
+        "p95": 160.29296875,
+        "max": 160.29296875
+      },
+      "threads": [
+        17
+      ]
+    },
+    "13726": {
+      "name": "rviz",
+      "cpu_one_core_percent": {
+        "n": 187,
+        "min": 2.0,
+        "median": 43.98,
+        "p95": 50.99,
+        "max": 54.98
+      },
+      "rss_MiB": {
+        "n": 187,
+        "min": 812.66796875,
+        "median": 857.17578125,
+        "p95": 861.2421875,
+        "max": 867.76953125
+      },
+      "threads": [
+        21,
+        26
+      ]
+    },
+    "12809": {
+      "name": "run_mapping_onl",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 25.99,
+        "median": 44.94499999999999,
+        "p95": 64.96,
+        "max": 66.98
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 63.046875,
+        "median": 64.8515625,
+        "p95": 67.6875,
+        "max": 67.6875
+      },
+      "threads": [
+        12,
+        14
+      ]
+    },
+    "13062": {
+      "name": "px4ctrl_node",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 7.0,
+        "median": 9.0,
+        "p95": 9.99,
+        "max": 10.0
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 10.08203125,
+        "median": 10.08203125,
+        "p95": 10.08203125,
+        "max": 10.08203125
+      },
+      "threads": [
+        5
+      ]
+    },
+    "12492": {
+      "name": "record",
+      "cpu_one_core_percent": {
+        "n": 222,
+        "min": 23.99,
+        "median": 26.99,
+        "p95": 29.99,
+        "max": 30.99
+      },
+      "rss_MiB": {
+        "n": 222,
+        "min": 25.55078125,
+        "median": 25.55078125,
+        "p95": 25.55078125,
+        "max": 25.55078125
+      },
+      "threads": [
+        17
+      ]
+    }
+  },
+  "source_hashes_verified": {
+    "/home/q/Documents/diff-planner-A8miniV2/src/user_command/multipoint/scripts/a8mini_detection.py": true,
+    "/home/q/Documents/diff-planner-A8miniV2/src/user_command/multipoint/scripts/a8mini_capture.py": true,
+    "/home/q/Documents/diff-planner-A8miniV2/src/user_command/multipoint/scripts/a8mini_video.py": true,
+    "/home/q/Documents/diff-planner-A8miniV2/src/user_command/multipoint/scripts/a8mini_diagnostics.py": true,
+    "/home/q/Documents/A8mini_Detction/rtsp_capture.py": true,
+    "/home/q/Documents/A8mini_Detction/A8mini_RTSP_YOLO_Detection.py": true
+  },
+  "land_republish_warning_count": 98,
+  "mission_csv_recovery": {
+    "source": "/tmp/a8mini_mission_timestamps.csv",
+    "verified_against": "/mission/gimbal_done in bag",
+    "sha256": "4d07a20da7eb27c747ecec6f19d471882f420a99c0611b43bf1a3b8e477089d1"
+  }
+}

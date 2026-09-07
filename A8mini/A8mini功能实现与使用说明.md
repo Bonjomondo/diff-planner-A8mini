@@ -119,7 +119,7 @@ src/user_command/multipoint/scripts/a8mini_gimbal_node.py
 - 使用 `0x0E` 发送绝对 yaw/pitch，角度单位是 `0.1°`；
 - 支持指定角度和可配置起止角度的水平范围扫描两种动作；
 - 校验 A8 mini 返回帧的长度、CRC 和命令字；
-- UDP 超时重试，默认超时 `0.6 s`，重试 3 次；
+- UDP 超时重试，默认超时 `1.2 s`，最多尝试 5 次；
 - 用工作线程执行云台任务，避免阻塞 ROS 订阅回调；
 - 校验任务长度、航点 ID、角度范围和等待时间；
 - 对正在执行和已完成的航点 ID 去重；
@@ -530,7 +530,7 @@ LIO/VIO 实机 launch 支持下列参数：
 | `next_distance` | `0.7` | 到点位置容差，单位 m |
 | `velocity_tolerance` | `0.2` | 到点速度容差，单位 m/s |
 | `arrival_stable_sec` | `0.5` | 位置和速度需要连续满足的时间 |
-| `gimbal_retry_sec` | `6.0` | 未收到完成消息时重发任务的间隔 |
+| `gimbal_retry_sec` | 实机 `12.0` | 未收到完成消息时重发任务的间隔；执行中的相同任务由云台节点去重 |
 | `start_plan` | `1` | 是否订阅主任务触发 |
 | `back_plan` | `1` | 是否订阅返程触发 |
 | `enable_rc` | `true` | 是否使用遥控器 8 通道逻辑 |

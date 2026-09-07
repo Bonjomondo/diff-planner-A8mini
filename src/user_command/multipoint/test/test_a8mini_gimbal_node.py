@@ -6,6 +6,7 @@ import sys
 import threading
 import types
 import unittest
+from unittest.mock import Mock, patch
 
 
 class _Message:
@@ -69,6 +70,19 @@ class FakeSiyiClient(MODULE.SiyiUdpClient):
 
 
 class SiyiRecordingTest(unittest.TestCase):
+    def test_disabled_auto_recording_does_not_subscribe_or_control_recording(self):
+        for enabled in (False, True):
+            ros = Mock()
+            ros.get_param.side_effect = lambda name, default=None: {
+                "~enable_auto_recording": enabled, "~dry_run": True,
+            }.get(name, default)
+            with patch.object(MODULE, "rospy", ros), patch.object(MODULE.threading, "Thread"):
+                node = MODULE.A8MiniGimbalNode()
+                topics = [call.args[0] for call in ros.Subscriber.call_args_list]
+                self.assertEqual("/mavros/extended_state" in topics, enabled)
+                self.assertEqual(node.recording_worker is not None, enabled)
+                self.assertIsNone(node.recording_desired)
+
     def test_record_toggle_frame_matches_sdk_example(self):
         packet = MODULE.encode_packet(
             0,

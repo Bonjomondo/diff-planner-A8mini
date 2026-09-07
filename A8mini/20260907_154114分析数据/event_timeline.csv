@@ -1,0 +1,135 @@
+wall_time,unix_sec,source,event
+2026-09-07T15:41:19.285+08:00,1788766879.285738,console/rosbag,"/mavros/state: [False, False, '']"
+2026-09-07T15:41:22.125+08:00,1788766882.125350,console/rosbag,/mavros/extended_state: 1
+2026-09-07T15:41:22.626+08:00,1788766882.626842,console/rosbag,"/mavros/state: [True, False, 'CMODE(131072)']"
+2026-09-07T15:41:23.624+08:00,1788766883.624928,console/rosbag,"/mavros/state: [True, False, 'ALTCTL']"
+2026-09-07T15:42:51.328+08:00,1788766971.328198,console/rosbag,/px4ctrl/takeoff_land: 1
+2026-09-07T15:42:51.445+08:00,1788766971.445863,console/rosbag,[px4ctrl] MANUAL_CTRL(L1) --> AUTO_TAKEOFF
+2026-09-07T15:42:51.625+08:00,1788766971.625355,console/rosbag,"/mavros/state: [True, True, 'OFFBOARD']"
+2026-09-07T15:42:51.625+08:00,1788766971.625374,console/rosbag,/mavros/extended_state: 2
+2026-09-07T15:43:01.587+08:00,1788766981.587613,console/rosbag,[px4ctrl] AUTO_TAKEOFF --> AUTO_HOVER(L2)
+2026-09-07T15:43:12.725+08:00,1788766992.725679,console/rosbag,"Published waypoint 1 goal: [x 3.00, y 0.00, z 1.00]"
+2026-09-07T15:43:12.725+08:00,1788766992.725913,console/rosbag,"/goal: [3.0, 0.0, 1.0]"
+2026-09-07T15:43:12.740+08:00,1788766992.740327,console/rosbag,[px4ctrl] AUTO_HOVER(L2) --> CMD_CTRL(L3)
+2026-09-07T15:43:21.801+08:00,1788767001.801891,console/rosbag,"Waypoint 1 arrived, ros_time=1788767001.802, distance=0.092, speed=0.130"
+2026-09-07T15:43:22.139+08:00,1788767002.139904,console/rosbag,[px4ctrl] From CMD_CTRL(L3) to AUTO_HOVER(L2)!
+2026-09-07T15:43:23.852+08:00,1788767003.852926,console/rosbag,"/mission/gimbal_task: [1.0, 0.0, 0.0, 2.0, 1.0, -135.0, 135.0]"
+2026-09-07T15:43:34.078+08:00,1788767014.078865,console/rosbag,/mission/gimbal_done: 1
+2026-09-07T15:43:34.078+08:00,1788767014.078948,console/rosbag,"Waypoint 1 gimbal done, ros_time=1788767014.079"
+2026-09-07T15:43:34.079+08:00,1788767014.079098,console/rosbag,"Published waypoint 2 goal: [x 5.00, y 3.00, z 1.00]"
+2026-09-07T15:43:34.079+08:00,1788767014.079412,console/rosbag,"/goal: [5.0, 3.0, 1.0]"
+2026-09-07T15:43:34.110+08:00,1788767014.110958,console/rosbag,[px4ctrl] AUTO_HOVER(L2) --> CMD_CTRL(L3)
+2026-09-07T15:43:44.752+08:00,1788767024.752219,console/rosbag,"Waypoint 2 arrived, ros_time=1788767024.752, distance=0.018, speed=0.107"
+2026-09-07T15:43:45.171+08:00,1788767025.171986,console/rosbag,[px4ctrl] From CMD_CTRL(L3) to AUTO_HOVER(L2)!
+2026-09-07T15:43:46.752+08:00,1788767026.752532,console/rosbag,"/mission/gimbal_task: [2.0, 0.0, 0.0, 2.0, 1.0, -135.0, 135.0]"
+2026-09-07T15:43:56.979+08:00,1788767036.979653,console/rosbag,"Waypoint 2 gimbal done, ros_time=1788767036.980"
+2026-09-07T15:43:56.979+08:00,1788767036.979686,console/rosbag,/mission/gimbal_done: 2
+2026-09-07T15:43:57.925+08:00,1788767037.925981,console/rosbag,"Published waypoint 1 goal: [x 0.00, y 0.00, z 1.00]"
+2026-09-07T15:43:57.926+08:00,1788767037.926126,console/rosbag,"/goal: [0.0, 0.0, 1.0]"
+2026-09-07T15:43:57.952+08:00,1788767037.952187,console/rosbag,[px4ctrl] AUTO_HOVER(L2) --> CMD_CTRL(L3)
+2026-09-07T15:44:13.701+08:00,1788767053.701968,console/rosbag,"Waypoint 1 arrived, ros_time=1788767053.702, distance=0.116, speed=0.117"
+2026-09-07T15:44:13.982+08:00,1788767053.982076,console/rosbag,[px4ctrl] From CMD_CTRL(L3) to AUTO_HOVER(L2)!
+2026-09-07T15:44:24.431+08:00,1788767064.431770,console/rosbag,/px4ctrl/takeoff_land: 2
+2026-09-07T15:44:24.433+08:00,1788767064.433538,console/rosbag,[px4ctrl] AUTO_HOVER(L2) --> AUTO_LAND
+2026-09-07T15:44:25.451+08:00,1788767065.451879,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:26.451+08:00,1788767066.451993,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:27.502+08:00,1788767067.502714,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:28.503+08:00,1788767068.503061,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:29.555+08:00,1788767069.555076,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:30.603+08:00,1788767070.603350,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:31.651+08:00,1788767071.651851,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:32.701+08:00,1788767072.701880,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:33.701+08:00,1788767073.701945,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:34.751+08:00,1788767074.751862,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:35.801+08:00,1788767075.801895,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:36.625+08:00,1788767076.625099,console/rosbag,"/mavros/state: [True, False, 'OFFBOARD']"
+2026-09-07T15:44:36.851+08:00,1788767076.851893,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:37.134+08:00,1788767077.134851,console/rosbag,/mavros/extended_state: 1
+2026-09-07T15:44:37.852+08:00,1788767077.852257,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:38.853+08:00,1788767078.853051,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:39.901+08:00,1788767079.901812,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:40.901+08:00,1788767080.901999,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:41.951+08:00,1788767081.951878,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:43.001+08:00,1788767083.001823,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:44.001+08:00,1788767084.001959,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:45.002+08:00,1788767085.002138,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:46.052+08:00,1788767086.052515,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:47.101+08:00,1788767087.101832,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:48.103+08:00,1788767088.103909,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:49.153+08:00,1788767089.153659,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:50.203+08:00,1788767090.203591,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:51.256+08:00,1788767091.256314,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:51.830+08:00,1788767091.830645,console/rosbag,[px4ctrl] AUTO_LAND --> MANUAL_CTRL(L1)
+2026-09-07T15:44:52.302+08:00,1788767092.302287,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:52.628+08:00,1788767092.628655,console/rosbag,"/mavros/state: [True, False, 'ALTCTL']"
+2026-09-07T15:44:53.351+08:00,1788767093.351889,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:54.401+08:00,1788767094.401881,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:55.452+08:00,1788767095.452097,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:56.501+08:00,1788767096.501877,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:57.502+08:00,1788767097.502058,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:58.551+08:00,1788767098.551867,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:44:59.602+08:00,1788767099.602154,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:00.602+08:00,1788767100.602282,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:01.651+08:00,1788767101.651862,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:02.625+08:00,1788767102.625970,console/rosbag,HP: reque[WARN] [1788767102.652997234]: Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:03.701+08:00,1788767103.701825,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:04.701+08:00,1788767104.701853,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:05.751+08:00,1788767105.751863,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:06.751+08:00,1788767106.751924,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:07.801+08:00,1788767107.801847,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:08.851+08:00,1788767108.851869,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:09.901+08:00,1788767109.901856,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:10.952+08:00,1788767110.952118,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:11.953+08:00,1788767111.953252,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:13.001+08:00,1788767113.001838,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:14.051+08:00,1788767114.051869,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:15.101+08:00,1788767115.101834,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:16.101+08:00,1788767116.101987,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:17.151+08:00,1788767117.151859,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:18.201+08:00,1788767118.201849,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:19.252+08:00,1788767119.252002,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:20.301+08:00,1788767120.301853,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:21.351+08:00,1788767121.351868,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:22.401+08:00,1788767122.401851,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:23.451+08:00,1788767123.451870,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:24.501+08:00,1788767124.501859,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:25.551+08:00,1788767125.551871,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:26.601+08:00,1788767126.601860,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:27.601+08:00,1788767127.601902,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:28.651+08:00,1788767128.651848,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:29.652+08:00,1788767129.652136,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:30.657+08:00,1788767130.657274,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:31.701+08:00,1788767131.701805,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:32.702+08:00,1788767132.702171,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:33.751+08:00,1788767133.751960,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:34.801+08:00,1788767134.801912,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:35.803+08:00,1788767135.803274,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:36.851+08:00,1788767136.851937,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:37.901+08:00,1788767137.901871,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:38.951+08:00,1788767138.951859,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:40.001+08:00,1788767140.001818,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:41.001+08:00,1788767141.001849,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:42.052+08:00,1788767142.052187,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:43.102+08:00,1788767143.102443,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:44.151+08:00,1788767144.151867,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:45.201+08:00,1788767145.201874,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:46.251+08:00,1788767146.251875,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:47.301+08:00,1788767147.301875,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:48.304+08:00,1788767148.304928,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:49.355+08:00,1788767149.355704,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:50.401+08:00,1788767150.401981,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:51.403+08:00,1788767151.403689,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:52.451+08:00,1788767152.451890,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:53.502+08:00,1788767153.502003,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:54.502+08:00,1788767154.502662,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:55.551+08:00,1788767155.551887,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:56.558+08:00,1788767156.558333,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:57.601+08:00,1788767157.601892,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:58.603+08:00,1788767158.603329,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:45:59.651+08:00,1788767159.651865,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:00.701+08:00,1788767160.701838,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:01.751+08:00,1788767161.751870,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:02.801+08:00,1788767162.801841,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:03.853+08:00,1788767163.853867,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:04.901+08:00,1788767164.901899,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER
+2026-09-07T15:46:05.951+08:00,1788767165.951875,console/rosbag,Landing remains latched; republished LAND command so px4ctrl can accept it after entering AUTO_HOVER

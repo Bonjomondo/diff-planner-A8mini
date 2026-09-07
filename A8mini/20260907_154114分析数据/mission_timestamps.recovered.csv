@@ -1,0 +1,3 @@
+waypoint_id,arrived_time,gimbal_done_time,yaw,pitch,gimbal_mode,yaw_min,yaw_max
+1,1788767001.802,1788767014.079,0.000,0.000,range,-135.000,135.000
+2,1788767024.752,1788767036.980,0.000,0.000,range,-135.000,135.000

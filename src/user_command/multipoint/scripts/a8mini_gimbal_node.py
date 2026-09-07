@@ -264,15 +264,15 @@ class A8MiniGimbalNode:
     def __init__(self):
         self.camera_ip = rospy.get_param("~camera_ip", "192.168.144.25")
         self.camera_port = int(rospy.get_param("~camera_port", 37260))
-        self.command_timeout_sec = float(rospy.get_param("~command_timeout_sec", 0.6))
-        self.command_retries = int(rospy.get_param("~command_retries", 3))
+        self.command_timeout_sec = float(rospy.get_param("~command_timeout_sec", 1.2))
+        self.command_retries = int(rospy.get_param("~command_retries", 5))
         self.move_wait_sec = float(rospy.get_param("~move_wait_sec", 2.0))
         self.range_move_wait_sec = float(rospy.get_param("~range_move_wait_sec", 4.0))
         self.max_settle_sec = float(rospy.get_param("~max_settle_sec", 60.0))
         self.dry_run = bool(rospy.get_param("~dry_run", False))
-        self.enable_auto_recording = bool(
-            rospy.get_param("~enable_auto_recording", True)
-        )
+        self.enable_auto_recording = rospy.get_param("~enable_auto_recording", True)
+        if not isinstance(self.enable_auto_recording, bool):
+            raise ValueError("enable_auto_recording must be a YAML boolean (true/false)")
         self.flight_state_topic = rospy.get_param(
             "~flight_state_topic", "/mavros/extended_state"
         )

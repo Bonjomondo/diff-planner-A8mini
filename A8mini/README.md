@@ -11,7 +11,7 @@ A8 mini 默认参数：
 
 - 控制地址：`192.168.144.25:37260/UDP`
 
-A8 mini 属于手册中的旧地址机型，常见 RTSP 地址为 `rtsp://192.168.144.25:8554/main.264`；不同出厂批次或改过配置的设备应以机身标签和调参助手显示为准。本任务只使用 UDP 控制地址，不依赖 RTSP。
+A8 mini 属于手册中的旧地址机型，常见 RTSP 地址为 `rtsp://192.168.144.25:8554/main.264`；不同出厂批次或改过配置的设备应以机身标签和调参助手显示为准。云台与 TF 卡录像控制使用 UDP；实时识别开启后另外读取 RTSP。
 
 给机载电脑连接达妙载板的网卡配置一个不冲突的同网段静态地址，例如 `192.168.144.30/24`。执行任务前先确认：
 
@@ -37,7 +37,78 @@ source devel/setup.bash
 roslaunch multipoint multipointplan_exp_lio.launch
 ```
 
-VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_single_lio.sh` 会启动 LIO 版本，并同时启动 A8 mini 云台节点。
+VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_single_lio.sh` 会启动 LIO 版本，并同时启动 A8 mini 云台节点，按任务配置启动实时识别。
+
+## 录像与实时识别开关
+
+修改当前任务的 [points.yaml](../src/user_command/multipoint/config/points.yaml)
+（使用覆盖任务时修改相应 `coverage_*.yaml`），重启任务后生效：
+
+```yaml
+enable_auto_recording: true       # 起飞开始、落地停止相机 TF 卡录像
+enable_realtime_detection: true   # 启动实时 YOLO 识别和显示
+save_detection_video: false       # 改为 true 才保存带识别框的视频到电脑
+```
+
+三个字段必须使用不带引号的 `true` / `false`。自动录像关闭时不发送自动录像
+查询或切换命令，云台航点动作仍可执行。识别关闭时，不启动检测子进程、不加载
+模型、不打开 RTSP；即使保存开关为 true，也不会保存识别视频。旧任务 YAML
+没有识别开关时，识别默认关闭。TF 卡原始录像与电脑上的带框视频相互独立。
+
+实机 LIO/VIO launch 已整合检测启动，使用原来的启动脚本即可，关闭之前独立
+运行的 `A8mini_RTSP_YOLO_Detection.py`，避免额外拉流和重复推理。本项目对相同
+源的集成检测实例加进程锁，但原独立脚本不使用此锁。临时禁止启动检测也可传
+`start_detection:=false`；仿真 launch 不启动实时识别。
+
+检测运行参数在 [a8mini_detection.yaml](../src/user_command/multipoint/config/a8mini_detection.yaml)：
+
+- `repo_path: ~/Documents/A8mini_Detction`：复用本地检测项目的类别名称和绘图代码；
+  需要保留其中的 `rtsp_capture.py`、`A8mini_RTSP_YOLO_Detection.py`、
+  `yolo11s.engine` 和 `yolo11s.names.json`。相对模型路径相对于此目录解析。
+  集成入口的采集使用本仓库 `scripts/a8mini_capture.py`；外部 `rtsp_capture.py`
+  仍是上游绘图模块的导入依赖，但不负责集成入口的实际取流。
+- `python_executable: /usr/bin/python3`：必须是已安装 OpenCV、Ultralytics、
+  PyTorch/CUDA/TensorRT 且能运行该 engine 的目标机 Python。ROS 节点不导入模型库。
+- 当前 `max_fps: 30`、`conf: 0.55`、`cpu_threads: 2`；推理限频并降低进程 CPU
+  调度优先级。推理限频不改变相机的推流帧率，也不限制整个系统的 GPU 使用率。
+- 默认 `open_timeout_ms: 5000`、`read_timeout_ms: 2500`、`reconnect_delay: 1.0`；
+  `max_frame_age_ms: 1000` 单独控制过期帧/结果丢弃，本地 AGE 包含 read 等待和推理，
+  不包含相机/编码器/网络内部缓存。read 耗时达到超时值，即使返回成功也重连；
+  连续没有合格帧也会触发独立 watchdog，约读取超时加 250 ms 宽限后开始清理连接。
+  这是故障检测预算，实际恢复还需等待进程重启、RTSP 握手和可解码帧。
+  无新帧时显示 `stalled`，而不是长期 `Waiting: streaming`。
+- 当前检查到 OpenCV 为 `GStreamer: NO`，保留 `backend: ffmpeg`。
+  只有目标 Python 的 OpenCV 支持 GStreamer、且 `nvv4l2decoder` / `nvvidconv`
+  插件可运行时才切换 `backend: gstreamer`。`codec: h265` 选择解码器，不修改相机编码。
+  `latency_ms` 仅作用于 GStreamer，FFmpeg 路径不使用它。
+- `video_dir: ~/Videos/a8mini_detection`：开启保存后输出带框 AVI/MJPEG 和逐帧时间 CSV，
+  每 60 秒或画面尺寸变化时结束当前片段。写盘使用独立线程和两帧有界队列，慢盘丢帧；
+  文件打开/写入异常会停用保存并打印错误，识别继续。该集成入口不按检测类别反复保存图片。
+  `video_fps: 25` 是文件播放帧率，掉帧或断流不补旧帧，因此视频时长可能短于实际经过时间，
+  对齐飞行日志应使用 CSV 的时间戳。
+  修复后 CSV 的 `capture_monotonic_sec` 从 read 开始计时，旧版本从 read 返回计时；
+  两者均不是相机曝光时间。
+
+识别在任务节点启动后运行，不等待起飞；电脑视频在识别运行期间保存，TF 卡录像
+才跟随飞行状态。用 Ctrl+C 结束任务会清理检测与采集进程，并尝试完成当前视频文件。
+调试脚本会把检测输出收进 `console.log`，同时保存 `a8mini_detection.yaml.snapshot`。
+检测和采集事件现在自带带时区时间戳，并记录连接代次、PID、重连原因和首帧恢复；
+调试脚本还保存检测/采集/录像/日志辅助脚本快照，并把视频异常纳入 `key_events.log`。
+本次断流依据、修复和复测步骤见 [20260906_183832 日志分析与修复报告](20260906_183832日志分析与修复报告.md)。
+新增诊断后的实飞复核见 [20260907_154114 飞行日志分析报告](20260907_154114飞行日志分析报告.md)，
+包含视频/负载趋势图、飞行时间线及恢复的任务 CSV。
+检测显示使用独立窗口，不发布 `/camera/color/image_raw`；RViz 原有 Image 面板的
+`No Image` 不能单独用来判断检测流是否中断。
+
+仅启动检测（不会发送云台或飞行控制指令）：
+
+```bash
+source devel/setup.bash
+roslaunch multipoint a8mini_detection.launch
+```
+
+2026-09-06 最新日志核对与本次验证范围见
+[实时识别整合与断流核对](实时识别整合与断流核对_20260906.md)。
 
 任务仍沿用原工程的安全触发方式：遥控器 8 通道从中位拨到上位，或发送一次：
 
@@ -174,6 +245,13 @@ source devel/setup.zsh
 - `key_events.log`：从控制台日志自动提取的拨杆、航点、云台和降落事件；
 - `points.yaml.snapshot`、launch 和启动脚本快照；
 - ROS 参数、节点列表、话题列表和 Git 版本信息。
+
+新增诊断默认开启：`host_metrics.jsonl` 每秒记录主机负载、磁盘、网卡与关键进程
+（含采集子进程）；`tegrastats.jsonl`、`camera_ping.jsonl`、`kernel.jsonl`
+分别保留 Jetson 状态、相机连通性和内核事件。各周期日志默认每文件 20 MiB、两个备份，
+工具不可用会记录原因。检测器还保存实际 Python/依赖版本和外部源码快照，日志带墙钟、
+单调时钟及进程标识。完整字段、开关、容量边界和验证结果见
+[飞行日志系统说明](飞行日志系统说明_20260907.md)。
 
 飞行结束时使用 `Ctrl+C`，等待脚本打印日志目录，保证 rosbag 正常写完索引。
 快速筛选降落和航点事件：

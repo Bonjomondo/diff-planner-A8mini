@@ -29,10 +29,14 @@ target_link_libraries(multipointplan yaml-cpp ${catkin_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(test/test_a8mini_gimbal_node.py)
+  catkin_add_nosetests(test/test_a8mini_detection.py)
+  catkin_add_nosetests(test/test_a8mini_capture.py)
 endif()
 
 catkin_install_python(
-  PROGRAMS scripts/a8mini_gimbal_node.py
+  PROGRAMS scripts/a8mini_gimbal_node.py scripts/a8mini_detection_node.py
+           scripts/a8mini_detection.py scripts/a8mini_video.py scripts/a8mini_capture.py
+           scripts/a8mini_diagnostics.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

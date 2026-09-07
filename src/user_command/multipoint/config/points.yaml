@@ -1,3 +1,10 @@
+# 起飞自动录像：true=起飞开始、落地停止（相机 TF 卡原始视频）；false=不自动控制录像。
+enable_auto_recording: false
+# 实时识别：true=随实机任务启动 YOLO；false=不加载模型、不拉 RTSP 流。
+enable_realtime_detection: true
+# 保存实时识别视频：true=保存带框视频到机载电脑；false=只识别/显示。
+save_detection_video: false
+
 # 航点按 waypoints 中的排列顺序依次执行。
 #
 # ==============================================================================
@@ -20,7 +27,7 @@ var_hover_sec: &var_hover_sec 2.0
 var_gimbal_mode: &var_gimbal_mode range
 var_yaw_min: &var_yaw_min -135.0
 var_yaw_max: &var_yaw_max 135.0
-var_pitch_deg: &var_pitch_deg -30.0
+var_pitch_deg: &var_pitch_deg 0.0
 var_settle_sec: &var_settle_sec 2.0
 
 waypoints:
@@ -36,8 +43,8 @@ waypoints:
     gimbal_settle_sec: *var_settle_sec
 
   - id: 2
-    x: 7.0
-    y: 0.0
+    x: 5.0
+    y: 3.0
     z: *var_z
     hover_sec: *var_hover_sec
     gimbal_mode: *var_gimbal_mode
@@ -46,16 +53,16 @@ waypoints:
     gimbal_pitch_deg: *var_pitch_deg
     gimbal_settle_sec: *var_settle_sec
 
-  - id: 3
-    x: 10.0
-    y: 0.0
-    z: *var_z
-    hover_sec: *var_hover_sec
-    gimbal_mode: *var_gimbal_mode
-    gimbal_yaw_min_deg: *var_yaw_min
-    gimbal_yaw_max_deg: *var_yaw_max
-    gimbal_pitch_deg: *var_pitch_deg
-    gimbal_settle_sec: *var_settle_sec
+  # - id: 3
+  #   x: 10.0
+  #   y: 0.0
+  #   z: *var_z
+  #   hover_sec: *var_hover_sec
+  #   gimbal_mode: *var_gimbal_mode
+  #   gimbal_yaw_min_deg: *var_yaw_min
+  #   gimbal_yaw_max_deg: *var_yaw_max
+  #   gimbal_pitch_deg: *var_pitch_deg
+  #   gimbal_settle_sec: *var_settle_sec
 
 # 可选返航路线，收到返航触发后按列表顺序执行：
 # - 每个元素的格式为 [x, y, z]，单位为米，坐标系与 waypoints 相同。

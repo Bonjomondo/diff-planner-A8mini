@@ -1,0 +1,53 @@
+path:        /home/q/Documents/diff-planner-A8miniV2/flight_logs/20260907_154114/flight_debug.bag
+version:     2.0
+duration:    4:46s (286s)
+start:       Sep 07 2026 15:41:19.29 (1788766879.29)
+end:         Sep 07 2026 15:46:06.00 (1788767166.00)
+size:        108.4 MB
+messages:    347928
+compression: none [139/139 chunks]
+types:       diagnostic_msgs/DiagnosticArray [60810da900de1dd6ddd437c3503511da]
+             geometry_msgs/PoseStamped       [d3812c3cbc69362b77dc0b19b345f8f5]
+             mavros_msgs/AttitudeTarget      [456f3af666b22ccd0222ea053a86b548]
+             mavros_msgs/ExtendedState       [ae780b1800fe17b917369d21b90058bd]
+             mavros_msgs/RCIn                [1c3eafdb5efbcda3c334e1788bbcfe39]
+             mavros_msgs/State               [65cd0a9fff993b062b91e354554ec7e9]
+             mavros_msgs/TimesyncStatus      [021ec8044e747bea518b441f374ba64b]
+             nav_msgs/Odometry               [cd5e73d190d741a2f92e81eda573aca7]
+             quadrotor_msgs/PositionCommand  [2809eb0c779bbce5b8d66b95a05bd27b]
+             quadrotor_msgs/Px4ctrlDebug     [2f7a32799f36d619215b0a5428a405f4]
+             quadrotor_msgs/TakeoffLand      [b30b3b93263aae01746755d3b8ff620f]
+             sensor_msgs/BatteryState        [4ddae7f048e32fda22cac764685e3974]
+             sensor_msgs/Imu                 [6a62c6daae103f4ff57a132d6f95cec2]
+             std_msgs/Empty                  [d41d8cd98f00b204e9800998ecf8427e]
+             std_msgs/Float64MultiArray      [4b7d974086d4060e7db4613a7e6c3ba4]
+             std_msgs/UInt32                 [304a39449588c7f8ce2df6e8001c5fce]
+             tf2_msgs/TFMessage              [94810edda583a504dfda3829e70d7eec]
+             traj_utils/PolyTraj             [7d47340fc475c0357eff322fb6ab494d]
+topics:      /back_trigger                              1 msg             : geometry_msgs/PoseStamped      
+             /debugPx4ctrl                          49930 msgs @ 200.7 Hz : quadrotor_msgs/Px4ctrlDebug    
+             /diagnostics                             221 msgs @   0.7 Hz : diagnostic_msgs/DiagnosticArray
+             /drone_0_planning/trajectory              37 msgs @   1.0 Hz : traj_utils/PolyTraj            
+             /drone_0_traj_server/heartbeat         23337 msgs @  97.2 Hz : std_msgs/Empty                 
+             /ekf/ekf_odom                          43537 msgs @ 169.7 Hz : nav_msgs/Odometry              
+             /goal                                      3 msgs @   0.0 Hz : geometry_msgs/PoseStamped      
+             /laserMapping/odometry                  2671 msgs @  10.0 Hz : nav_msgs/Odometry              
+             /mavros/battery                        27452 msgs @ 104.2 Hz : sensor_msgs/BatteryState       
+             /mavros/extended_state                   568 msgs @   2.0 Hz : mavros_msgs/ExtendedState      
+             /mavros/imu/data                       48124 msgs @ 167.6 Hz : sensor_msgs/Imu                
+             /mavros/imu/data_raw                   47900 msgs @ 168.0 Hz : sensor_msgs/Imu                
+             /mavros/local_position/odom             8530 msgs @  30.1 Hz : nav_msgs/Odometry              
+             /mavros/rc/in                           2843 msgs @  10.0 Hz : mavros_msgs/RCIn               
+             /mavros/setpoint_raw/attitude          49931 msgs @ 200.6 Hz : mavros_msgs/AttitudeTarget     
+             /mavros/setpoint_raw/target_attitude   33413 msgs @ 132.0 Hz : mavros_msgs/AttitudeTarget     
+             /mavros/state                            285 msgs @   1.0 Hz : mavros_msgs/State              
+             /mavros/timesync_status                 2868 msgs @  10.0 Hz : mavros_msgs/TimesyncStatus     
+             /mission/gimbal_done                       2 msgs @   0.0 Hz : std_msgs/UInt32                
+             /mission/gimbal_task                       2 msgs @   0.0 Hz : std_msgs/Float64MultiArray     
+             /move_base_simple/goal                     1 msg             : geometry_msgs/PoseStamped      
+             /planning/stop                             1 msg             : std_msgs/Empty                 
+             /px4ctrl/takeoff_land                    100 msgs @   1.0 Hz : quadrotor_msgs/TakeoffLand     
+             /setpoints_cmd                          3501 msgs @ 100.1 Hz : quadrotor_msgs/PositionCommand 
+             /tf                                     2668 msgs @  10.0 Hz : tf2_msgs/TFMessage             
+             /tf_static                                 1 msg             : tf2_msgs/TFMessage             
+             /traj_start_trigger                        1 msg             : geometry_msgs/PoseStamped
