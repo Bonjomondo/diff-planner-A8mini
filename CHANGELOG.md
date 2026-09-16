@@ -2,6 +2,88 @@
 
 本文件记录 Diff-Planner A8 mini 分支的重要功能、配置和实机行为变更。
 
+## Unreleased - 2026-09-16
+
+### Added
+
+- 新增 `sh_files/one_click_takeoff.sh`，用于开机后执行单个文件启动完整的 LIO
+  实机飞行栈并请求自动起飞。
+- 一键入口会自动加载 `/opt/ros/noetic/setup.zsh` 和当前工作空间的
+  `devel/setup.zsh`，不再需要手动执行 `cd` 或 `source`。
+- 新增 `--start-only`（同时兼容 `--no-takeoff`）模式，仅启动飞行栈，不发送
+  起飞指令，便于拆桨检查和现场调试。
+- 新增 RViz 多点点选航线：使用 `Publish Point` 按顺序标记多个地图点，节点将其
+  转换为连续航点并逐点交给 Diff-Planner 进行避障规划。
+- 新增 `/mission/start_clicked_route` 和 `/mission/clear_clicked_route` 交互航线
+  控制话题，以及 `/mission/clicked_waypoints` 编号点和连线可视化话题。
+
+### Changed
+
+- 一键脚本复用现有 `run_single_lio_debug.sh`，继续保存控制台、ROS 节点日志、
+  rosbag、参数快照和关键事件摘要。
+- 启动后增加就绪等待和连续稳定确认，要求关键节点（MAVROS、LIO、EKF、
+  `px4ctrl`、`multipointplan`）、IMU、电池、里程计、起飞话题订阅和解锁服务
+  均可用。
+- 起飞前增加地面安全检查：飞控已连接且未解锁、ExtendedState 为地面状态、
+  RC 摇杆居中、悬停/指令模式开关打开，并且 RC 8 通道处于 `DOWN`。
+- 起飞指令只发布一次；脚本会等待 `armed=True` 且 MAVROS 进入离地/起飞状态
+  后报告起飞确认，不会自动触发航点任务。
+- 起飞确认超时不会盲目发送降落指令，而是保持飞行栈运行，提示操作员通过
+  遥控器确认和接管。
+- `multipointplan` 增加点击航点坐标系转换、固定飞行高度和最大点数配置；交互航线
+  不执行 A8 mini 云台动作，适用于拆掉 A8 mini 后的飞行。
+- RViz 配置默认显示交互航点标记；`run_single_lio.sh` 增加
+  `A8MINI_START_GIMBAL_NODE` 和 `A8MINI_START_DETECTION` 环境变量，允许无 A8 mini
+  启动完整 LIO 飞行栈。
+- 更新 `README.md` 和 `A8mini/README.md`，补充一键起飞的使用方法、启动条件
+  、`--start-only` 以及 RViz 点选多航点说明；同时记录项目原有 `3D Nav Goal`
+  单点规划的操作逻辑。
+
+### Usage
+
+```bash
+/home/q/Documents/diff-planner-A8miniV2/sh_files/one_click_takeoff.sh
+```
+
+只启动不自动起飞：
+
+```bash
+/home/q/Documents/diff-planner-A8miniV2/sh_files/one_click_takeoff.sh --start-only
+```
+
+### Verification
+
+- `zsh -n sh_files/one_click_takeoff.sh`：通过。
+- `git diff --check`：通过。
+- `python3 -m unittest test_flight_diagnostics`（在 `sh_files/` 目录执行）：10 项通过。
+- `catkin_make --pkg multipoint -j2`：通过。
+- `roslaunch --nodes multipoint multipointplan_exp_lio.launch start_gimbal_node:=false
+  start_detection:=false`：通过。
+- 本次未连接真实飞机执行实飞测试。
+
+### RViz 点选多航点
+
+启动实机系统时拆掉 A8 mini：
+
+```bash
+A8MINI_START_GIMBAL_NODE=false \
+A8MINI_START_DETECTION=false \
+./sh_files/run_single_lio.sh
+```
+
+在 RViz 选择 **Publish Point**，按顺序点击地图点；确认后选择 **2D Nav Goal**
+作为执行确认，或执行：
+
+```bash
+rostopic pub -1 /mission/start_clicked_route std_msgs/Empty '{}'
+```
+
+交互航线不会自动解锁或起飞。清空航线后才能重新标点：
+
+```bash
+rostopic pub -1 /mission/clear_clicked_route std_msgs/Empty '{}'
+```
+
 ## Unreleased - 2026-08-08
 
 ### Fixed

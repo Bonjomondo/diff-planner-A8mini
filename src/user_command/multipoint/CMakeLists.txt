@@ -12,10 +12,13 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  tf
+  visualization_msgs
 )
 
 catkin_package(
-  CATKIN_DEPENDS geometry_msgs mavros_msgs nav_msgs quadrotor_msgs roscpp rospy std_msgs
+  CATKIN_DEPENDS geometry_msgs mavros_msgs nav_msgs quadrotor_msgs roscpp rospy std_msgs tf
+                 visualization_msgs
   DEPENDS EIGEN3
 )
 

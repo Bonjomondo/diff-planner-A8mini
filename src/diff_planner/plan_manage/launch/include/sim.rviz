@@ -209,6 +209,14 @@ Toolbars:
 Visualization Manager:
   Class: ""
   Displays:
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /mission/clicked_waypoints
+      Name: RViz clicked route
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
     - Alpha: 1
       Class: rviz/Axes
       Enabled: true

@@ -58,6 +58,37 @@ roslaunch diff_planner run_sim_single.launch
   <img src="images/rviz_test.gif" alt="rviz_tes" width="600" />
 </p>
 
+### 2.1 RViz连续点选航线
+
+启动 `multipointplan` 后，可以用 RViz 的 **Publish Point** 工具在建好的地图上
+连续点击多个点。节点会按点击顺序把这些点作为航点，逐点发布到 `/goal`，由
+Diff-Planner 对相邻航点之间的路段进行避障规划；点位会显示为带编号的橙色标记，
+默认飞行高度为 1.0 m。
+
+点击完成后，用 RViz 的 **2D Nav Goal** 工具再点一次作为“开始执行”触发，或者执行：
+
+```bash
+rostopic pub -1 /mission/start_clicked_route std_msgs/Empty '{}'
+```
+
+清空当前点选航线后才能重新标点：
+
+```bash
+rostopic pub -1 /mission/clear_clicked_route std_msgs/Empty '{}'
+```
+
+点选航线不会自动解锁或起飞；应先按原有流程起飞并确认定位、地图和遥控器接管正常。
+实机不使用 A8 mini 时，启动航点节点应同时关闭云台和识别：
+
+```bash
+A8MINI_START_GIMBAL_NODE=false \
+A8MINI_START_DETECTION=false \
+./sh_files/run_single_lio.sh
+```
+
+如果只单独启动 `multipointplan_exp_lio.launch`，则直接传入
+`start_gimbal_node:=false start_detection:=false`。
+
 
 ### 3. 单机预设点飞行：
 在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 的 `waypoints`
@@ -109,6 +140,27 @@ rostopic echo /camera/depth/camera_info
 cd Diff-Planner
 ./sh_files/run_single_lio.sh #请先按照配套的产品手册教程配置途径点位
 ```
+
+如果希望开机后只执行一个文件完成“启动飞行栈并自动起飞”，可直接运行：
+
+```bash
+cd /home/q/Documents/diff-planner-A8miniV2
+./sh_files/one_click_takeoff.sh
+```
+
+该入口会自动加载 ROS 和当前工作空间，不需要另外执行 `source`。它会等待
+MAVROS、LIO/EKF、RC、里程计和飞控地面状态满足条件后才发送一次起飞指令；
+脚本随后保持运行，按 `Ctrl+C` 可正常停止节点并保存调试日志。只启动系统而不
+发送起飞指令时使用：
+
+```bash
+./sh_files/one_click_takeoff.sh --start-only
+```
+
+起飞前仍需确认桨叶、场地、电池和遥控器安全；遥控器摇杆应居中，模式/指令开关
+应打开，RC 8 通道应处于 DOWN。该脚本只负责起飞，不会自动开始航点任务；起飞
+确认后再将 RC 8 拨到 UP，或手动发布任务触发消息。
+
 ### 2. 视觉定位下规划：
 ```
 cd Diff-Planner

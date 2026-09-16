@@ -227,6 +227,16 @@ rostopic pub -1 /mission/gimbal_task std_msgs/Float64MultiArray \
 
 需要排查航点、遥控器拨杆、降落或云台问题时，使用调试启动脚本代替普通脚本：
 
+日常需要开机一键启动并自动起飞时，直接执行工作空间中的：
+
+```bash
+./sh_files/one_click_takeoff.sh
+```
+
+它会自动加载 ROS/工作空间，等待飞控、定位、RC 和地面状态满足安全条件后发送
+一次起飞指令；不会自动启动航点任务。只启动不发送起飞指令可执行
+`./sh_files/one_click_takeoff.sh --start-only`。
+
 本次降落故障的完整日志证据、根因和复测标准见
 [降落失败 Bug/问题分析](./%E9%99%8D%E8%90%BD%E5%A4%B1%E8%B4%A5Bug%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90.md)。
 

@@ -10,6 +10,12 @@
     <arg name="back_plan" default="1" />
     <arg name="enable_rc" default="false" />
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps_sim.csv" />
+    <arg name="goal_frame_id" default="world" />
+    <arg name="enable_rviz_click_route" default="true" />
+    <arg name="clicked_point_topic" default="/clicked_point" />
+    <arg name="clicked_point_height" default="1.0" />
+    <arg name="clicked_point_use_z" default="false" />
+    <arg name="clicked_max_points" default="50" />
     <arg name="start_gimbal_node" default="true" />
     <!-- 未传 launch 覆盖值时，使用任务 YAML 中的 enable_auto_recording。 -->
     <arg name="enable_auto_recording" default="" />
@@ -18,6 +24,7 @@
     <node pkg="multipoint" name="multipointplan" type="multipointplan" output="screen">
         <remap from="odom_topic" to="$(arg odom_topic)" />
         <param name="yaml_path" value="$(arg yaml_path)" />
+        <param name="goal_frame_id" value="$(arg goal_frame_id)" />
         <param name="position_tolerance" value="$(arg next_distance)" />
         <param name="velocity_tolerance" value="$(arg velocity_tolerance)" />
         <param name="arrival_stable_sec" value="$(arg arrival_stable_sec)" />
@@ -27,6 +34,11 @@
         <param name="back_plan" value="$(arg back_plan)" />
         <param name="enable_rc" value="$(arg enable_rc)" />
         <param name="mission_csv_path" value="$(arg mission_csv_path)" />
+        <param name="enable_rviz_click_route" value="$(arg enable_rviz_click_route)" />
+        <param name="clicked_point_topic" value="$(arg clicked_point_topic)" />
+        <param name="clicked_point_height" value="$(arg clicked_point_height)" />
+        <param name="clicked_point_use_z" value="$(arg clicked_point_use_z)" />
+        <param name="clicked_max_points" value="$(arg clicked_max_points)" />
     </node>
 
     <group if="$(arg start_gimbal_node)">

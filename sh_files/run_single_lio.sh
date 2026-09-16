@@ -3,6 +3,11 @@
 echo '1' | sudo -S chmod 777 /dev/tty* & sleep 1
 export DRONE_ID=0
 
+# A8 mini is optional. Override these when the camera/gimbal is not mounted:
+# A8MINI_START_GIMBAL_NODE=false A8MINI_START_DETECTION=false ./sh_files/run_single_lio.sh
+A8MINI_START_GIMBAL_NODE="${A8MINI_START_GIMBAL_NODE:-true}"
+A8MINI_START_DETECTION="${A8MINI_START_DETECTION:-true}"
+
 wait_for_mavros_connection() {
   local timeout_s=30
   local start_time=$SECONDS
@@ -79,6 +84,8 @@ roslaunch faster_lio mapping_mid360.launch & sleep 10
 roslaunch ekf ekf_lidar.launch & sleep 5
 roslaunch diff_planner run_exp_single_lio.launch & sleep 3
 roslaunch px4ctrl run_ctrl_lio.launch & sleep 3
-roslaunch multipoint multipointplan_exp_lio.launch & sleep 2
+roslaunch multipoint multipointplan_exp_lio.launch \
+  start_gimbal_node:="${A8MINI_START_GIMBAL_NODE}" \
+  start_detection:="${A8MINI_START_DETECTION}" & sleep 2
 roslaunch diff_planner exp_rviz.launch & sleep 1
 wait

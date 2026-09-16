@@ -2,6 +2,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include <Eigen/Dense>
+#include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/RCIn.h>
 #include <nav_msgs/Odometry.h>
@@ -9,6 +10,9 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <std_msgs/UInt32.h>
+#include <tf/transform_listener.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <cmath>
 #include <cstdint>
@@ -68,6 +72,7 @@ public:
           current_index_(0),
           odom_received_(false),
           mission_uses_gimbal_(true),
+          clicked_route_started_(false),
           rc_eight_pre_(RC_EIGHT_DOWN),
           rc_initialized_(false),
           landing_latched_(false),
@@ -85,10 +90,17 @@ public:
         pnh_.param("start_plan", enable_start_trigger_, 1);
         pnh_.param("back_plan", enable_back_trigger_, 1);
         pnh_.param("enable_rc", enable_rc_, true);
+        pnh_.param("enable_rviz_click_route", enable_rviz_click_route_, true);
+        pnh_.param<std::string>("clicked_point_topic", clicked_point_topic_,
+                                "/clicked_point");
+        pnh_.param("clicked_point_height", clicked_point_height_, 1.0);
+        pnh_.param("clicked_point_use_z", clicked_point_use_z_, false);
+        pnh_.param("clicked_max_points", clicked_max_points_, 50);
 
         if (position_tolerance_ <= 0.0 || velocity_tolerance_ < 0.0 ||
             arrival_stable_sec_ < 0.0 || gimbal_retry_sec_ <= 0.0 ||
-            land_command_retry_sec_ <= 0.0)
+            land_command_retry_sec_ <= 0.0 || clicked_max_points_ <= 0 ||
+            !finite(clicked_point_height_))
         {
             throw std::runtime_error("Invalid mission tolerance or timing parameter");
         }
@@ -105,6 +117,9 @@ public:
             nh_.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
         backcommand_pub_ =
             nh_.advertise<geometry_msgs::PoseStamped>("/back_trigger", 10);
+        clicked_markers_pub_ =
+            nh_.advertise<visualization_msgs::MarkerArray>("/mission/clicked_waypoints", 1,
+                                                            true);
 
         odom_sub_ = nh_.subscribe("odom_topic", 10, &MultipointPlanner::odomCallback, this);
         gimbal_done_sub_ = nh_.subscribe("/mission/gimbal_done", 10,
@@ -123,12 +138,25 @@ public:
         {
             rc_sub_ = nh_.subscribe("/mavros/rc/in", 10, &MultipointPlanner::rcCallback, this);
         }
+        if (enable_rviz_click_route_)
+        {
+            clicked_point_sub_ = nh_.subscribe(clicked_point_topic_, 50,
+                                                &MultipointPlanner::clickedPointCallback, this);
+            start_clicked_route_sub_ = nh_.subscribe(
+                "/mission/start_clicked_route", 1,
+                &MultipointPlanner::startClickedRouteCallback, this);
+            clear_clicked_route_sub_ = nh_.subscribe(
+                "/mission/clear_clicked_route", 1,
+                &MultipointPlanner::clearClickedRouteCallback, this);
+            publishClickedMarkers();
+        }
 
         timer_ = nh_.createTimer(ros::Duration(0.05), &MultipointPlanner::timerCallback, this);
 
-        ROS_INFO("A8 mini mission ready: %zu waypoint(s), position tolerance %.2f m, "
-                 "velocity tolerance %.2f m/s",
-                 mission_waypoints_.size(), position_tolerance_, velocity_tolerance_);
+        ROS_INFO("Mission ready: %zu YAML waypoint(s), position tolerance %.2f m, "
+                 "velocity tolerance %.2f m/s, RViz click route %s",
+                 mission_waypoints_.size(), position_tolerance_, velocity_tolerance_,
+                 enable_rviz_click_route_ ? "enabled" : "disabled");
     }
 
 private:
@@ -314,7 +342,212 @@ private:
             ROS_WARN("Ignoring start trigger because a mission is already active");
             return;
         }
+        if (enable_rviz_click_route_ && !clicked_waypoints_.empty() &&
+            !clicked_route_started_)
+        {
+            startClickedRoute();
+            return;
+        }
         startMission(mission_waypoints_, true);
+    }
+
+    Waypoint makeClickedWaypoint(const geometry_msgs::Point &point, uint32_t id) const
+    {
+        Waypoint waypoint;
+        waypoint.id = id;
+        waypoint.x = point.x;
+        waypoint.y = point.y;
+        waypoint.z = clicked_point_use_z_ ? point.z : clicked_point_height_;
+        waypoint.hover_sec = 0.0;
+        waypoint.gimbal_yaw_deg = 0.0;
+        waypoint.gimbal_yaw_min_deg = -135.0;
+        waypoint.gimbal_yaw_max_deg = 135.0;
+        waypoint.gimbal_pitch_deg = 0.0;
+        waypoint.gimbal_settle_sec = 0.0;
+        waypoint.gimbal_mode = GIMBAL_ANGLE;
+        waypoint.run_gimbal = false;
+        return waypoint;
+    }
+
+    void clickedPointCallback(const geometry_msgs::PointStampedConstPtr &msg)
+    {
+        if (!enable_rviz_click_route_)
+        {
+            return;
+        }
+        if (state_ != FINISHED || clicked_route_started_)
+        {
+            ROS_WARN_THROTTLE(3.0,
+                              "Ignoring RViz point: clear the finished route before marking "
+                              "a new one");
+            return;
+        }
+        if (static_cast<int>(clicked_waypoints_.size()) >= clicked_max_points_)
+        {
+            ROS_WARN_THROTTLE(3.0, "RViz click route reached its %d-point limit",
+                              clicked_max_points_);
+            return;
+        }
+        if (msg->header.frame_id.empty())
+        {
+            ROS_WARN("Ignoring RViz point without a frame_id");
+            return;
+        }
+
+        geometry_msgs::PointStamped point_in_goal_frame = *msg;
+        if (msg->header.frame_id != goal_frame_id_)
+        {
+            try
+            {
+                tf_listener_.transformPoint(goal_frame_id_, *msg, point_in_goal_frame);
+            }
+            catch (const tf::TransformException &error)
+            {
+                ROS_WARN("Cannot transform clicked point from '%s' to '%s': %s",
+                         msg->header.frame_id.c_str(), goal_frame_id_.c_str(), error.what());
+                return;
+            }
+        }
+
+        const geometry_msgs::Point &point = point_in_goal_frame.point;
+        const double z = clicked_point_use_z_ ? point.z : clicked_point_height_;
+        if (!finite(point.x) || !finite(point.y) || !finite(z))
+        {
+            ROS_WARN("Ignoring non-finite RViz clicked point");
+            return;
+        }
+
+        const uint32_t id = static_cast<uint32_t>(clicked_waypoints_.size() + 1);
+        clicked_waypoints_.push_back(makeClickedWaypoint(point, id));
+        publishClickedMarkers();
+        ROS_INFO("RViz route point %u added: [%.2f, %.2f, %.2f] in frame '%s'",
+                 id, point.x, point.y, z, goal_frame_id_.c_str());
+    }
+
+    void startClickedRouteCallback(const std_msgs::EmptyConstPtr &)
+    {
+        startClickedRoute();
+    }
+
+    void startClickedRoute()
+    {
+        if (!enable_rviz_click_route_ || clicked_waypoints_.empty())
+        {
+            ROS_WARN("No RViz clicked points are waiting to be flown");
+            return;
+        }
+        if (landing_latched_)
+        {
+            ROS_WARN("Ignoring RViz route start because landing is latched");
+            return;
+        }
+        if (state_ != FINISHED || clicked_route_started_)
+        {
+            ROS_WARN("Ignoring RViz route start because a route is already active or consumed");
+            return;
+        }
+
+        clicked_route_started_ = true;
+        startMission(clicked_waypoints_, false);
+        ROS_INFO("Started RViz clicked route with %zu point(s); A8 mini actions disabled",
+                 active_waypoints_.size());
+    }
+
+    void clearClickedRouteCallback(const std_msgs::EmptyConstPtr &)
+    {
+        if (state_ != FINISHED)
+        {
+            ROS_WARN("Cannot clear RViz clicked route while it is active; land first");
+            return;
+        }
+        clicked_waypoints_.clear();
+        clicked_route_started_ = false;
+        publishClickedMarkers();
+        ROS_INFO("Cleared RViz clicked route");
+    }
+
+    void publishClickedMarkers()
+    {
+        if (!enable_rviz_click_route_)
+        {
+            return;
+        }
+
+        const ros::Time stamp = ros::Time::now();
+        visualization_msgs::MarkerArray marker_array;
+
+        visualization_msgs::Marker points;
+        points.header.frame_id = goal_frame_id_;
+        points.header.stamp = stamp;
+        points.ns = "rviz_clicked_route";
+        points.id = 0;
+        points.type = visualization_msgs::Marker::SPHERE_LIST;
+        points.action = clicked_waypoints_.empty() ? visualization_msgs::Marker::DELETE
+                                                    : visualization_msgs::Marker::ADD;
+        points.pose.orientation.w = 1.0;
+        points.scale.x = 0.22;
+        points.scale.y = 0.22;
+        points.scale.z = 0.22;
+        points.color.r = 1.0;
+        points.color.g = 0.65;
+        points.color.b = 0.05;
+        points.color.a = 1.0;
+
+        visualization_msgs::Marker line;
+        line.header = points.header;
+        line.ns = points.ns;
+        line.id = 1;
+        line.type = visualization_msgs::Marker::LINE_STRIP;
+        line.action = clicked_waypoints_.size() < 2 ? visualization_msgs::Marker::DELETE
+                                                    : visualization_msgs::Marker::ADD;
+        line.pose.orientation.w = 1.0;
+        line.scale.x = 0.05;
+        line.color.r = 1.0;
+        line.color.g = 0.35;
+        line.color.b = 0.05;
+        line.color.a = 0.9;
+
+        for (std::size_t i = 0; i < clicked_waypoints_.size(); ++i)
+        {
+            geometry_msgs::Point marker_point;
+            marker_point.x = clicked_waypoints_[i].x;
+            marker_point.y = clicked_waypoints_[i].y;
+            marker_point.z = clicked_waypoints_[i].z;
+            points.points.push_back(marker_point);
+            line.points.push_back(marker_point);
+
+            visualization_msgs::Marker label;
+            label.header = points.header;
+            label.ns = points.ns;
+            label.id = static_cast<int32_t>(1000 + i);
+            label.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+            label.action = visualization_msgs::Marker::ADD;
+            label.pose.orientation.w = 1.0;
+            label.pose.position = marker_point;
+            label.pose.position.z += 0.18;
+            label.scale.z = 0.24;
+            label.color.r = 1.0;
+            label.color.g = 0.9;
+            label.color.b = 0.1;
+            label.color.a = 1.0;
+            label.text = std::to_string(i + 1);
+            marker_array.markers.push_back(label);
+        }
+
+        marker_array.markers.push_back(points);
+        marker_array.markers.push_back(line);
+        for (std::size_t i = clicked_waypoints_.size(); i < last_clicked_marker_count_; ++i)
+        {
+            visualization_msgs::Marker label;
+            label.header = points.header;
+            label.ns = points.ns;
+            label.id = static_cast<int32_t>(1000 + i);
+            label.action = visualization_msgs::Marker::DELETE;
+            marker_array.markers.push_back(label);
+        }
+
+        clicked_markers_pub_.publish(marker_array);
+        last_clicked_marker_count_ = clicked_waypoints_.size();
     }
 
     void backCallback(const geometry_msgs::PoseStamped::ConstPtr &)
@@ -746,16 +979,22 @@ private:
     ros::Publisher planning_stop_pub_;
     ros::Publisher startcommand_pub_;
     ros::Publisher backcommand_pub_;
+    ros::Publisher clicked_markers_pub_;
     ros::Subscriber odom_sub_;
     ros::Subscriber gimbal_done_sub_;
     ros::Subscriber startcommand_sub_;
     ros::Subscriber backcommand_sub_;
     ros::Subscriber rc_sub_;
+    ros::Subscriber clicked_point_sub_;
+    ros::Subscriber start_clicked_route_sub_;
+    ros::Subscriber clear_clicked_route_sub_;
     ros::Timer timer_;
+    tf::TransformListener tf_listener_;
 
     std::vector<Waypoint> mission_waypoints_;
     std::vector<Waypoint> return_waypoints_;
     std::vector<Waypoint> active_waypoints_;
+    std::vector<Waypoint> clicked_waypoints_;
     MissionState state_;
     std::size_t current_index_;
 
@@ -763,6 +1002,10 @@ private:
     Eigen::Vector3d odom_velocity_;
     bool odom_received_;
     bool mission_uses_gimbal_;
+    bool clicked_route_started_;
+    bool enable_rviz_click_route_;
+    bool clicked_point_use_z_;
+    std::size_t last_clicked_marker_count_ = 0;
 
     ros::Time arrival_candidate_time_;
     ros::Time arrived_time_;
@@ -778,6 +1021,9 @@ private:
     double arrival_stable_sec_;
     double gimbal_retry_sec_;
     double land_command_retry_sec_;
+    double clicked_point_height_;
+    int clicked_max_points_;
+    std::string clicked_point_topic_;
     int enable_start_trigger_;
     int enable_back_trigger_;
     bool enable_rc_;

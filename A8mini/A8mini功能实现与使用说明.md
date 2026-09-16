@@ -146,6 +146,10 @@ pitch:  -90° ~ 25°
 | `odom_topic` | `nav_msgs/Odometry` | 定位端 → `multipointplan` | 判断位置误差和飞行速度 |
 | `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | 用户 → `multipointplan` | 触发主航点任务 |
 | `/back_trigger` | `geometry_msgs/PoseStamped` | 用户 → `multipointplan` | 触发可选返程路线 |
+| `/clicked_point` | `geometry_msgs/PointStamped` | RViz → `multipointplan` | 按顺序收集交互航点 |
+| `/mission/start_clicked_route` | `std_msgs/Empty` | 用户 → `multipointplan` | 开始执行已收集的 RViz 航线 |
+| `/mission/clear_clicked_route` | `std_msgs/Empty` | 用户 → `multipointplan` | 清空已收集的 RViz 航线 |
+| `/mission/clicked_waypoints` | `visualization_msgs/MarkerArray` | `multipointplan` → RViz | 显示编号航点和连线 |
 
 ### 3.4 航点配置
 
@@ -479,7 +483,44 @@ rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
 
 触发消息的位置内容不会被当作航点；它只起“开始执行 `points.yaml`”的作用。
 
-### 7.2 使用遥控器 8 通道
+### 7.2 使用 RViz 点选多航点
+
+`multipointplan` 默认开启 RViz 交互航线。选择 RViz 工具栏的 **Publish Point**，
+在地图上依次点击想要经过的点；节点会按照点击顺序收集航点，并在
+`/mission/clicked_waypoints` 发布带编号的标记和连线。
+
+交互航点默认使用 `clicked_point_height` 指定的固定高度（实机 launch 默认 1.0 m），
+这样点击到地面或障碍物表面时不会把表面高度直接当成飞行高度。确认所有点后，使用
+**2D Nav Goal** 再点击一次，或执行：
+
+```bash
+rostopic pub -1 /mission/start_clicked_route std_msgs/Empty '{}'
+```
+
+这条交互航线不执行 A8 mini 云台动作，适合拆掉 A8 mini 后使用。每个航点到达并稳定
+后，节点才会把下一个点发布给 Diff-Planner；因此相邻点之间仍然经过现有局部避障规划。
+交互航点不会自动解锁或起飞，起飞和降落仍由原有 PX4/遥控器流程负责。
+
+如果通过完整的 `sh_files/run_single_lio.sh` 启动实机系统，拆掉 A8 mini 后使用：
+
+```bash
+A8MINI_START_GIMBAL_NODE=false \
+A8MINI_START_DETECTION=false \
+./sh_files/run_single_lio.sh
+```
+
+这两个环境变量默认仍为 `true`，以保持原有 A8 mini 设备的启动行为。
+
+任务结束并落地后，清空点位才能标记下一条航线：
+
+```bash
+rostopic pub -1 /mission/clear_clicked_route std_msgs/Empty '{}'
+```
+
+如果 RViz 的固定坐标系不是 `world`，应通过 launch 的 `goal_frame_id` 设置目标坐标系；
+节点会尝试将 `/clicked_point` 从其消息坐标系转换到该目标坐标系。
+
+### 7.3 使用遥控器 8 通道
 
 保留的默认逻辑是：
 
@@ -509,7 +550,7 @@ rostopic echo /mavros/rc/in
 roslaunch multipoint multipointplan_exp_lio.launch enable_rc:=false
 ```
 
-### 7.3 返程触发
+### 7.4 返程触发
 
 只有 `points.yaml` 中配置了 `test_back` 时才能使用：
 
@@ -535,6 +576,12 @@ LIO/VIO 实机 launch 支持下列参数：
 | `back_plan` | `1` | 是否订阅返程触发 |
 | `enable_rc` | `true` | 是否使用遥控器 8 通道逻辑 |
 | `mission_csv_path` | `/tmp/a8mini_mission_timestamps.csv` | 任务时间记录文件 |
+| `goal_frame_id` | `world` | 规划目标和交互航点使用的目标坐标系 |
+| `enable_rviz_click_route` | `true` | 是否接收 RViz `/clicked_point` 交互航线 |
+| `clicked_point_topic` | `/clicked_point` | RViz 点选话题 |
+| `clicked_point_height` | `1.0` | 交互航点固定飞行高度，单位 m |
+| `clicked_point_use_z` | `false` | 是否直接使用 `/clicked_point` 的 z 值；实机通常保持 false |
+| `clicked_max_points` | `50` | 单条交互航线最多点数 |
 | `start_gimbal_node` | `true` | 是否同时启动 Python 云台节点 |
 | `camera_ip` | `192.168.144.25` | A8 mini IP |
 | `camera_port` | `37260` | A8 mini UDP 控制端口 |
