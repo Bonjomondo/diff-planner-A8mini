@@ -22,7 +22,7 @@ touch "${LOG_DIR}/run_started.marker"
 export ROS_LOG_DIR="${LOG_DIR}/ros"
 export UAV_DEBUG_LOG_DIR="${LOG_DIR}"
 
-exec > >(tee -a "${LOG_DIR}/console.log") 2>&1
+exec > >(tee -i -a "${LOG_DIR}/console.log") 2>&1
 
 typeset -g RUN_PID=""
 typeset -g BAG_PID=""
@@ -59,18 +59,22 @@ cleanup_debug_run() {
     timeout 5 rosparam dump "${LOG_DIR}/rosparams.final.yaml" > "${LOG_DIR}/rosparam_final_dump.log" 2>&1
     echo "$(date -Is) final_dump_exit_status=$?" >> "${LOG_DIR}/snapshot_status.log"
 
+    # Keep the recorder alive until the owned flight stack (including detached
+    # detector workers) has really exited. TERM reaches background shell traps.
+    if [[ -n "${RUN_PID}" ]] && kill -0 "${RUN_PID}" 2>/dev/null; then
+        echo "[debug] Stopping flight stack before finalizing rosbag..."
+        kill -TERM "${RUN_PID}" 2>/dev/null
+        wait "${RUN_PID}" 2>/dev/null
+    fi
+
     if [[ -n "${BAG_PID}" ]] && kill -0 "${BAG_PID}" 2>/dev/null; then
         echo "[debug] Finalizing rosbag..."
-        kill -INT "${BAG_PID}" 2>/dev/null
+        kill -TERM "${BAG_PID}" 2>/dev/null
         wait "${BAG_PID}" 2>/dev/null
     fi
 
     if [[ -f "${LOG_DIR}/flight_debug.bag" ]]; then
         rosbag info "${LOG_DIR}/flight_debug.bag" > "${LOG_DIR}/rosbag_info.txt" 2>&1 || true
-    fi
-
-    if [[ -n "${RUN_PID}" ]] && kill -0 "${RUN_PID}" 2>/dev/null; then
-        kill -INT "${RUN_PID}" 2>/dev/null
     fi
 
     if [[ -n "${DIAGNOSTICS_PID}" ]]; then
@@ -142,6 +146,8 @@ source "${WORKSPACE_DIR}/devel/setup.zsh"
 
 cp "${0:A}" "${LOG_DIR}/run_single_lio_debug.sh.snapshot"
 cp "${RUN_SCRIPT}" "${LOG_DIR}/run_single_lio.sh.snapshot"
+cp "${SCRIPT_DIR}/one_click_takeoff.sh" "${LOG_DIR}/one_click_takeoff.sh.snapshot"
+cp "${SCRIPT_DIR}/process_supervisor.py" "${LOG_DIR}/process_supervisor.py.snapshot"
 cp "${WORKSPACE_DIR}/src/user_command/multipoint/config/points.yaml" \
    "${LOG_DIR}/points.yaml.snapshot" 2>/dev/null || true
 cp "${WORKSPACE_DIR}/src/user_command/multipoint/config/a8mini_detection.yaml" \
@@ -172,7 +178,8 @@ if [[ "${UAV_DEBUG_DIAGNOSTICS:-1}" == "1" ]]; then
                       --max-mb "${UAV_DEBUG_DIAG_MAX_MB:-20}")
     [[ "${UAV_DEBUG_DIAG_PROBES:-1}" == "0" ]] && DIAGNOSTICS_ARGS+=(--no-probes)
     [[ "${UAV_DEBUG_CAMERA_PING:-1}" == "0" ]] && DIAGNOSTICS_ARGS+=(--no-ping)
-    /usr/bin/python3 -u "${SCRIPT_DIR}/flight_diagnostics.py" "${DIAGNOSTICS_ARGS[@]}" \
+    /usr/bin/python3 "${SCRIPT_DIR}/process_supervisor.py" --ignore-terminal-int -- \
+        /usr/bin/python3 -u "${SCRIPT_DIR}/flight_diagnostics.py" "${DIAGNOSTICS_ARGS[@]}" \
         > "${LOG_DIR}/diagnostics.log" 2>&1 &
     DIAGNOSTICS_PID=$!
     echo "[debug] Host/camera diagnostics started, pid=${DIAGNOSTICS_PID}"
@@ -182,7 +189,7 @@ fi
 RUN_PID=$!
 
 integer master_wait=0
-while ! rosnode list >/dev/null 2>&1; do
+while ! timeout 3 rosnode list >/dev/null 2>&1; do
     if ! kill -0 "${RUN_PID}" 2>/dev/null; then
         echo "[debug] run_single_lio.sh exited before the ROS master became available"
         wait "${RUN_PID}"
@@ -191,8 +198,7 @@ while ! rosnode list >/dev/null 2>&1; do
     fi
     if (( master_wait >= 60 )); then
         echo "[debug] ROS master was not available after 60 seconds; aborting debug run"
-        wait "${RUN_PID}"
-        RUN_STATUS=$?
+        RUN_STATUS=1
         exit "${RUN_STATUS}"
     fi
     sleep 1
@@ -221,9 +227,16 @@ BAG_TOPICS=(
     /ekf/ekf_odom
     /setpoints_cmd
     /debugPx4ctrl
+    /px4ctrl/state
+    /px4ctrl/mission_ready
     /traj_start_trigger
     /goal
     /move_base_simple/goal
+    /clicked_point
+    /mission/start_clicked_route
+    /mission/clear_clicked_route
+    /mission/land
+    /mission/clicked_waypoints
     /back_trigger
     /planning/stop
     /planning/yaw
@@ -246,7 +259,8 @@ if [[ "${UAV_DEBUG_RECORD_MAVLINK:-0}" == "1" ]]; then
     echo "[debug] Raw MAVLink recording enabled (/mavlink/from, /mavlink/to)"
 fi
 
-rosbag record --tcpnodelay -O "${LOG_DIR}/flight_debug.bag" \
+/usr/bin/python3 "${SCRIPT_DIR}/process_supervisor.py" --ignore-terminal-int -- \
+    rosbag record --tcpnodelay -O "${LOG_DIR}/flight_debug.bag" \
     "${BAG_TOPICS[@]}" \
     > "${LOG_DIR}/rosbag.log" 2>&1 &
 BAG_PID=$!

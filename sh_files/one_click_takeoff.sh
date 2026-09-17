@@ -81,7 +81,7 @@ cleanup() {
 
     if stack_process_running; then
         echo "[one-click] 正在停止飞行栈，等待日志和 rosbag 收尾..."
-        kill -INT "${STACK_PID}" 2>/dev/null || true
+        kill -TERM "${STACK_PID}" 2>/dev/null || true
         wait "${STACK_PID}" 2>/dev/null || true
     fi
 }
@@ -269,14 +269,15 @@ wait_for_takeoff_confirmation() {
             return 1
         fi
 
-        local state extended_state
+        local state extended_state controller_ready
         state="$(topic_once /mavros/state)" || state=""
         extended_state="$(topic_once /mavros/extended_state)" || extended_state=""
+        controller_ready="$(topic_once /px4ctrl/mission_ready)" || controller_ready=""
         if [[ "${state}" == *"armed: True"* ]] &&
-           ([[ "${extended_state}" == *"landed_state: 2"* ]] ||
-            [[ "${extended_state}" == *"landed_state: 3"* ]] ||
-            [[ "${extended_state}" == *"landed_state: 4"* ]]); then
-            echo "[one-click] 已确认：飞控 armed=True，ExtendedState 已离地/起飞。"
+           [[ "${state}" == *"mode: \"OFFBOARD\""* || "${state}" == *"mode: OFFBOARD"* ]] &&
+           [[ "${extended_state}" == *"landed_state: 2"* ]] &&
+           [[ "${controller_ready}" == *"data: True"* ]]; then
+            echo "[one-click] 已确认：OFFBOARD、IN_AIR，控制器已完成起飞并进入可执行任务的悬停状态。"
             return 0
         fi
 
@@ -322,8 +323,9 @@ if [[ "${RUN_MODE}" == "start-only" ]]; then
 fi
 
 if ! send_takeoff; then
-    echo "[one-click] 起飞消息发布失败；未自动重试。" >&2
-    exit 1
+    echo "[one-click] 起飞发布未正常完成，消息可能已送达；保留飞行栈，请检查并用遥控器接管。" >&2
+    wait "${STACK_PID}"
+    exit $?
 fi
 
 if ! wait_for_takeoff_confirmation; then
@@ -334,7 +336,7 @@ if ! wait_for_takeoff_confirmation; then
     exit "${STACK_EXIT_STATUS}"
 fi
 
-echo "[one-click] 起飞流程完成，系统继续运行。后续可用 RC8 UP 启动航点任务。"
+echo "[one-click] 起飞流程完成。点击模式请先用 Publish Point 标点，再用 2D Nav Goal 或 RC8 UP 开始。"
 wait "${STACK_PID}"
 STACK_EXIT_STATUS=$?
 exit "${STACK_EXIT_STATUS}"

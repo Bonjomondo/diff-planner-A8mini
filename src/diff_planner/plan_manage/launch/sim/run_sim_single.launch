@@ -1,4 +1,5 @@
 <launch>
+    <arg name="mission_source" default="preset" />
     <arg name="map_size_x" value="200.0"/>
     <arg name="map_size_y" value="200.0"/>
     <arg name="map_size_z" value=" 3.0"/>
@@ -37,7 +38,8 @@
         <arg name="odom_topic" value="$(arg odom_topic)"/>
         <arg name="flight_type" value="1"/>
     </include>
-    <include file="$(find multipoint)/launch/multipointplan_sim.launch" />
+    <include file="$(find multipoint)/launch/multipointplan_sim.launch">
+        <arg name="mission_source" value="$(arg mission_source)" />
+    </include>
     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find diff_planner)/launch/include/sim.rviz" required="true" />
 </launch>
-

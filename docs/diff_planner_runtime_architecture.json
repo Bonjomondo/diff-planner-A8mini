@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Diff-Planner 运行时系统架构 (A8mini V2)",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1140, 440],
+    "views": [
+      {
+        "id": "full-pipeline",
+        "label": "端到端自主飞行全链路",
+        "focus": ["mid360", "faster_lio", "ekf_pose", "grid_map", "diff_planner", "traj_server", "px4ctrl", "px4_fcu"],
+        "note": "激光点云采集、高频里程计建图、实时避障规划与底层姿态控制闭环。"
+      },
+      {
+        "id": "mission-gimbal",
+        "label": "航点任务与云台协同",
+        "focus": ["rc_gcs", "multipoint", "gimbal_node", "a8mini_cam", "diff_planner"],
+        "note": "多航点调度、悬停到位判定、A8mini 云台扫描与飞行状态自动录像。"
+      },
+      {
+        "id": "perception-control",
+        "label": "感知融合与底层控制",
+        "focus": ["mid360", "faster_lio", "ekf_pose", "px4ctrl", "px4_fcu"],
+        "note": "Faster-LIO 与 EKF 多源状态估计融合，向 px4ctrl 提供 100Hz 稳定里程计。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "rc_gcs",
+      "type": "external",
+      "label": "地面站 / 遥控器",
+      "sublabel": "RC 拨杆 / 3D 目标点",
+      "pos": [40, 70],
+      "size": [130, 48]
+    },
+    {
+      "id": "multipoint",
+      "type": "backend",
+      "label": "任务调度器",
+      "sublabel": "multipointplan 节点",
+      "pos": [250, 70],
+      "size": [140, 48]
+    },
+    {
+      "id": "gimbal_node",
+      "type": "backend",
+      "label": "云台控制节点",
+      "sublabel": "a8mini_gimbal 状态机",
+      "pos": [470, 70],
+      "size": [140, 48]
+    },
+    {
+      "id": "a8mini_cam",
+      "type": "external",
+      "label": "思翼 A8 mini",
+      "sublabel": "三轴云台相机 (UDP)",
+      "pos": [690, 70],
+      "size": [140, 48]
+    },
+    {
+      "id": "mid360",
+      "type": "frontend",
+      "label": "Livox Mid-360",
+      "sublabel": "3D LiDAR 激光雷达",
+      "pos": [40, 190],
+      "size": [130, 48]
+    },
+    {
+      "id": "faster_lio",
+      "type": "backend",
+      "label": "Faster-LIO",
+      "sublabel": "激光里程计与点云配准",
+      "pos": [250, 190],
+      "size": [140, 48]
+    },
+    {
+      "id": "grid_map",
+      "type": "database",
+      "label": "3D 局部占据栅格",
+      "sublabel": "Grid Map & 膨胀/安全壁",
+      "pos": [470, 190],
+      "size": [140, 48]
+    },
+    {
+      "id": "diff_planner",
+      "type": "backend",
+      "label": "Diff-Planner 核心",
+      "sublabel": "FSM + A* + 轨迹优化",
+      "pos": [690, 190],
+      "size": [150, 48]
+    },
+    {
+      "id": "traj_server",
+      "type": "backend",
+      "label": "轨迹服务器",
+      "sublabel": "traj_server 采样/Yaw",
+      "pos": [920, 190],
+      "size": [140, 48]
+    },
+    {
+      "id": "ekf_pose",
+      "type": "backend",
+      "label": "EKF 融合定位",
+      "sublabel": "IMU + 里程计滤波",
+      "pos": [250, 310],
+      "size": [140, 48]
+    },
+    {
+      "id": "px4ctrl",
+      "type": "backend",
+      "label": "PX4 控制器",
+      "sublabel": "px4ctrl SO(3) 几何控制",
+      "pos": [690, 310],
+      "size": [150, 48]
+    },
+    {
+      "id": "px4_fcu",
+      "type": "security",
+      "label": "PX4 飞控硬件",
+      "sublabel": "Pixhawk 飞控 / MAVROS",
+      "pos": [920, 310],
+      "size": [140, 48]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "机载计算平台 (DM-Orin NX / ROS 1 Noetic)",
+      "wraps": [
+        "multipoint",
+        "gimbal_node",
+        "faster_lio",
+        "grid_map",
+        "diff_planner",
+        "traj_server",
+        "ekf_pose",
+        "px4ctrl"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "任务与运动规划核心 (Planning Pipeline)",
+      "wraps": ["multipoint", "gimbal_node", "diff_planner", "traj_server"]
+    },
+    {
+      "kind": "security-group",
+      "label": "感知定位与底层控制 (Perception & Control)",
+      "wraps": ["faster_lio", "grid_map", "ekf_pose", "px4ctrl"]
+    }
+  ],
+  "connections": [
+    {
+      "id": "rc-to-mission",
+      "from": "rc_gcs",
+      "to": "multipoint",
+      "label": "触发 / 航点",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mission-to-gimbal",
+      "from": "multipoint",
+      "to": "gimbal_node",
+      "label": "gimbal_task"
+    },
+    {
+      "id": "gimbal-to-cam",
+      "from": "gimbal_node",
+      "to": "a8mini_cam",
+      "label": "UDP:37260",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mission-to-planner",
+      "from": "multipoint",
+      "to": "diff_planner",
+      "label": "目标航点 /goal",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "mid360-to-lio",
+      "from": "mid360",
+      "to": "faster_lio",
+      "label": "点云 & IMU"
+    },
+    {
+      "id": "lio-to-grid",
+      "from": "faster_lio",
+      "to": "grid_map",
+      "label": "注册点云"
+    },
+    {
+      "id": "lio-to-ekf",
+      "from": "faster_lio",
+      "to": "ekf_pose",
+      "label": "激光里程计",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 20
+    },
+    {
+      "id": "ekf-to-grid",
+      "from": "ekf_pose",
+      "to": "grid_map",
+      "label": "位姿更新",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "grid-to-planner",
+      "from": "grid_map",
+      "to": "diff_planner",
+      "label": "栅格距离场"
+    },
+    {
+      "id": "planner-to-traj",
+      "from": "diff_planner",
+      "to": "traj_server",
+      "label": "B样条轨迹"
+    },
+    {
+      "id": "traj-to-ctrl",
+      "from": "traj_server",
+      "to": "px4ctrl",
+      "label": "PositionCommand",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "ekf-to-ctrl",
+      "from": "ekf_pose",
+      "to": "px4ctrl",
+      "label": "/ekf/ekf_odom"
+    },
+    {
+      "id": "ctrl-to-fcu",
+      "from": "px4ctrl",
+      "to": "px4_fcu",
+      "label": "姿态目标",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "感知与多源定位",
+      "items": [
+        "Livox Mid-360 采集激光点云与机载高频 IMU",
+        "Faster-LIO 实时点云配准并输出高频里程计",
+        "EKF 融合飞控 IMU 发布稳定 /ekf/ekf_odom (100Hz)"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "规划与自主避障",
+      "items": [
+        "3D Grid Map 实时栅格占据更新与碰撞膨胀",
+        "Diff-Planner 状态机、A* 逃逸与 B 样条轨迹优化",
+        "traj_server 高频采样发布 PositionCommand 并控制机头朝向"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "任务调度与控制闭环",
+      "items": [
+        "multipoint 调度多航点巡航、悬停到位与返航降落",
+        "a8mini_gimbal 基于 UDP (37260) 控制云台扫描与录像",
+        "px4ctrl 实现 SO(3) 几何控制并通过 MAVROS 驱动飞控"
+      ]
+    }
+  ]
+}

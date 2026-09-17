@@ -67,6 +67,17 @@ def acquire_source_lock(source):
     return lock  # Keep the inode; unlinking could allow concurrent owners.
 
 
+def window_should_close(cv2, window, created):
+    if cv2.waitKey(1) & 0xFF in (ord("q"), 27, 3):
+        return True
+    if created:
+        try:
+            return cv2.getWindowProperty(window, cv2.WND_PROP_VISIBLE) < 1
+        except cv2.error:
+            return True  # The window manager has already destroyed the window.
+    return False
+
+
 def run(args, stop):
     repo = Path(args.repo_path).expanduser().resolve()
     if not (repo / "rtsp_capture.py").is_file():
@@ -134,8 +145,9 @@ def run(args, stop):
         last_result = 0.0
         last_waiting = 0.0
         count = 0
+        window_created = False
         while not stop.is_set():
-            if display and cv2.waitKey(1) & 0xFF in (ord("q"), 27):
+            if display and window_should_close(cv2, window, window_created):
                 break
             now = time.monotonic()
             if now < next_inference:
@@ -148,6 +160,7 @@ def run(args, stop):
                     cv2.putText(waiting, "Waiting: " + capture.status, (15, 90),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
                     cv2.imshow(window, waiting)
+                    window_created = True
                     last_waiting = now
                 if now - last_stats >= 2:
                     log("[STATS] RTSP: " + capture.status + "; waiting for fresh frame", flush=True)
@@ -188,6 +201,7 @@ def run(args, stop):
                         0.65, (0, 255, 255), 2)
             if display:
                 cv2.imshow(window, frame)
+                window_created = True
             if video is not None:
                 video.submit(frame, packet.captured_at)
             last_result = now
@@ -214,7 +228,7 @@ def run(args, stop):
 def main(argv=None):
     args = parse_args(argv)
     stop = threading.Event()
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, lambda *_: stop.set())
     try:
         with acquire_source_lock(args.source):

@@ -5,9 +5,13 @@
 #include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/RCIn.h>
+#include <mavros_msgs/State.h>
+#include <mavros_msgs/ExtendedState.h>
 #include <nav_msgs/Odometry.h>
 #include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/String.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <std_msgs/UInt32.h>
 #include <tf/transform_listener.h>
@@ -24,6 +28,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "mission_guard.h"
 
 enum MissionState
 {
@@ -96,6 +101,23 @@ public:
         pnh_.param("clicked_point_height", clicked_point_height_, 1.0);
         pnh_.param("clicked_point_use_z", clicked_point_use_z_, false);
         pnh_.param("clicked_max_points", clicked_max_points_, 50);
+        pnh_.param<std::string>("mission_source", mission_source_, "clicked");
+        pnh_.param("enable_gimbal_actions", enable_gimbal_actions_, true);
+        pnh_.param("require_flight_ready", require_flight_ready_, true);
+        pnh_.param("odom_timeout_sec", odom_timeout_sec_, 0.5);
+        pnh_.param("flight_state_timeout_sec", flight_state_timeout_sec_, 2.5);
+        pnh_.param("waypoint_timeout_sec", waypoint_timeout_sec_, 120.0);
+        pnh_.param("gimbal_timeout_sec", gimbal_timeout_sec_, 90.0);
+        if ((mission_source_ != "clicked" && mission_source_ != "preset") ||
+            goal_frame_id_ != "world" ||
+            (mission_source_ == "clicked" && !enable_rviz_click_route_) ||
+            !finite(odom_timeout_sec_) || odom_timeout_sec_ <= 0.0 ||
+            !finite(flight_state_timeout_sec_) || flight_state_timeout_sec_ <= 0.0 ||
+            !finite(waypoint_timeout_sec_) || waypoint_timeout_sec_ <= 0.0 ||
+            !finite(gimbal_timeout_sec_) || gimbal_timeout_sec_ <= 0.0)
+        {
+            throw std::runtime_error("Invalid mission source/frame/timeout: use clicked|preset and world");
+        }
 
         if (position_tolerance_ <= 0.0 || velocity_tolerance_ < 0.0 ||
             arrival_stable_sec_ < 0.0 || gimbal_retry_sec_ <= 0.0 ||
@@ -122,6 +144,17 @@ public:
                                                             true);
 
         odom_sub_ = nh_.subscribe("odom_topic", 10, &MultipointPlanner::odomCallback, this);
+        fcu_sub_ = nh_.subscribe("/mavros/state", 1, &MultipointPlanner::fcuCallback, this);
+        extended_sub_ = nh_.subscribe("/mavros/extended_state", 1,
+                                     &MultipointPlanner::extendedCallback, this);
+        controller_sub_ = nh_.subscribe("/px4ctrl/state", 1,
+                                       &MultipointPlanner::controllerCallback, this);
+        ready_sub_ = nh_.subscribe("/px4ctrl/mission_ready", 1,
+                                  &MultipointPlanner::readyCallback, this);
+        heartbeat_sub_ = nh_.subscribe("/drone_0_traj_server/heartbeat", 1,
+                                      &MultipointPlanner::heartbeatCallback, this);
+        land_sub_ = nh_.subscribe("/mission/land", 1,
+                                 &MultipointPlanner::landCallback, this);
         gimbal_done_sub_ = nh_.subscribe("/mission/gimbal_done", 10,
                                          &MultipointPlanner::gimbalDoneCallback, this);
         if (enable_start_trigger_)
@@ -157,6 +190,9 @@ public:
                  "velocity tolerance %.2f m/s, RViz click route %s",
                  mission_waypoints_.size(), position_tolerance_, velocity_tolerance_,
                  enable_rviz_click_route_ ? "enabled" : "disabled");
+        ROS_INFO("Mission configuration: source=%s gimbal_actions=%s flight_gate=%s",
+                 mission_source_.c_str(), enable_gimbal_actions_ ? "true" : "false",
+                 require_flight_ready_ ? "true" : "false");
     }
 
 private:
@@ -279,7 +315,7 @@ private:
                                                : 135.0;
             waypoint.gimbal_pitch_deg = node["gimbal_pitch_deg"].as<double>();
             waypoint.gimbal_settle_sec = node["gimbal_settle_sec"].as<double>();
-            waypoint.run_gimbal = true;
+            waypoint.run_gimbal = enable_gimbal_actions_;
             validateWaypoint(waypoint, &ids);
             mission_waypoints_.push_back(waypoint);
 
@@ -327,7 +363,82 @@ private:
             msg->pose.pose.position.z;
         odom_velocity_ << msg->twist.twist.linear.x, msg->twist.twist.linear.y,
             msg->twist.twist.linear.z;
-        odom_received_ = true;
+        odom_received_ = odom_position_.allFinite() && odom_velocity_.allFinite() &&
+                         (msg->header.frame_id == goal_frame_id_ ||
+                          msg->header.frame_id == "/" + goal_frame_id_);
+        odom_receive_time_ = ros::WallTime::now();
+        odom_stamp_ = msg->header.stamp;
+    }
+
+    void fcuCallback(const mavros_msgs::StateConstPtr &msg)
+    {
+        fcu_state_ = *msg;
+        fcu_receive_time_ = ros::WallTime::now();
+    }
+
+    void extendedCallback(const mavros_msgs::ExtendedStateConstPtr &msg)
+    {
+        landed_state_ = msg->landed_state;
+        extended_receive_time_ = ros::WallTime::now();
+    }
+
+    void controllerCallback(const std_msgs::StringConstPtr &msg)
+    {
+        controller_state_ = msg->data;
+        controller_receive_time_ = ros::WallTime::now();
+    }
+
+    void readyCallback(const std_msgs::BoolConstPtr &msg)
+    {
+        controller_ready_ = msg->data;
+        ready_receive_time_ = ros::WallTime::now();
+    }
+
+    void heartbeatCallback(const std_msgs::EmptyConstPtr &)
+    {
+        heartbeat_receive_time_ = ros::WallTime::now();
+    }
+
+    bool fresh(const ros::WallTime &stamp, double timeout) const
+    {
+        return !stamp.isZero() && mission_guard::fresh(
+            (ros::WallTime::now() - stamp).toSec(), timeout);
+    }
+
+    bool odomFresh() const
+    {
+        return odom_received_ && fresh(odom_receive_time_, odom_timeout_sec_) &&
+            !odom_stamp_.isZero() && mission_guard::fresh(
+                (ros::Time::now() - odom_stamp_).toSec(), odom_timeout_sec_);
+    }
+
+    bool flightReady(bool starting) const
+    {
+        if (!require_flight_ready_)
+            return true;  // Only the simulator launch disables this gate.
+        mission_guard::FlightStatus status;
+        status.fresh_state = fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
+                             fresh(extended_receive_time_, flight_state_timeout_sec_);
+        status.connected = fcu_state_.connected;
+        status.armed = fcu_state_.armed;
+        status.offboard = fcu_state_.mode == "OFFBOARD";
+        status.in_air = landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR;
+        status.controller_fresh = fresh(controller_receive_time_, 0.5) &&
+                                  fresh(ready_receive_time_, 0.5);
+        status.controller_ready = controller_ready_;
+        status.hover_or_command = controller_state_ == "AUTO_HOVER" || controller_state_ == "CMD_CTRL";
+        return mission_guard::flightReady(status, starting);
+    }
+
+    void abortMission(const char *reason)
+    {
+        ROS_ERROR("Mission stopped: %s. Check aircraft/RC; land and restart the stack before a new mission.", reason);
+        state_ = FINISHED;
+        mission_fault_ = true;
+        automatic_landing_ = false;
+        arrival_candidate_time_ = ros::Time(0);
+        planning_stop_pub_.publish(std_msgs::Empty());
+        closeMissionCsv();
     }
 
     void startCallback(const geometry_msgs::PoseStamped::ConstPtr &)
@@ -342,13 +453,12 @@ private:
             ROS_WARN("Ignoring start trigger because a mission is already active");
             return;
         }
-        if (enable_rviz_click_route_ && !clicked_waypoints_.empty() &&
-            !clicked_route_started_)
+        if (mission_source_ == "clicked")
         {
             startClickedRoute();
             return;
         }
-        startMission(mission_waypoints_, true);
+        startMission(mission_waypoints_, enable_gimbal_actions_);
     }
 
     Waypoint makeClickedWaypoint(const geometry_msgs::Point &point, uint32_t id) const
@@ -431,6 +541,11 @@ private:
 
     void startClickedRoute()
     {
+        if (mission_source_ != "clicked")
+        {
+            ROS_WARN("RViz route execution disabled in preset mode; restart with mission_source:=clicked");
+            return;
+        }
         if (!enable_rviz_click_route_ || clicked_waypoints_.empty())
         {
             ROS_WARN("No RViz clicked points are waiting to be flown");
@@ -447,8 +562,9 @@ private:
             return;
         }
 
+        if (!startMission(clicked_waypoints_, false))
+            return;
         clicked_route_started_ = true;
-        startMission(clicked_waypoints_, false);
         ROS_INFO("Started RViz clicked route with %zu point(s); A8 mini actions disabled",
                  active_waypoints_.size());
     }
@@ -562,18 +678,35 @@ private:
             ROS_ERROR("No test_back route is configured");
             return;
         }
-        if (state_ != FINISHED)
-        {
-            ROS_WARN("Return trigger cancels the active waypoint mission");
-        }
-        startMission(return_waypoints_, false);
+        if (startMission(return_waypoints_, false, true))
+            ROS_INFO("Return route accepted; any previous waypoint mission was replaced");
     }
 
-    void startMission(const std::vector<Waypoint> &waypoints, bool use_gimbal)
+    bool startMission(const std::vector<Waypoint> &waypoints, bool use_gimbal,
+                      bool returning = false)
     {
+        // The legacy gimbal protocol deduplicates by waypoint ID only. Until
+        // session IDs are available, do not silently skip actions on a rerun.
+        if (use_gimbal && gimbal_mission_consumed_)
+        {
+            ROS_WARN("Gimbal route already used in this run; land and restart the complete stack before repeating it");
+            return false;
+        }
+        if (landing_latched_ || mission_fault_ || waypoints.empty() || !odomFresh() ||
+            !flightReady(!returning) ||
+            !fresh(heartbeat_receive_time_, 0.5) || point_pub_.getNumSubscribers() == 0 ||
+            (use_gimbal && gimbal_task_pub_.getNumSubscribers() == 0))
+        {
+            ROS_WARN("Mission start rejected: need fresh world odometry, planner heartbeat/goal subscriber, "
+                     "OFFBOARD + armed + IN_AIR + controller mission_ready; payload missions also need gimbal. "
+                     "Route is preserved; confirm hover and trigger again.");
+            return false;
+        }
         active_waypoints_ = waypoints;
         current_index_ = 0;
         mission_uses_gimbal_ = use_gimbal;
+        if (use_gimbal)
+            gimbal_mission_consumed_ = true;
         arrival_candidate_time_ = ros::Time(0);
         arrived_time_ = ros::Time(0);
 
@@ -585,9 +718,10 @@ private:
         else
         {
             closeMissionCsv();
-            ROS_INFO("Received return trigger");
+            ROS_INFO("Starting route without gimbal actions");
         }
         publishCurrentGoal();
+        return true;
     }
 
     void publishCurrentGoal()
@@ -601,6 +735,7 @@ private:
         goal.pose.position.z = waypoint.z;
         goal.pose.orientation.w = 1.0;
         point_pub_.publish(goal);
+        goal_publish_time_ = ros::WallTime::now();
 
         state_ = FLYING;
         arrival_candidate_time_ = ros::Time(0);
@@ -612,6 +747,15 @@ private:
     {
         const ros::Time now = ros::Time::now();
         if (landing_latched_ && automatic_landing_ &&
+            fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
+            fresh(extended_receive_time_, flight_state_timeout_sec_) &&
+            !fcu_state_.armed &&
+            landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
+        {
+            automatic_landing_ = false;
+            ROS_INFO("Landing complete: ground + disarmed; LAND retries stopped. Restart stack for next flight.");
+        }
+        if (landing_latched_ && automatic_landing_ &&
             (now - last_land_publish_time_).toSec() >= land_command_retry_sec_)
         {
             publishLandingCommand(true);
@@ -621,9 +765,9 @@ private:
         {
             return;
         }
-        if (!odom_received_)
+        if (!odomFresh() || !flightReady(false) || !fresh(heartbeat_receive_time_, 0.5))
         {
-            ROS_WARN_THROTTLE(5.0, "Waiting for odometry before evaluating waypoint arrival");
+            abortMission("odometry, controller, FCU or planner heartbeat is no longer valid");
             return;
         }
 
@@ -631,6 +775,11 @@ private:
 
         if (state_ == FLYING)
         {
+            if ((ros::WallTime::now() - goal_publish_time_).toSec() > waypoint_timeout_sec_)
+            {
+                abortMission("waypoint timeout (goal may have been rejected, changed or unreachable)");
+                return;
+            }
             const Eigen::Vector3d target(waypoint.x, waypoint.y, waypoint.z);
             const double distance = (target - odom_position_).norm();
             const double speed = odom_velocity_.norm();
@@ -659,6 +808,14 @@ private:
 
         if (state_ == HOVERING)
         {
+            const Eigen::Vector3d target(waypoint.x, waypoint.y, waypoint.z);
+            if ((target - odom_position_).norm() > position_tolerance_ ||
+                odom_velocity_.norm() > velocity_tolerance_)
+            {
+                state_ = FLYING;
+                arrival_candidate_time_ = ros::Time(0);
+                return;
+            }
             if ((now - hover_start_time_).toSec() < waypoint.hover_sec)
             {
                 return;
@@ -668,6 +825,7 @@ private:
             {
                 publishGimbalTask(false);
                 state_ = WAITING_GIMBAL;
+                gimbal_wait_time_ = ros::WallTime::now();
             }
             else
             {
@@ -676,6 +834,12 @@ private:
             return;
         }
 
+        if (state_ == WAITING_GIMBAL &&
+            (ros::WallTime::now() - gimbal_wait_time_).toSec() > gimbal_timeout_sec_)
+        {
+            abortMission("gimbal completion timeout");
+            return;
+        }
         if (state_ == WAITING_GIMBAL &&
             (now - last_gimbal_publish_time_).toSec() >= gimbal_retry_sec_)
         {
@@ -722,6 +886,11 @@ private:
         }
 
         const Waypoint &waypoint = active_waypoints_.at(current_index_);
+        if (!odomFresh() || !flightReady(false))
+        {
+            abortMission("invalid flight state at gimbal completion");
+            return;
+        }
         if (msg->data != waypoint.id)
         {
             ROS_WARN("Ignoring gimbal_done %u; currently waiting for waypoint %u",
@@ -844,7 +1013,7 @@ private:
         }
         else
         {
-            ROS_WARN("RC channel 8: LAND requested; active waypoint mission cancelled");
+            ROS_WARN("LAND requested; active waypoint mission cancelled");
         }
     }
 
@@ -871,6 +1040,11 @@ private:
             ROS_WARN("RC channel 8: manual LAND selected because channel 6 is out of "
                      "command mode; planner stopped and automatic LAND retry disabled");
         }
+    }
+
+    void landCallback(const std_msgs::EmptyConstPtr &)
+    {
+        requestLanding(true);
     }
 
     void rcCallback(const mavros_msgs::RCInConstPtr &msg)
@@ -950,7 +1124,7 @@ private:
             takeoff_land_pub_.publish(command);
             ROS_INFO("RC channel 8: takeoff");
         }
-        else if (current == RC_EIGHT_UP && previous == RC_EIGHT_MIDDLE)
+        else if (current == RC_EIGHT_UP)
         {
             geometry_msgs::PoseStamped trigger;
             trigger.header.stamp = ros::Time::now();
@@ -988,6 +1162,7 @@ private:
     ros::Subscriber clicked_point_sub_;
     ros::Subscriber start_clicked_route_sub_;
     ros::Subscriber clear_clicked_route_sub_;
+    ros::Subscriber fcu_sub_, extended_sub_, controller_sub_, ready_sub_, heartbeat_sub_, land_sub_;
     ros::Timer timer_;
     tf::TransformListener tf_listener_;
 
@@ -1027,6 +1202,18 @@ private:
     int enable_start_trigger_;
     int enable_back_trigger_;
     bool enable_rc_;
+    std::string mission_source_, controller_state_;
+    bool enable_gimbal_actions_, require_flight_ready_;
+    bool controller_ready_ = false;
+    bool mission_fault_ = false;
+    bool gimbal_mission_consumed_ = false;
+    uint8_t landed_state_ = mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED;
+    mavros_msgs::State fcu_state_;
+    ros::WallTime odom_receive_time_, fcu_receive_time_, extended_receive_time_;
+    ros::WallTime controller_receive_time_, ready_receive_time_, heartbeat_receive_time_;
+    ros::WallTime goal_publish_time_, gimbal_wait_time_;
+    ros::Time odom_stamp_;
+    double odom_timeout_sec_, flight_state_timeout_sec_, waypoint_timeout_sec_, gimbal_timeout_sec_;
 
     RC_EIGHT_STATE rc_eight_pre_;
     bool rc_initialized_;

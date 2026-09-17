@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   quadrotor_msgs
   geometry_msgs
+  std_msgs
   sensor_msgs
   uav_utils
   mavros

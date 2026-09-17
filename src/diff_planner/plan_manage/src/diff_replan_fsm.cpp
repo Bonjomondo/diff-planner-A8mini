@@ -728,6 +728,11 @@ namespace diff_planner
   void DiffReplanFSM::waypointCallback(const geometry_msgs::PoseStampedPtr &msg)
   {
     Eigen::Vector3d end_wp(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    if (msg->header.frame_id != "world" || !end_wp.allFinite())
+    {
+      ROS_ERROR("Reject goal: finite coordinates in frame 'world' are required");
+      return;
+    }
     if (planner_manager_->grid_map_->getInflateOccupancy(end_wp) == -1)
     {
       ROS_WARN("The goal is outside the safe fence, ignore this goal!");

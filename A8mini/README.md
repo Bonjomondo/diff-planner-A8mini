@@ -1,5 +1,10 @@
 # A8 mini 航点连续录像任务
 
+**2026-09-17 更新：** 实机默认改为 RViz 点击模式，不再隐式执行 YAML。
+先看 [实机操作指南](../docs/A8mini实机操作指南.md) 完成起飞、标点、执行、降落与退出。
+本页的 YAML 云台任务必须显式选择 `mission_source:=preset`；
+整栈脚本使用 `MISSION_SOURCE=preset`。验证范围见[修复说明](../docs/2026-09-17_修复-A8mini-report.md)。
+
 完整的代码实现、参数、编译运行和故障排查说明见
 [《A8 mini 功能实现与使用说明》](A8mini功能实现与使用说明.md)。
 
@@ -34,7 +39,7 @@ roslaunch multipoint multipointplan_exp_lio.launch camera_ip:=192.168.144.26
 ```bash
 catkin_make -DROS_EDITION=ROS1
 source devel/setup.bash
-roslaunch multipoint multipointplan_exp_lio.launch
+roslaunch multipoint multipointplan_exp_lio.launch mission_source:=preset
 ```
 
 VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_single_lio.sh` 会启动 LIO 版本，并同时启动 A8 mini 云台节点，按任务配置启动实时识别。
@@ -110,7 +115,7 @@ roslaunch multipoint a8mini_detection.launch
 2026-09-06 最新日志核对与本次验证范围见
 [实时识别整合与断流核对](实时识别整合与断流核对_20260906.md)。
 
-任务仍沿用原工程的安全触发方式：遥控器 8 通道从中位拨到上位，或发送一次：
+预设模式下，确认已起飞悬停且任务就绪后，遥控器 8 通道从中位拨到上位，或发送一次：
 
 ```bash
 rostopic pub -1 /move_base_simple/goal geometry_msgs/PoseStamped '{}'
@@ -134,6 +139,7 @@ config/coverage_20x20.yaml   # 81 个航点
 
 ```bash
 roslaunch multipoint multipointplan_exp_lio.launch \
+  mission_source:=preset \
   yaml_path:=$(rospack find multipoint)/config/coverage_5x5.yaml
 ```
 

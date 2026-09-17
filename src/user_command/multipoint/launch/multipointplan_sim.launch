@@ -11,6 +11,7 @@
     <arg name="enable_rc" default="false" />
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps_sim.csv" />
     <arg name="goal_frame_id" default="world" />
+    <arg name="mission_source" default="preset" />
     <arg name="enable_rviz_click_route" default="true" />
     <arg name="clicked_point_topic" default="/clicked_point" />
     <arg name="clicked_point_height" default="1.0" />
@@ -25,6 +26,9 @@
         <remap from="odom_topic" to="$(arg odom_topic)" />
         <param name="yaml_path" value="$(arg yaml_path)" />
         <param name="goal_frame_id" value="$(arg goal_frame_id)" />
+        <param name="mission_source" value="$(arg mission_source)" />
+        <param name="require_flight_ready" value="false" />
+        <param name="enable_gimbal_actions" value="$(arg start_gimbal_node)" />
         <param name="position_tolerance" value="$(arg next_distance)" />
         <param name="velocity_tolerance" value="$(arg velocity_tolerance)" />
         <param name="arrival_stable_sec" value="$(arg arrival_stable_sec)" />

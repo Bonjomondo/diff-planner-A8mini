@@ -70,7 +70,15 @@ def main():
         except ProcessLookupError:
             pass
 
+    stop_lock = threading.Lock()
+    stopped = False
+
     def stop():
+        nonlocal stopped
+        with stop_lock:
+            if stopped:
+                return
+            stopped = True
         signal_group(signal.SIGINT)
         try:
             try:

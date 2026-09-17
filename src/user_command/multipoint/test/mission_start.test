@@ -1,0 +1,12 @@
+<launch>
+  <!-- Mock topics only: no MAVROS, controller, motors, camera or planner. -->
+  <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
+    <param name="yaml_path" value="$(find multipoint)/config/points.yaml" />
+    <param name="mission_source" value="clicked" />
+    <param name="enable_gimbal_actions" value="false" />
+    <param name="require_flight_ready" value="true" />
+    <param name="enable_rc" value="false" />
+    <remap from="odom_topic" to="/test/odom" />
+  </node>
+  <test pkg="multipoint" type="test_mission_start.py" name="mission_start" time-limit="40" />
+</launch>

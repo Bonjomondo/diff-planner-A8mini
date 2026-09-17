@@ -60,7 +60,8 @@ roslaunch diff_planner run_sim_single.launch
 
 ### 2.1 RViz连续点选航线
 
-启动 `multipointplan` 后，可以用 RViz 的 **Publish Point** 工具在建好的地图上
+仿真使用 `roslaunch diff_planner run_sim_single.launch mission_source:=clicked`，
+实机 LIO 入口现默认 `mission_source=clicked`。启动 `multipointplan` 后，可以用 RViz 的 **Publish Point** 工具在建好的地图上
 连续点击多个点。节点会按点击顺序把这些点作为航点，逐点发布到 `/goal`，由
 Diff-Planner 对相邻航点之间的路段进行避障规划；点位会显示为带编号的橙色标记，
 默认飞行高度为 1.0 m。
@@ -122,6 +123,12 @@ cd Diff-Planner #新建终端
 
 ## 实机运行教程
 
+本次修复后的逐步流程见 **[A8mini 实机操作指南](docs/A8mini实机操作指南.md)**，
+日志依据、测试结果和尚未闭环的审查项见 [20260916 日志修复说明](docs/2026-09-17_修复-A8mini-report.md)。
+常用顺序是 **RC8 DOWN→MIDDLE 请求起飞 → 确认悬停 → Publish Point 标点 →
+2D Nav Goal 或 RC8 UP 开始执行**。实机默认点击模式不再回退到 YAML；
+需要 YAML 任务时启动前设置 `MISSION_SOURCE=preset`。
+
 ### A8 mini 连续录像航点任务
 
 A8 mini 通过达妙载板网口接入机载电脑时，可使用新增的航点—悬停—云台握手流程。配置、网络参数和测试方法见 [A8mini/README.md](A8mini/README.md)。
@@ -158,8 +165,9 @@ MAVROS、LIO/EKF、RC、里程计和飞控地面状态满足条件后才发送�
 ```
 
 起飞前仍需确认桨叶、场地、电池和遥控器安全；遥控器摇杆应居中，模式/指令开关
-应打开，RC 8 通道应处于 DOWN。该脚本只负责起飞，不会自动开始航点任务；起飞
-确认后再将 RC 8 拨到 UP，或手动发布任务触发消息。
+应打开，RC 8 通道应处于 DOWN。该脚本只负责起飞，不会自动开始航点任务；
+确认 OFFBOARD、IN_AIR 和 `/px4ctrl/mission_ready=True` 后，先标点再将 RC8 拨到 UP，
+或手动发布任务触发消息。落地上锁后再 Ctrl+C 退出；Ctrl+C 不负责降落。
 
 ### 2. 视觉定位下规划：
 ```

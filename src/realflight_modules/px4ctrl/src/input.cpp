@@ -21,6 +21,19 @@ RC_Data_t::RC_Data_t()
 
 void RC_Data_t::feed(mavros_msgs::RCInConstPtr pMsg)
 {
+    if (pMsg->channels.size() < 8)
+    {
+        ROS_WARN_THROTTLE(2.0, "[px4ctrl] Reject RC message with fewer than 8 channels");
+        return;
+    }
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (pMsg->channels[i] < 900 || pMsg->channels[i] > 2100)
+        {
+            ROS_WARN_THROTTLE(2.0, "[px4ctrl] Reject invalid RC PWM");
+            return;
+        }
+    }
     msg = *pMsg;
     rcv_stamp = ros::Time::now();
 

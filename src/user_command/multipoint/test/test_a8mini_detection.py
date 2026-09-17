@@ -73,9 +73,22 @@ class VideoTest(unittest.TestCase):
 
 
 class DetectionTest(unittest.TestCase):
+    def test_window_close_and_keyboard_exit(self):
+        cv = Mock()
+        cv.waitKey.return_value = -1
+        cv.getWindowProperty.return_value = 0
+        self.assertFalse(detection.window_should_close(cv, 'detector', False))
+        cv.getWindowProperty.assert_not_called()
+        self.assertTrue(detection.window_should_close(cv, 'detector', True))
+        cv.getWindowProperty.return_value = 1
+        self.assertFalse(detection.window_should_close(cv, 'detector', True))
+        for key in (ord('q'), 27, 3):
+            cv.waitKey.return_value = key
+            self.assertTrue(detection.window_should_close(cv, 'detector', True))
+
     def test_runtime_snapshot_uses_detector_environment_and_external_source_hashes(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             (root / 'yolo11s.engine').write_bytes(b'fake engine')
             (root / 'rtsp_capture.py').write_text('# external capture\n')
             (root / 'A8mini_RTSP_YOLO_Detection.py').write_text('# external helpers\n')

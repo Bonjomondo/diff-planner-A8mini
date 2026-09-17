@@ -1,6 +1,8 @@
 #include <ros/ros.h>
 #include "PX4CtrlFSM.h"
 #include <signal.h>
+#include <std_msgs/Bool.h>
+#include <std_msgs/String.h>
 
 void mySigintHandler(int sig)
 {
@@ -79,6 +81,10 @@ int main(int argc, char *argv[])
     fsm.traj_start_trigger_pub = nh.advertise<geometry_msgs::PoseStamped>("/traj_start_trigger", 10);
 
     fsm.debug_pub = nh.advertise<quadrotor_msgs::Px4ctrlDebug>("/debugPx4ctrl", 10); // debug
+    // Non-latched: a fresh controller heartbeat is required before a mission.
+    ros::Publisher fsm_state_pub = nh.advertise<std_msgs::String>("state", 1);
+    ros::Publisher mission_ready_pub = nh.advertise<std_msgs::Bool>("mission_ready", 1);
+    ros::Time last_status_publish;
 
     fsm.set_FCU_mode_srv = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
     fsm.arming_client_srv = nh.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
@@ -120,6 +126,27 @@ int main(int argc, char *argv[])
         r.sleep();
         ros::spinOnce();
         fsm.process(); // We DO NOT rely on feedback as trigger, since there is no significant performance difference through our test.
+        const ros::Time now = ros::Time::now();
+        if ((now - last_status_publish).toSec() >= 0.1)
+        {
+            static const char *names[] = {"UNKNOWN", "MANUAL_CTRL", "AUTO_HOVER",
+                                          "CMD_CTRL", "AUTO_TAKEOFF", "AUTO_LAND"};
+            std_msgs::String status;
+            status.data = names[static_cast<int>(fsm.get_state())];
+            fsm_state_pub.publish(status);
+            std_msgs::Bool ready;
+            ready.data = fsm.get_state() == PX4CtrlFSM::AUTO_HOVER &&
+                fsm.state_data.current_state.connected && fsm.state_data.current_state.armed &&
+                fsm.state_data.current_state.mode == "OFFBOARD" &&
+                fsm.extended_state_data.current_extended_state.landed_state ==
+                    mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR &&
+                fsm.odom_is_received(now) && fsm.imu_is_received(now) &&
+                (param.takeoff_land.no_RC || (fsm.rc_is_received(now) &&
+                    fsm.rc_data.is_hover_mode && fsm.rc_data.is_command_mode &&
+                    fsm.rc_data.check_centered()));
+            mission_ready_pub.publish(ready);
+            last_status_publish = now;
+        }
     }
 
     return 0;

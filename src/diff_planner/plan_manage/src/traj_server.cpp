@@ -6,6 +6,8 @@
 #include <std_msgs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
+#include <algorithm>
+#include <cmath>
 
 using namespace Eigen;
 
@@ -68,10 +70,10 @@ void takeoffLandCallback(const quadrotor_msgs::TakeoffLandConstPtr &msg)
   {
     if (landing_requested_)
     {
-      ROS_INFO("[traj_server] TAKEOFF received: position-command output unlocked; "
-               "waiting for a new trajectory.");
+      ROS_WARN("[traj_server] TAKEOFF cannot clear the stop/landing latch. "
+               "After ground + disarmed, restart the complete flight stack for a new flight.");
+      return;
     }
-    landing_requested_ = false;
     receive_traj_ = false;
   }
 }
@@ -100,7 +102,15 @@ void polyTrajCallback(traj_utils::PolyTrajPtr msg)
     ROS_ERROR("[traj_server] Only support trajectory order equals 5 now!");
     return;
   }
-  if (msg->duration.size() * (msg->order + 1) != msg->coef_x.size())
+  const size_t coefficient_count = msg->duration.size() * 6;
+  const auto finite = [](double value) { return std::isfinite(value); };
+  if (msg->duration.empty() || coefficient_count != msg->coef_x.size() ||
+      coefficient_count != msg->coef_y.size() || coefficient_count != msg->coef_z.size() ||
+      !std::all_of(msg->duration.begin(), msg->duration.end(),
+                   [](double value) { return std::isfinite(value) && value > 0.0; }) ||
+      !std::all_of(msg->coef_x.begin(), msg->coef_x.end(), finite) ||
+      !std::all_of(msg->coef_y.begin(), msg->coef_y.end(), finite) ||
+      !std::all_of(msg->coef_z.begin(), msg->coef_z.end(), finite))
   {
     ROS_ERROR("[traj_server] WRONG trajectory parameters, ");
     return;
@@ -254,6 +264,7 @@ void cmdCallback(const ros::TimerEvent &e)
 
     receive_traj_ = false;
     publish_cmd(last_pos_, Vector3d::Zero(), Vector3d::Zero(), Vector3d::Zero(), last_yaw_, 0);
+    return;
   }
 
   double t_cur = (time_now - start_time_).toSec();
