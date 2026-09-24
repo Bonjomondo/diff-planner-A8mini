@@ -79,7 +79,7 @@ rostopic pub -1 /mission/clear_clicked_route std_msgs/Empty '{}'
 ```
 
 点选航线不会自动解锁或起飞；应先按原有流程起飞并确认定位、地图和遥控器接管正常。
-实机不使用 A8 mini 时，启动航点节点应同时关闭云台和识别：
+实机不使用 A8 mini 时，可直接在 `src/user_command/multipoint/config/points.yaml` 中配置 `enable_gimbal: false`，脚本启动时将自动关闭云台和识别节点；也可通过环境变量显式指定：
 
 ```bash
 A8MINI_START_GIMBAL_NODE=false \

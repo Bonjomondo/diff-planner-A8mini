@@ -44,21 +44,22 @@ roslaunch multipoint multipointplan_exp_lio.launch mission_source:=preset
 
 VIO 定位时使用 `multipointplan_exp_vio.launch`。现有 `sh_files/run_single_lio.sh` 会启动 LIO 版本，并同时启动 A8 mini 云台节点，按任务配置启动实时识别。
 
-## 录像与实时识别开关
+## 云台、录像与实时识别开关
 
 修改当前任务的 [points.yaml](../src/user_command/multipoint/config/points.yaml)
 （使用覆盖任务时修改相应 `coverage_*.yaml`），重启任务后生效：
 
 ```yaml
-enable_auto_recording: true       # 起飞开始、落地停止相机 TF 卡录像
-enable_realtime_detection: true   # 启动实时 YOLO 识别和显示
+enable_gimbal: true              # 云台硬件总开关：false=不启动云台与识别节点，航点无需云台参数
+enable_auto_recording: false     # 起飞开始、落地停止相机 TF 卡录像（仅 enable_gimbal: true 生效）
+enable_realtime_detection: true   # 启动实时 YOLO 识别和显示（仅 enable_gimbal: true 生效）
 save_detection_video: false       # 改为 true 才保存带识别框的视频到电脑
 ```
 
-三个字段必须使用不带引号的 `true` / `false`。自动录像关闭时不发送自动录像
-查询或切换命令，云台航点动作仍可执行。识别关闭时，不启动检测子进程、不加载
-模型、不打开 RTSP；即使保存开关为 true，也不会保存识别视频。旧任务 YAML
-没有识别开关时，识别默认关闭。TF 卡原始录像与电脑上的带框视频相互独立。
+上述字段必须使用不带引号的 `true` / `false`。
+- `enable_gimbal: false` 时，启动脚本 `run_single_lio.sh` 自动禁用云台和识别节点；C++ 航点规划节点不再要求任何 `gimbal_*` 字段，也不再等待云台动作。
+- 自动录像关闭时不发送自动录像查询或切换命令，云台航点动作仍可执行。
+- 识别关闭时，不启动检测子进程、不加载模型、不打开 RTSP；即使保存开关为 true，也不会保存识别视频。旧任务 YAML 没有识别开关时，识别默认关闭。TF 卡原始录像与电脑上的带框视频相互独立。
 
 实机 LIO/VIO launch 已整合检测启动，使用原来的启动脚本即可，关闭之前独立
 运行的 `A8mini_RTSP_YOLO_Detection.py`，避免额外拉流和重复推理。本项目对相同

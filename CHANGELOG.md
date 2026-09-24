@@ -2,6 +2,15 @@
 
 本文件记录 Diff-Planner A8 mini 分支的重要功能、配置和实机行为变更。
 
+## Unreleased - 2026-09-24
+
+### Added / Changed
+- **云台与检测硬件解耦及 points.yaml 集中配置**：
+  - 在 `points.yaml` 及覆盖任务配置中新增 `enable_gimbal` 配置项（`true`/`false`），作为硬件总开关。
+  - `run_single_lio.sh` 启动脚本自动优先读取 `points.yaml` 中的 `enable_gimbal` 与 `enable_realtime_detection`，统一作为单一配置源；环境变量 `A8MINI_START_GIMBAL_NODE` 和 `A8MINI_START_DETECTION` 仍保留作为临时覆盖。
+  - 当 `enable_gimbal: false` 时，启动脚本自动关闭云台节点与 YOLO 实时识别节点（无云台则无 RTSP 视频流）。
+  - `multipointplan` 节点解析 YAML 时支持从 `enable_gimbal` 自动同步云台执行模式；无云台时航点列表中的 `gimbal_*`（如 `gimbal_pitch_deg`、`gimbal_settle_sec`、`gimbal_yaw_deg`）及 `hover_sec` 字段变为可选（缺省自动填充为 0），无需配置云台参数即可执行航点飞行。
+
 ## Unreleased - 2026-09-17
 
 - 根据 `20260916_163402` 修复地面误触任务、点击航线隐式回退 YAML、关闭载荷后仍等云台的问题。

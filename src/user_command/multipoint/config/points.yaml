@@ -1,6 +1,15 @@
+# ==============================================================================
+# 硬件 / 功能总开关
+# ==============================================================================
+# 云台开关：true=启动云台节点 + 云台任务；false=不启动云台，不发送 SIYI 指令。
+# 设为 false 时，航点中的 gimbal_* 字段可省略，也不会启动云台和识别节点。
+enable_gimbal: true
+
 # 起飞自动录像：true=起飞开始、落地停止（相机 TF 卡原始视频）；false=不自动控制录像。
+# 仅在 enable_gimbal: true 时生效。
 enable_auto_recording: false
 # 实时识别：true=随实机任务启动 YOLO；false=不加载模型、不拉 RTSP 流。
+# 仅在 enable_gimbal: true 时生效（识别需要云台 RTSP 流）。
 enable_realtime_detection: true
 # 保存实时识别视频：true=保存带框视频到机载电脑；false=只识别/显示。
 save_detection_video: false
@@ -32,8 +41,8 @@ var_settle_sec: &var_settle_sec 2.0
 
 waypoints:
   - id: 1
-    x: 0.5
-    y: 0.0
+    x: 1.5
+    y: 1.0
     z: *var_z
     hover_sec: *var_hover_sec
     gimbal_mode: *var_gimbal_mode
@@ -42,16 +51,16 @@ waypoints:
     gimbal_pitch_deg: *var_pitch_deg
     gimbal_settle_sec: *var_settle_sec
 
-  # - id: 2
-  #   x: 5.0
-  #   y: 3.0
-  #   z: *var_z
-  #   hover_sec: *var_hover_sec
-  #   gimbal_mode: *var_gimbal_mode
-  #   gimbal_yaw_min_deg: *var_yaw_min
-  #   gimbal_yaw_max_deg: *var_yaw_max
-  #   gimbal_pitch_deg: *var_pitch_deg
-  #   gimbal_settle_sec: *var_settle_sec
+  - id: 2
+    x: 5.0
+    y: -3.0
+    z: *var_z
+    hover_sec: *var_hover_sec
+    gimbal_mode: *var_gimbal_mode
+    gimbal_yaw_min_deg: *var_yaw_min
+    gimbal_yaw_max_deg: *var_yaw_max
+    gimbal_pitch_deg: *var_pitch_deg
+    gimbal_settle_sec: *var_settle_sec
 
   # - id: 3
   #   x: 10.0

@@ -1,3 +1,6 @@
+# 云台开关：true=启动云台节点 + 云台任务；false=不启动云台，不发送 SIYI 指令。
+enable_gimbal: true
+
 # 起飞自动录像：true=起飞开始、落地停止（相机 TF 卡原始视频）；false=不自动控制录像。
 enable_auto_recording: true
 # 实时识别：true=随实机任务启动 YOLO；false=不加载模型、不拉 RTSP 流。

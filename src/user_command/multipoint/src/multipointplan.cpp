@@ -250,6 +250,20 @@ private:
         }
 
         YAML::Node root = YAML::LoadFile(yaml_path_);
+
+        // If the YAML contains enable_gimbal, use it as the ground truth unless
+        // the launch/rosparam already forced it off.  This lets points.yaml be
+        // the single source of truth for gimbal configuration.
+        if (root["enable_gimbal"])
+        {
+            const bool yaml_gimbal = root["enable_gimbal"].as<bool>();
+            if (!yaml_gimbal)
+            {
+                enable_gimbal_actions_ = false;
+                ROS_INFO("enable_gimbal is false in YAML; disabling gimbal actions");
+            }
+        }
+
         YAML::Node waypoints = root["waypoints"];
         if (!waypoints || !waypoints.IsSequence() || waypoints.size() == 0)
         {
@@ -260,12 +274,22 @@ private:
         for (std::size_t i = 0; i < waypoints.size(); ++i)
         {
             const YAML::Node &node = waypoints[i];
-            if (!node.IsMap() || !node["id"] || !node["x"] || !node["y"] || !node["z"] ||
-                !node["hover_sec"] || !node["gimbal_pitch_deg"] ||
-                !node["gimbal_settle_sec"])
+            // Core navigation fields are always required.
+            if (!node.IsMap() || !node["id"] || !node["x"] || !node["y"] || !node["z"])
             {
                 std::ostringstream error;
-                error << "Waypoint " << i << " is missing one or more required fields";
+                error << "Waypoint " << i << " is missing one or more required fields (id, x, y, z)";
+                throw std::runtime_error(error.str());
+            }
+            // Gimbal-related fields are required only when the gimbal is enabled.
+            if (enable_gimbal_actions_ &&
+                (!node["hover_sec"] || !node["gimbal_pitch_deg"] ||
+                 !node["gimbal_settle_sec"]))
+            {
+                std::ostringstream error;
+                error << "Waypoint " << i << " is missing gimbal fields "
+                      << "(hover_sec, gimbal_pitch_deg, gimbal_settle_sec) "
+                      << "which are required when enable_gimbal is true";
                 throw std::runtime_error(error.str());
             }
 
@@ -281,7 +305,7 @@ private:
             waypoint.x = node["x"].as<double>();
             waypoint.y = node["y"].as<double>();
             waypoint.z = node["z"].as<double>();
-            waypoint.hover_sec = node["hover_sec"].as<double>();
+            waypoint.hover_sec = node["hover_sec"] ? node["hover_sec"].as<double>() : 0.0;
             waypoint.gimbal_mode = GIMBAL_ANGLE;
             if (node["gimbal_mode"])
             {
@@ -300,7 +324,8 @@ private:
                         "gimbal_mode must be 'angle' or 'range' ('sweep' is also accepted)");
                 }
             }
-            if (waypoint.gimbal_mode == GIMBAL_ANGLE && !node["gimbal_yaw_deg"])
+            if (enable_gimbal_actions_ &&
+                waypoint.gimbal_mode == GIMBAL_ANGLE && !node["gimbal_yaw_deg"])
             {
                 throw std::runtime_error(
                     "gimbal_yaw_deg is required when gimbal_mode is 'angle'");
@@ -313,8 +338,10 @@ private:
             waypoint.gimbal_yaw_max_deg = node["gimbal_yaw_max_deg"]
                                                ? node["gimbal_yaw_max_deg"].as<double>()
                                                : 135.0;
-            waypoint.gimbal_pitch_deg = node["gimbal_pitch_deg"].as<double>();
-            waypoint.gimbal_settle_sec = node["gimbal_settle_sec"].as<double>();
+            waypoint.gimbal_pitch_deg =
+                node["gimbal_pitch_deg"] ? node["gimbal_pitch_deg"].as<double>() : 0.0;
+            waypoint.gimbal_settle_sec =
+                node["gimbal_settle_sec"] ? node["gimbal_settle_sec"].as<double>() : 0.0;
             waypoint.run_gimbal = enable_gimbal_actions_;
             validateWaypoint(waypoint, &ids);
             mission_waypoints_.push_back(waypoint);

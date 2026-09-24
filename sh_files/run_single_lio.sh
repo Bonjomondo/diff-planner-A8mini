@@ -18,9 +18,25 @@ export DRONE_ID=0
 
 # A8 mini is optional. Override these when the camera/gimbal is not mounted:
 # A8MINI_START_GIMBAL_NODE=false A8MINI_START_DETECTION=false ./sh_files/run_single_lio.sh
-A8MINI_START_GIMBAL_NODE="${A8MINI_START_GIMBAL_NODE:-true}"
-A8MINI_START_DETECTION="${A8MINI_START_DETECTION:-true}"
+#
+# By default, read enable_gimbal / enable_realtime_detection from points.yaml
+# so the YAML file is the single source of truth. Env vars still override if set.
+POINTS_YAML="${SCRIPT_DIR:h}/src/user_command/multipoint/config/points.yaml"
+_yaml_gimbal=""
+_yaml_detection=""
+if [[ -r "${POINTS_YAML}" ]]; then
+  _yaml_gimbal="$(grep -m1 '^enable_gimbal:' "${POINTS_YAML}" 2>/dev/null | awk '{print $2}')"
+  _yaml_detection="$(grep -m1 '^enable_realtime_detection:' "${POINTS_YAML}" 2>/dev/null | awk '{print $2}')"
+fi
+# Priority: env var > YAML > default (true)
+A8MINI_START_GIMBAL_NODE="${A8MINI_START_GIMBAL_NODE:-${_yaml_gimbal:-true}}"
+A8MINI_START_DETECTION="${A8MINI_START_DETECTION:-${_yaml_detection:-true}}"
+# When gimbal is disabled, detection also cannot work (no RTSP source).
+if [[ "${A8MINI_START_GIMBAL_NODE}" == "false" ]]; then
+  A8MINI_START_DETECTION="false"
+fi
 MISSION_SOURCE="${MISSION_SOURCE:-clicked}"
+echo "[startup] Configuration: gimbal=${A8MINI_START_GIMBAL_NODE} detection=${A8MINI_START_DETECTION} mission_source=${MISSION_SOURCE}"
 typeset -a LAUNCH_PIDS LAUNCH_NAMES
 
 start_launch() {

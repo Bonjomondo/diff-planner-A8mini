@@ -50,7 +50,15 @@ MISSION_SOURCE=clicked ./sh_files/one_click_takeoff.sh --start-only
 
 此入口自动加载 ROS/工作空间、启动飞行栈并保存调试日志。等待“仅启动模式：未发送起飞指令”。此时 CH8 保持 DOWN。这个入口只启动一次，不要再运行另一份 `run_single_lio.sh`。
 
-没有接 A8mini 时改用：
+没有接 A8mini 时：
+
+推荐直接在 `src/user_command/multipoint/config/points.yaml` 中配置：
+```yaml
+enable_gimbal: false
+```
+启动脚本将自动检测该配置，自动关闭云台与 YOLO 实时识别节点，且航点文件中无需填写任何 `gimbal_*` 参数。
+
+也可以通过环境变量临时覆盖：
 
 ```bash
 A8MINI_START_GIMBAL_NODE=false \
