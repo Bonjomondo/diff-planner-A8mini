@@ -68,13 +68,15 @@ save_detection_video: false       # 改为 true 才保存带识别框的视频�
 
 检测运行参数在 [a8mini_detection.yaml](../src/user_command/multipoint/config/a8mini_detection.yaml)：
 
-- `repo_path: ~/Documents/A8mini_Detction`：复用本地检测项目的类别名称和绘图代码；
-  需要保留其中的 `rtsp_capture.py`、`A8mini_RTSP_YOLO_Detection.py`、
-  `yolo11s.engine` 和 `yolo11s.names.json`。相对模型路径相对于此目录解析。
-  集成入口的采集使用本仓库 `scripts/a8mini_capture.py`；外部 `rtsp_capture.py`
-  仍是上游绘图模块的导入依赖，但不负责集成入口的实际取流。
-- `python_executable: /usr/bin/python3`：必须是已安装 OpenCV、Ultralytics、
-  PyTorch/CUDA/TensorRT 且能运行该 engine 的目标机 Python。ROS 节点不导入模型库。
+- 模型和类别表位于本仓库 `src/user_command/multipoint/models/`。启动文件用
+  `$(find multipoint)/models/yolo11s.engine` 定位模型，可通过 launch 参数 `model:=绝对路径`
+  切换；类别表必须在模型旁边，文件名为同名 `.names.json`。缺少或无效时检测启动报错。
+  `yolo11s.engine` 是 TensorRT 序列化模型，换 JetPack / TensorRT / GPU 后需确认兼容性，
+  必要时用原始权重在目标机重新导出。运行时无需相邻的 `A8mini_Detction` 目录。
+- `python_executable`：当前机器指向工作空间根目录的 `.venv-a8mini/bin/python`，
+  其中装有检测所需的 OpenCV、Ultralytics 和 PyTorch；ROS 节点仍使用系统 Python。
+  这个约 790 MiB 的环境不进入 Git，换机器或移动工作空间后需重新准备环境并更新此路径。
+  目标 Python 还须能使用 CUDA/TensorRT 运行当前 engine。
 - 当前 `max_fps: 30`、`conf: 0.55`、`cpu_threads: 2`；推理限频并降低进程 CPU
   调度优先级。推理限频不改变相机的推流帧率，也不限制整个系统的 GPU 使用率。
 - 默认 `open_timeout_ms: 5000`、`read_timeout_ms: 2500`、`reconnect_delay: 1.0`；
@@ -103,8 +105,10 @@ save_detection_video: false       # 改为 true 才保存带识别框的视频�
 本次断流依据、修复和复测步骤见 [20260906_183832 日志分析与修复报告](20260906_183832日志分析与修复报告.md)。
 新增诊断后的实飞复核见 [20260907_154114 飞行日志分析报告](20260907_154114飞行日志分析报告.md)，
 包含视频/负载趋势图、飞行时间线及恢复的任务 CSV。
-检测显示使用独立窗口，不发布 `/camera/color/image_raw`；RViz 原有 Image 面板的
-`No Image` 不能单独用来判断检测流是否中断。
+单仓模型布局、引擎兼容性和类别表要求见[检测单仓整合说明](20260930_A8mini检测单仓整合说明.md)。
+检测显示使用独立窗口，不发布 `/camera/color/image_raw`。实机 RViz 配置已移除
+订阅该空话题的根图像显示，并新增 `lidar_map` 显示 `/laserMapping/cloud_registered`。
+若旧 RViz 配置仍出现 `No Image`，不能据此判断检测流是否中断。
 
 仅启动检测（不会发送云台或飞行控制指令）：
 
@@ -266,7 +270,7 @@ source devel/setup.zsh
 新增诊断默认开启：`host_metrics.jsonl` 每秒记录主机负载、磁盘、网卡与关键进程
 （含采集子进程）；`tegrastats.jsonl`、`camera_ping.jsonl`、`kernel.jsonl`
 分别保留 Jetson 状态、相机连通性和内核事件。各周期日志默认每文件 20 MiB、两个备份，
-工具不可用会记录原因。检测器还保存实际 Python/依赖版本和外部源码快照，日志带墙钟、
+工具不可用会记录原因。检测器还保存实际 Python/依赖版本、本仓库辅助源码快照和模型校验信息，日志带墙钟、
 单调时钟及进程标识。完整字段、开关、容量边界和验证结果见
 [飞行日志系统说明](飞行日志系统说明_20260907.md)。
 

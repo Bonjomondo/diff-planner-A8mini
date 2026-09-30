@@ -18,6 +18,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.venv-a8mini/
 
 # Runtime data and logs
 *.bag

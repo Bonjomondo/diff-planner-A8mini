@@ -7,7 +7,6 @@ ADD_COMPILE_OPTIONS(-std=c++14 )
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 
 find_package(OpenCV REQUIRED)
-include("~/Documents/opencv-4.6.0/build/OpenCVConfig.cmake")
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp

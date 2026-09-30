@@ -26,7 +26,7 @@ def relay_output(stream):
 def build_command(params, script):
     command = [str(Path(params.get("python_executable", sys.executable)).expanduser()),
                "-u", str(script)]
-    for key in ("repo_path", "model", "source", "backend", "codec", "imgsz", "conf",
+    for key in ("model", "source", "backend", "codec", "imgsz", "conf",
                 "max_fps", "cpu_threads", "video_dir", "video_fps", "latency_ms",
                 "open_timeout_ms", "read_timeout_ms", "reconnect_delay",
                 "max_frame_age_ms"):

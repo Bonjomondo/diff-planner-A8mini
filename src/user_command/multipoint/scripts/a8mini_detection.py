@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""RTSP-only flight integration for Bonjomondo/A8mini_Detction (c83acee6).
-
-Uses local capture watchdog and upstream class-name/drawing helpers. No camera control
-commands, ROS imports, or flight-state subscriptions are used in this process.
-"""
+"""RTSP-only A8 mini detection using this package's capture, model and labels."""
 
 import argparse
 import fcntl
@@ -13,19 +9,22 @@ import math
 import os
 from pathlib import Path
 import signal
-import sys
 import tempfile
 import threading
 import time
 
 from a8mini_video import AsyncVideoWriter
 from a8mini_diagnostics import log, write_runtime_snapshot
+from a8mini_labels import load_class_names, draw_detection
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo-path", default="~/Documents/A8mini_Detction")
-    parser.add_argument("--model", default="yolo11s.engine")
+    script = Path(__file__).resolve()
+    source_model = script.parents[1] / "models/yolo11s.engine"
+    installed_model = script.parents[2] / "share/multipoint/models/yolo11s.engine"
+    parser.add_argument("--model", default=str(source_model if source_model.is_file()
+                                               else installed_model))
     parser.add_argument("--source", default="rtsp://192.168.144.25:8554/main.264")
     parser.add_argument("--backend", choices=("auto", "gstreamer", "ffmpeg"), default="auto")
     parser.add_argument("--codec", choices=("h264", "h265"), default="h264")
@@ -79,25 +78,19 @@ def window_should_close(cv2, window, created):
 
 
 def run(args, stop):
-    repo = Path(args.repo_path).expanduser().resolve()
-    if not (repo / "rtsp_capture.py").is_file():
-        raise FileNotFoundError("A8mini_Detction repo_path is invalid: " + str(repo))
-    model_path = Path(args.model).expanduser()
-    if not model_path.is_absolute():
-        model_path = repo / model_path
+    model_path = Path(args.model).expanduser().resolve()
     if not model_path.is_file():
         raise FileNotFoundError("model does not exist: " + str(model_path))
+    names = load_class_names(model_path)
     # Apply before loading OpenCV/PyTorch; spawn workers inherit these limits.
     for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
         os.environ[key] = str(args.cpu_threads)
     os.nice(10)
-    sys.path.insert(0, str(repo))
     import cv2
     import numpy as np
     import torch
     from ultralytics import YOLO
     from a8mini_capture import CaptureConfig, LatestFrameCapture
-    from A8mini_RTSP_YOLO_Detection import ClassNameResolver, draw_detection
 
     cv2.setNumThreads(args.cpu_threads)
     torch.set_num_threads(args.cpu_threads)
@@ -120,7 +113,8 @@ def run(args, stop):
             window_max[key] = 0
     try:
         model = YOLO(str(model_path), task="detect")
-        names = ClassNameResolver(model_path)
+        log("[DETECTION] Loaded %d class names from %s" %
+            (len(names), model_path.with_suffix(".names.json")))
         log("[DETECTION] Warming up model before opening the live stream", flush=True)
         model.predict(source=np.zeros((args.imgsz, args.imgsz, 3), dtype=np.uint8),
                       imgsz=args.imgsz, conf=args.conf, device=0, rect=False, verbose=False)
@@ -190,9 +184,8 @@ def run(args, stop):
                     diagnostics("stale_inference")
                     last_stats, count = time.monotonic(), 0
                 continue
-            class_names = names.resolve(result.names, [row[-1] for row in boxes])
             for row in boxes:
-                draw_detection(frame, row[:4], int(row[-1]), float(row[-2]), class_names)
+                draw_detection(frame, row[:4], int(row[-1]), float(row[-2]), names, cv2)
             now = time.monotonic()
             # Includes read + inference, excludes camera/encoder/network internal buffering.
             age_ms = (now - packet.captured_at) * 1000

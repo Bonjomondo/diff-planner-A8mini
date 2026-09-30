@@ -18,6 +18,14 @@ def log(message, **kwargs):
         time.monotonic(), os.getpid(), message), **kwargs)
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def write_runtime_snapshot(args, model_path, cv2, torch):
     directory = os.environ.get("UAV_DEBUG_LOG_DIR")
     if not directory:
@@ -27,10 +35,11 @@ def write_runtime_snapshot(args, model_path, cv2, torch):
         root.mkdir(parents=True, exist_ok=True)
         sources = {}
         scripts = Path(__file__).resolve().parent
-        repo = Path(args.repo_path).expanduser().resolve()
         paths = [scripts / name for name in ("a8mini_detection.py", "a8mini_capture.py",
-                                             "a8mini_video.py", "a8mini_diagnostics.py")]
-        paths += [repo / name for name in ("rtsp_capture.py", "A8mini_RTSP_YOLO_Detection.py")]
+                                             "a8mini_video.py", "a8mini_diagnostics.py",
+                                             "a8mini_labels.py")]
+        names_path = model_path.with_suffix(".names.json")
+        paths.append(names_path)
         for path in paths:
             try:
                 if path.stat().st_size > 1024 * 1024:
@@ -53,7 +62,8 @@ def write_runtime_snapshot(args, model_path, cv2, torch):
                     "pid": os.getpid(), "python_executable": sys.executable, "python_version": sys.version,
                     "parameters": vars(args), "packages": packages, "opencv_version": cv2.__version__,
                     "torch_version": str(torch.__version__), "torch_cuda_version": str(torch.version.cuda),
-                    "model": {"path": str(model_path), "size": stat.st_size, "mtime_ns": stat.st_mtime_ns},
+                    "model": {"path": str(model_path), "size": stat.st_size,
+                              "mtime_ns": stat.st_mtime_ns, "sha256": sha256_file(model_path)},
                     "sources": sources,
                     "thread_environment": {key: os.environ.get(key) for key in (
                         "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS")}}

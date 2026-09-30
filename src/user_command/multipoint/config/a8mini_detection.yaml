@@ -1,10 +1,9 @@
 # 实时识别运行参数。三个功能开关在当前任务的 points.yaml / coverage_*.yaml 中。
-# 使用已安装 YOLO/TensorRT 的 Python 环境；不更改 ROS 的 Python 环境。
-python_executable: /usr/bin/python3
-repo_path: ~/Documents/A8mini_Detction
-model: yolo11s.engine
+# 检测进程使用本工作空间的 Python 环境；ROS 节点仍使用系统 Python。
+# 工作空间搬迁后需同步更新此绝对路径。
+python_executable: /home/ly/Documents/diff-planner-A8miniV2/.venv-a8mini/bin/python
 source: rtsp://192.168.144.25:8554/main.264
-# 当前 /usr/bin/python3 的 OpenCV 检查结果为 GStreamer: NO，保持可用的 FFmpeg。
+# 当前使用 FFmpeg 后端；目标 Python 的 OpenCV/GStreamer 能力以现场检查为准。
 # 目标机 OpenCV 支持 GStreamer 且 nvv4l2decoder/nvvidconv 可用后可改为 gstreamer。
 backend: ffmpeg
 # 真机流是 H.265，不能根据 main.264 文件名判断；GStreamer 后端需要此参数。

@@ -2,6 +2,52 @@
 
 本文件记录 Diff-Planner A8 mini 分支的重要功能、配置和实机行为变更。
 
+## Unreleased - 2026-09-30
+
+### Added / Changed
+
+- **检测单仓整合**：A8 mini 实时检测的代码、类别表与模型并入 `multipoint` 包，
+  正常启动不再依赖外部 `~/Documents/A8mini_Detction`。
+  - 新增 `models/yolo11s.engine`、`models/yolo11s.names.json` 及
+    `scripts/a8mini_labels.py`（类别名加载校验与画框）。
+  - `a8mini_detection.launch` 新增 `model` 参数，默认
+    `$(find multipoint)/models/yolo11s.engine`，可用 `model:=绝对路径` 切换；
+    类别表须与模型同目录同基名（`custom.engine` ↔ `custom.names.json`），
+    缺失、含占位名或编号不连续时在加载推理环境前报错。
+  - `a8mini_detection.py` 移除 `repo_path` 及外部 `rtsp_capture.py`、
+    `A8mini_RTSP_YOLO_Detection.py` 依赖；`a8mini_detection_node.py` 不再传递
+    `repo_path`。
+  - `a8mini_diagnostics.py` 增加 `sha256_file`，manifest 记录模型路径/大小/修改时间
+    /SHA-256，源码快照改为本仓库检测、采集、录像、诊断、标签脚本及所用类别表。
+  - `a8mini_detection.yaml` 的 `python_executable` 指向工作空间
+    `.venv-a8mini/bin/python`，并移除 `repo_path`/`model` 键；`.venv-a8mini/`
+    加入 `.gitignore`。
+  - `CMakeLists.txt` 安装 `a8mini_labels.py` 与 `models` 目录。
+- **本机环境重建 / OpenCV 修复**：删除 `plan_env/CMakeLists.txt` 中失效的
+  `~/Documents/opencv-4.6.0` 路径引用，改用系统 OpenCV 重新构建整个 catkin 工作空间。
+- **RViz 配置**：`exp.rviz` 新增 `lidar_map` 显示 `/laserMapping/cloud_registered`，
+  并移除订阅空话题 `/camera/color/image_raw` 的根图像显示。
+- **雷达 / 网络配置迁移到本机**：
+  - `MID360_config.json`、`MID360s_config.json` 的 host IP 由 `192.168.1.50`
+    改为 `192.168.1.5`，雷达 IP 由 `192.168.1.171` 改为 `192.168.1.190`。
+  - `mapping_mid360.launch` 的 `user_config_path` 由 `MID360s_config.json`
+    改为 `MID360_config.json`。
+  - `mid360.yaml` 更新 IMU-LiDAR 外参，并新增 `publish/tf_world_frame: world`，
+    对齐 EKF / 规划器 / RViz 的世界系。
+- **文档**：新增 [检测单仓整合说明](A8mini/20260930_A8mini检测单仓整合说明.md)、
+  [2026-09-29 全问题诊断报告](docs/20260929_全问题诊断报告.md) 和
+  [达妙载板网口驱动说明](A8mini/达妙载板网口驱动_r8125_installed.md)；同步更新
+  `A8mini/README.md`、`docs/A8mini实机操作指南.md` 及历史日志分析报告。
+
+### Verification
+
+- 独立检测单测、独立 catkin 编译与 install 布局检查通过。
+- 本机宿主机 PyTorch CUDA 可用，仓库 engine 的 TensorRT 预热成功；只读 RTSP 检测
+  约 25 s 收到 400 帧、处理 379 帧、重连 0 次；桌面显示运行约 22 s 稳定在
+  24–25 FPS 并正常退出。
+- 重建后规划、LIO、控制、任务节点动态库加载检查均无 `not found`。
+- 完整飞行栈负载与实飞尚未验证。
+
 ## Unreleased - 2026-09-24
 
 ### Added / Changed

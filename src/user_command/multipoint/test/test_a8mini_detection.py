@@ -2,6 +2,7 @@
 
 import importlib.util
 import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -17,6 +18,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import a8mini_detection as detection
 import a8mini_diagnostics as diagnostics
+from a8mini_labels import load_class_names, draw_detection
 from a8mini_video import AsyncVideoWriter
 
 
@@ -86,24 +88,48 @@ class DetectionTest(unittest.TestCase):
             cv.waitKey.return_value = key
             self.assertTrue(detection.window_should_close(cv, 'detector', True))
 
-    def test_runtime_snapshot_uses_detector_environment_and_external_source_hashes(self):
+    def test_runtime_snapshot_records_bundled_sources_and_model_hashes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
             (root / 'yolo11s.engine').write_bytes(b'fake engine')
-            (root / 'rtsp_capture.py').write_text('# external capture\n')
-            (root / 'A8mini_RTSP_YOLO_Detection.py').write_text('# external helpers\n')
+            (root / 'yolo11s.names.json').write_text('{"names": {"0": "person"}}')
             cv2 = types.SimpleNamespace(__version__='actual-cv', getBuildInformation=lambda: 'GStreamer: NO')
             torch = types.SimpleNamespace(__version__='actual-torch', version=types.SimpleNamespace(cuda='test-cuda'))
-            args = detection.parse_args(['--repo-path', directory])
+            args = detection.parse_args(['--model', str(root / 'yolo11s.engine')])
             with patch.dict(diagnostics.os.environ, {'UAV_DEBUG_LOG_DIR': directory}):
                 diagnostics.write_runtime_snapshot(args, root / 'yolo11s.engine', cv2, torch)
             manifest_path = next(root.glob('detector_runtime_*/manifest.json'))
-            import json
             manifest = json.loads(manifest_path.read_text())
             self.assertEqual(manifest['python_executable'], sys.executable)
             self.assertEqual(manifest['opencv_version'], 'actual-cv')
-            self.assertIn('sha256', manifest['sources'][str(root / 'rtsp_capture.py')])
+            self.assertIn('sha256', manifest['sources'][str(root / 'yolo11s.names.json')])
+            self.assertIn('sha256', manifest['sources'][str(SCRIPTS / 'a8mini_labels.py')])
+            self.assertEqual(manifest['model']['sha256'], diagnostics.sha256_file(root / 'yolo11s.engine'))
             self.assertEqual((manifest_path.parent / 'opencv_build.txt').read_text(), 'GStreamer: NO')
+
+    def test_bundled_names_and_drawing(self):
+        model_path = SCRIPTS.parent / 'models/yolo11s.engine'
+        names = load_class_names(model_path)
+        self.assertEqual(len(names), 80)
+        self.assertEqual(names[0], 'person')
+        frame = np.zeros((16, 16, 3), np.uint8)
+        cv2 = Mock(FONT_HERSHEY_SIMPLEX=0, LINE_AA=16)
+        cv2.getTextSize.return_value = ((20, 10), 2)
+        draw_detection(frame, [-5, -5, 20, 20], 0, 0.9, names, cv2)
+        self.assertEqual(cv2.rectangle.call_args_list[0].args[1:3], ((0, 0), (15, 15)))
+        self.assertEqual(cv2.putText.call_args.args[1], 'person 0.90')
+
+    def test_invalid_or_missing_names_fail_before_inference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory) / 'model.engine'
+            with self.assertRaises(FileNotFoundError):
+                load_class_names(model)
+            names_file = model.with_suffix('.names.json')
+            for names in ({'0': 'person', '2': 'car'}, {'0': 'class0'}, {'bad': 'person'}):
+                with self.subTest(names=names):
+                    names_file.write_text(json.dumps({'names': names}))
+                    with self.assertRaises(ValueError):
+                        load_class_names(model)
 
     def test_duplicate_source_rejected_then_released(self):
         source = 'test-source-' + str(time.monotonic())
@@ -124,12 +150,15 @@ class DetectionTest(unittest.TestCase):
     def test_save_toggle_preserves_inference_and_capture_cleanup(self):
         for save in (False, True):
             with self.subTest(save=save), tempfile.TemporaryDirectory() as directory:
-                repo = Path(directory)
-                (repo / 'rtsp_capture.py').touch()
-                (repo / 'yolo11s.engine').touch()
+                model_path = Path(directory) / 'yolo11s.engine'
+                model_path.touch()
+                model_path.with_suffix('.names.json').write_text('{"names": {"0": "person"}}')
                 stop = threading.Event()
                 model = Mock()
-                result = types.SimpleNamespace(boxes=None, names={0: 'person'})
+                boxes = Mock()
+                boxes.data.detach.return_value.cpu.return_value.numpy.return_value = np.array(
+                    [[0, 0, 15, 15, 0.9, 0]])
+                result = types.SimpleNamespace(boxes=boxes, names={0: 'class0'})
                 calls = []
                 def predict(**kw):
                     calls.append(kw)
@@ -142,16 +171,15 @@ class DetectionTest(unittest.TestCase):
                 capture.read_latest.return_value = types.SimpleNamespace(
                     frame=np.zeros((16, 16, 3), np.uint8), captured_at=time.monotonic(),
                     cap_ms=1, backend='fake', sequence=(1, 1))
-                upstream = Mock()
                 modules = {
                     'cv2': Mock(__version__='test'), 'torch': Mock(),
                     'ultralytics': types.SimpleNamespace(YOLO=Mock(return_value=model)),
                     'a8mini_capture': types.SimpleNamespace(
                         CaptureConfig=Mock(), LatestFrameCapture=Mock(
                             return_value=Mock(start=Mock(return_value=capture)))),
-                    'A8mini_RTSP_YOLO_Detection': upstream,
                 }
-                args = detection.parse_args(['--repo-path', directory, '--no-display',
+                modules['cv2'].getTextSize.return_value = ((20, 10), 2)
+                args = detection.parse_args(['--model', str(model_path), '--no-display',
                                              '--read-timeout-ms', '3200',
                                              '--open-timeout-ms', '6000',
                                              '--latency-ms', '250', '--reconnect-delay', '2',
@@ -169,6 +197,8 @@ class DetectionTest(unittest.TestCase):
                         read_timeout_ms=3200, open_timeout_ms=6000, latency_ms=250,
                         reconnect_delay=2.0, max_frame_age_ms=800)
                     capture.close.assert_called_once()
+                    self.assertEqual(modules['cv2'].putText.call_args_list[0].args[1],
+                                     'person 0.90')
                     self.assertEqual(writer.called, save)
                     if save:
                         writer.return_value.submit.assert_called_once()
@@ -180,10 +210,10 @@ class DetectionTest(unittest.TestCase):
         with patch.dict(sys.modules, {'rospy': Mock()}):
             spec.loader.exec_module(supervisor)
         command = supervisor.build_command({'save_detection_video': True, 'display': False,
-                                             'repo_path': '/tmp/repo with spaces'}, '/tmp/runner.py')
+                                             'model': '/tmp/model with spaces.engine'}, '/tmp/runner.py')
         self.assertIn('--save-video', command)
         self.assertIn('--no-display', command)
-        self.assertIn('/tmp/repo with spaces', command)
+        self.assertIn('/tmp/model with spaces.engine', command)
         self.assertNotIn('--save-video', supervisor.build_command({'save_detection_video': False}, 'run.py'))
         with self.assertRaises(ValueError):
             supervisor.build_command({'save_detection_video': 'false'}, 'run.py')

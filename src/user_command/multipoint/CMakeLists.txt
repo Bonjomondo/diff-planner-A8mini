@@ -44,7 +44,7 @@ endif()
 catkin_install_python(
   PROGRAMS scripts/a8mini_gimbal_node.py scripts/a8mini_detection_node.py
            scripts/a8mini_detection.py scripts/a8mini_video.py scripts/a8mini_capture.py
-           scripts/a8mini_diagnostics.py
+           scripts/a8mini_diagnostics.py scripts/a8mini_labels.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -54,6 +54,6 @@ install(
 )
 
 install(
-  DIRECTORY config launch
+  DIRECTORY config launch models
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

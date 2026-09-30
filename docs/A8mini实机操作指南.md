@@ -14,6 +14,8 @@ catkin_make -DROS_EDITION=ROS1
 source devel/setup.bash
 ```
 
+A8 mini 检测所需的 `yolo11s.engine`、类别表和检测辅助代码已随仓库提供，部署时不需另放 `A8mini_Detction` 目录。目标机仍须准备匹配的 PyTorch、Ultralytics、OpenCV、CUDA/TensorRT 环境；TensorRT 引擎跨 JetPack/TensorRT/GPU 环境的兼容性须在目标机核实。参数和故障边界见 [检测单仓整合说明](../A8mini/20260930_A8mini检测单仓整合说明.md)。
+
 先按修复说明做不连接飞控的回归及地面拆桨检查，再使用下面的飞行步骤。不要同时运行上一轮残留节点或另一份独立 A8mini 检测程序。
 
 启动脚本现在不会修改 `/dev/tty*` 权限。确认飞控 `/dev/ttyACM0` 对当前用户可读写；权限不足时在 Ubuntu 上一次性配置串口用户组，重新登录后再检查：

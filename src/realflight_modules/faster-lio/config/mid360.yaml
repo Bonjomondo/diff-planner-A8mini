@@ -29,12 +29,14 @@ mapping:
     # world_transform_R: [ 0.9659258, 0, -0.2588190, 0, 1, 0, 0.2588190, 0, 0.9659258]
     
     # Option 2: /mavros/imu/data
-    # extrinsic_T: [0.094614, -0.012512, 0.043731]
-    # extrinsic_R: [0.9659258, 0, 0.2588190, 0, 1, 0, -0.2588190, 0, 0.9659258]
-    extrinsic_T: [-0.036817,  0.002759,  0.095866]
-    extrinsic_R: [ 0.999825,  0.016834, -0.008137, 
-                  -0.017019,  0.999587, -0.023176,
-                   0.007744,  0.023311,  0.999698]
+    # extrinsic_T: [ 0.007595, -0.009984, 0.108315 ]
+    # extrinsic_R: [ 0.999893, -0.001987, -0.014524,
+    #                0.001777, 0.999894, -0.014471,
+    #                0.014551, 0.014444, 0.999790]
+    extrinsic_T: [0.092711, 0.026376, 0.042704]
+    extrinsic_R: [0.920182,  0.013079,  0.391273,
+                 0.001701,  0.999299, -0.037404,
+                -0.391488,  0.035084,  0.919514]
     world_transform_T: [ 0.0, 0.0, 0.0]
     world_transform_R: [ 1, 0, 0, 0, 1, 0, 0, 0, 1]
     # ===================================================================
@@ -44,6 +46,7 @@ publish:
     scan_publish_en: true # false: close all the point cloud output
     dense_publish_en: false # false: low down the points number in a global-frame point clouds scan.
     scan_bodyframe_pub_en: true # true: output the point cloud scans in IMU-body-frame
+    tf_world_frame: world # match the world frame used by EKF / planner / RViz
  
 pcd_save:
     pcd_save_en: false
