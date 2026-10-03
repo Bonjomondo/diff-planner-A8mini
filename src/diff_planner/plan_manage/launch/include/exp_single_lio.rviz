@@ -1,0 +1,203 @@
+# Single-aircraft real-flight LIO view; keep simulation windows out of this config.
+Panels:
+- Class: rviz/Displays
+  Name: Displays
+  Property Tree Widget:
+    Expanded:
+    - /Global Options1
+    - /Status1
+    - /lidar_map1
+    Splitter Ratio: 0.5
+- Class: rviz/Views
+  Name: Views
+Visualization Manager:
+  Class: ''
+  Displays:
+  - Alpha: 0.7
+    Cell Size: 1
+    Class: rviz/Grid
+    Color: 150; 150; 150
+    Enabled: true
+    Line Style:
+      Line Width: 0.029999999329447746
+      Value: Lines
+    Name: Grid
+    Normal Cell Count: 0
+    Offset:
+      X: 0
+      Y: 0
+      Z: 0
+    Plane: XY
+    Plane Cell Count: 30
+    Reference Frame: <Fixed Frame>
+    Value: true
+  - Alpha: 1
+    Class: rviz/Axes
+    Enabled: true
+    Length: 1
+    Name: Axes
+    Radius: 0.03
+    Reference Frame: <Fixed Frame>
+    Show Trail: false
+    Value: true
+  - Alpha: 1
+    Class: rviz/PointCloud2
+    Color: 110; 190; 255
+    Color Transformer: FlatColor
+    Decay Time: 1
+    Enabled: true
+    Name: lidar_map
+    Position Transformer: XYZ
+    Queue Size: 2
+    Selectable: true
+    Size (Pixels): 2
+    Size (m): 0.05
+    Style: Points
+    Topic: /laserMapping/cloud_registered
+    Unreliable: false
+    Use Fixed Frame: true
+    Value: true
+  - Alpha: 1
+    Class: rviz/Axes
+    Enabled: true
+    Length: 0.5
+    Name: Body axes
+    Radius: 0.03
+    Reference Frame: body
+    Show Trail: false
+    Value: true
+  - Angle Tolerance: 0.10000000149011612
+    Class: rviz/Odometry
+    Covariance:
+      Orientation:
+        Alpha: 0.5
+        Color: 255; 255; 127
+        Color Style: Unique
+        Frame: Local
+        Offset: 1
+        Scale: 1
+        Value: true
+      Position:
+        Alpha: 0.30000001192092896
+        Color: 204; 51; 204
+        Scale: 1
+        Value: true
+      Value: false
+    Enabled: true
+    Keep: 1
+    Name: EKF odometry
+    Position Tolerance: 0.009999999776482582
+    Queue Size: 10
+    Shape:
+      Alpha: 1
+      Axes Length: 0.5
+      Axes Radius: 0.20000000298023224
+      Color: 255; 25; 0
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Value: Axes
+    Topic: /ekf/ekf_odom
+    Unreliable: false
+    Value: true
+  - Class: rviz/MarkerArray
+    Enabled: true
+    Marker Topic: /mission/clicked_waypoints
+    Name: RViz clicked route
+    Namespaces: {}
+    Queue Size: 100
+    Value: true
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 2.375
+      Min Value: -0.02500000037252903
+      Value: true
+    Axis: Z
+    Channel Name: intensity
+    Class: rviz/PointCloud2
+    Color: 29; 108; 212
+    Color Transformer: AxisColor
+    Decay Time: 0
+    Enabled: true
+    Invert Rainbow: false
+    Max Color: 255; 255; 255
+    Min Color: 0; 0; 0
+    Name: map inflate
+    Position Transformer: XYZ
+    Queue Size: 10
+    Selectable: false
+    Size (Pixels): 3
+    Size (m): 0.15000000596046448
+    Style: Boxes
+    Topic: /drone_0_diff_planner_node/grid_map/occupancy_inflate
+    Unreliable: false
+    Use Fixed Frame: true
+    Use rainbow: true
+    Value: true
+  - Class: rviz/Marker
+    Enabled: true
+    Marker Topic: /drone_0_diff_planner_node/goal_point
+    Name: goal_point
+    Namespaces: {}
+    Queue Size: 10
+    Value: true
+  - Class: rviz/Marker
+    Enabled: true
+    Marker Topic: /drone_0_diff_planner_node/global_list
+    Name: global_path
+    Namespaces:
+      "": true
+    Queue Size: 10
+    Value: true
+  - Class: rviz/Marker
+    Enabled: true
+    Marker Topic: /drone_0_diff_planner_node/optimal_list
+    Name: optimal_traj
+    Namespaces:
+      "": true
+    Queue Size: 10
+    Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Default Light: true
+    Fixed Frame: world
+    Frame Rate: 20
+  Name: root
+  Tools:
+  - Class: rviz/Interact
+    Hide Inactive Objects: true
+  - Class: rviz/MoveCamera
+  - Class: rviz/Select
+  - Class: rviz/FocusCamera
+  - Class: rviz/Measure
+  - Class: rviz/SetGoal
+    Topic: /move_base_simple/goal
+  - Class: rviz/PublishPoint
+    Single click: true
+    Topic: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 12
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.7
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 0.8
+    Saved: null
+Window Geometry:
+  Height: 800
+  Width: 1200
+  X: 60
+  Y: 60
+  Hide Left Dock: false
+  Hide Right Dock: false

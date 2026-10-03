@@ -1,0 +1,21 @@
+Read-only inspection on 2026-10-03 (Asia/Shanghai).
+NoMachine version: 9.4.14
+Current physical X11 display: :1, 1920x1080
+
+Session started: 2026-10-03 16:26:42
+2026-10-03 16:26:43 X11Poller: WARNING! Server pixmap format is not 'ZPixmap'.
+Info: Using MIT-SHM extension.
+Info: Using damage extension for screen updates.
+Info: Screen blanking running.
+Info: Using grab method 'ShmGetImage'.
+Info: Using H.264 software encoder.
+Info: Using display polling for screen updates.
+
+Monitor log at 2026-10-03 16:26:43:
+X Error: BadMatch 8
+Major opcode: 62
+(repeated four times)
+
+These are session-level startup findings, not a confirmed RViz-specific error.
+Screen blanking can also make local X11 screenshots black; black screenshots
+alone cannot prove that the remote client receives a black image.

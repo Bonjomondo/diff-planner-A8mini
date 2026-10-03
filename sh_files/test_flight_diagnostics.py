@@ -156,6 +156,7 @@ class DiagnosticsTests(unittest.TestCase):
                                         'MISSION_CSV_SOURCE=' + shlex.quote(str(mission_csv)))
             (scripts / 'run_single_lio_debug.sh').write_text(launcher)
             shutil.copyfile(original / 'flight_diagnostics.py', scripts / 'flight_diagnostics.py')
+            shutil.copyfile(original / 'process_supervisor.py', scripts / 'process_supervisor.py')
             (scripts / 'run_single_lio.sh').write_text('#!/bin/zsh\necho waypoint_id,arrived_time > ' +
                                                      shlex.quote(str(mission_csv)) + '\nsleep 0.5\ntouch ' +
                                                      shlex.quote(str(root / 'ready')) + '\nsleep 2\nexit 0\n')
@@ -202,7 +203,9 @@ else:
             self.assertEqual(process.returncode, 0, output)
             run_dir = next((root / 'logs').iterdir())
             metadata = (run_dir / 'metadata.txt').read_text()
-            self.assertIn('diagnostics_exit_status=0', metadata)
+            # Cleanup sends TERM to the supervisor; its status reports the
+            # requested signal even when the collector shuts down cleanly.
+            self.assertIn('diagnostics_exit_status=143', metadata)
             self.assertIn('run_status=0', metadata)
             self.assertIn('state=ready', (run_dir / 'snapshot_status.log').read_text())
             self.assertIn('initial: partial', (run_dir / 'rosparams.initial.yaml').read_text())
@@ -214,6 +217,8 @@ else:
             self.assertEqual((run_dir / 'mission_timestamps.csv').read_bytes(), mission_csv.read_bytes())
             rows = [json.loads(x) for x in (run_dir / 'host_metrics.jsonl').read_text().splitlines()]
             self.assertEqual(rows[-1]['event'], 'collector_exit')
+            self.assertNotEqual(rows[-1]['reason'], 'parent_exited')
+            self.assertGreaterEqual(len(rows), 3, 'collector must sample while the launcher is alive')
             self.assertEqual(len(rows[-1]['probes']), 3)
             self.assertTrue(all(p['returncode'] is not None for p in rows[-1]['probes']))
             for name in ('tegrastats', 'kernel', 'camera_ping'):

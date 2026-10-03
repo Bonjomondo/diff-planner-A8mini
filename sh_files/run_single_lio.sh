@@ -146,7 +146,7 @@ start_launch multipoint multipointplan_exp_lio.launch \
   start_detection:="${A8MINI_START_DETECTION}"
 sleep 2
 check_launches || exit 1
-start_launch diff_planner exp_rviz.launch
+start_launch diff_planner exp_rviz.launch rviz_args:="${UAV_RVIZ_ARGS:-}"
 while check_launches; do
   sleep 1
 done

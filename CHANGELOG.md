@@ -2,6 +2,15 @@
 
 本文件记录 Diff-Planner A8 mini 分支的重要功能、配置和实机行为变更。
 
+## Unreleased - 2026-10-03
+
+- 实机 RViz 默认使用 `exp_single_lio.rviz`，从 42 机仿真配置切换为 10 项单机显示；
+  保留 world、实机点云、EKF、膨胀地图与点击航线。新增 `rviz_config` / `rviz_args` 参数。
+- debug 入口保存 RViz/LIO 配置快照、点云频率和 Ogre 渲染日志；修复采集器因 supervisor
+  中间进程误判 launcher 退出、导致 CPU/GPU 诊断在启动前停止的问题。
+- 新增 [20261003_162838 黑屏分析](docs/20261003_162838_RViz黑屏分析.md)。旧/新配置独立
+  GPU 渲染均能显示 Grid；持续黑屏的桌面呈现原因及完整栈显示结果仍需核对。
+
 ## Unreleased - 2026-09-30
 
 ### Added / Changed

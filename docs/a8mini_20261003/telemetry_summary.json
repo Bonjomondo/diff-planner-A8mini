@@ -1,0 +1,129 @@
+{
+  "log": "flight_logs/20261003_170857",
+  "host_samples": 155,
+  "cpu_busy_percent": {
+    "median": 97.84,
+    "peak": 100.0
+  },
+  "min_mem_available_mib": 5826.9,
+  "processes_top": [
+    {
+      "pid": 17580,
+      "name": "rostopic",
+      "mean_cpu_one_core": 38.0,
+      "max_cpu_one_core": 37.99,
+      "n": 1
+    },
+    {
+      "pid": 16272,
+      "name": "run_mapping_onl",
+      "mean_cpu_one_core": 29.8,
+      "max_cpu_one_core": 121.94,
+      "n": 129
+    },
+    {
+      "pid": 18269,
+      "name": "python",
+      "mean_cpu_one_core": 26.5,
+      "max_cpu_one_core": 49.94,
+      "n": 10
+    },
+    {
+      "pid": 16667,
+      "name": "rviz",
+      "mean_cpu_one_core": 23.7,
+      "max_cpu_one_core": 45.89,
+      "n": 104
+    },
+    {
+      "pid": 17940,
+      "name": "unavailable: [Errno 2] No such file or directory: '/proc/17940/comm'",
+      "mean_cpu_one_core": 22.4,
+      "max_cpu_one_core": 39.94,
+      "n": 23
+    },
+    {
+      "pid": 16007,
+      "name": "record",
+      "mean_cpu_one_core": 20.9,
+      "max_cpu_one_core": 88.5,
+      "n": 149
+    },
+    {
+      "pid": 15938,
+      "name": "python3",
+      "mean_cpu_one_core": 16.9,
+      "max_cpu_one_core": 30.2,
+      "n": 150
+    },
+    {
+      "pid": 15823,
+      "name": "python3",
+      "mean_cpu_one_core": 16.8,
+      "max_cpu_one_core": 30.94,
+      "n": 154
+    },
+    {
+      "pid": 15932,
+      "name": "mavros_node",
+      "mean_cpu_one_core": 16.4,
+      "max_cpu_one_core": 51.14,
+      "n": 144
+    },
+    {
+      "pid": 16271,
+      "name": "livox_ros_drive",
+      "mean_cpu_one_core": 14.3,
+      "max_cpu_one_core": 52.12,
+      "n": 131
+    },
+    {
+      "pid": 16649,
+      "name": "python",
+      "mean_cpu_one_core": 13.9,
+      "max_cpu_one_core": 91.97,
+      "n": 108
+    },
+    {
+      "pid": 15827,
+      "name": "python3",
+      "mean_cpu_one_core": 10.4,
+      "max_cpu_one_core": 15.99,
+      "n": 154
+    }
+  ],
+  "detector_stats": {
+    "fps": {
+      "min": 0.2,
+      "median": 2.4,
+      "max": 4.0
+    },
+    "cap_ms": {
+      "min": 20.5,
+      "median": 76.5,
+      "max": 346.5
+    },
+    "yolo_ms": {
+      "min": 72.6,
+      "median": 210.1,
+      "max": 539.4
+    },
+    "age_ms": {
+      "min": 248.0,
+      "median": 469.2,
+      "max": 813.0
+    }
+  },
+  "gpu_percent": {
+    "median": 17,
+    "max": 72
+  },
+  "ping": {
+    "replies": 188,
+    "sequence_first": 1,
+    "sequence_last": 188,
+    "missing_sequences": 0,
+    "median_ms": 0.194,
+    "max_ms": 6.08
+  }
+}

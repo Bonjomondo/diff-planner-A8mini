@@ -21,6 +21,9 @@ mkdir -p "${LOG_DIR}/ros" "${LOG_DIR}/topic_rates"
 touch "${LOG_DIR}/run_started.marker"
 export ROS_LOG_DIR="${LOG_DIR}/ros"
 export UAV_DEBUG_LOG_DIR="${LOG_DIR}"
+# Keep renderer initialization/errors in console.log; RViz stdout is otherwise
+# only copied into the ROS log tree. Override explicitly for compatibility tests.
+export UAV_RVIZ_ARGS="${UAV_RVIZ_ARGS:---ogre-log}"
 
 exec > >(tee -i -a "${LOG_DIR}/console.log") 2>&1
 
@@ -160,6 +163,14 @@ done
 cp "${SCRIPT_DIR}/flight_diagnostics.py" "${LOG_DIR}/flight_diagnostics.py.snapshot" 2>/dev/null || true
 cp "${WORKSPACE_DIR}/src/user_command/multipoint/launch/multipointplan_exp_lio.launch" \
    "${LOG_DIR}/multipointplan_exp_lio.launch.snapshot" 2>/dev/null || true
+for rviz_config in exp.rviz exp_single_lio.rviz; do
+    cp "${WORKSPACE_DIR}/src/diff_planner/plan_manage/launch/include/${rviz_config}" \
+       "${LOG_DIR}/${rviz_config}.snapshot" 2>/dev/null || true
+done
+cp "${WORKSPACE_DIR}/src/diff_planner/plan_manage/launch/exp/exp_rviz.launch" \
+   "${LOG_DIR}/exp_rviz.launch.snapshot" 2>/dev/null || true
+cp "${WORKSPACE_DIR}/src/realflight_modules/faster-lio/config/mid360.yaml" \
+   "${LOG_DIR}/mid360.yaml.snapshot" 2>/dev/null || true
 # HEAD includes both staged and unstaged tracked changes, unlike plain `git diff`.
 git diff HEAD > "${LOG_DIR}/working_tree.diff" 2>/dev/null || true
 
@@ -292,6 +303,8 @@ BAG_PID=$!
     capture_topic_rate /mavros/battery mavros_battery &
     capture_topic_rate /mavros/px4flow/raw/optical_flow_rad mavros_optical_flow_rad &
     capture_topic_rate /ekf/ekf_odom ekf_odom &
+    capture_topic_rate /laserMapping/cloud_registered lidar_cloud &
+    capture_topic_rate /drone_0_diff_planner_node/grid_map/occupancy_inflate occupancy_inflate &
     capture_topic_rate /setpoints_cmd setpoints_cmd &
     capture_topic_rate /mavros/setpoint_raw/attitude mavros_attitude_command &
     wait

@@ -341,9 +341,16 @@ def main(argv=None):
         sampler = HostSampler(directory)
         next_sockets = started
         while not stop.is_set():
-            if args.parent_pid and os.getppid() != args.parent_pid:
-                reason = "parent_exited"
-                break
+            if args.parent_pid:
+                # process_supervisor.py sits between us and the debug launcher.
+                # Watch the requested PID's lifetime, not our immediate parent.
+                try:
+                    os.kill(args.parent_pid, 0)
+                except ProcessLookupError:
+                    reason = "parent_exited"
+                    break
+                except PermissionError:
+                    pass  # The process exists but belongs to another UID.
             if args.duration and time.monotonic() - started >= args.duration:
                 reason = "duration"
                 break

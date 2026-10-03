@@ -1,4 +1,5 @@
 <launch>
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find diff_planner)/launch/include/exp.rviz" required="true" />
+  <arg name="rviz_config" default="$(find diff_planner)/launch/include/exp_single_lio.rviz" />
+  <arg name="rviz_args" default="" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d &quot;$(arg rviz_config)&quot; $(arg rviz_args)" output="screen" required="true" />
 </launch>
-
