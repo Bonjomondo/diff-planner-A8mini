@@ -78,6 +78,7 @@ def window_should_close(cv2, window, created):
 
 
 def run(args, stop):
+    startup_started = time.monotonic()
     model_path = Path(args.model).expanduser().resolve()
     if not model_path.is_file():
         raise FileNotFoundError("model does not exist: " + str(model_path))
@@ -86,11 +87,14 @@ def run(args, stop):
     for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
         os.environ[key] = str(args.cpu_threads)
     os.nice(10)
+    log("[DETECTION] Loading inference libraries", flush=True)
     import cv2
     import numpy as np
     import torch
     from ultralytics import YOLO
     from a8mini_capture import CaptureConfig, LatestFrameCapture
+    log("[DETECTION] Inference libraries ready in %.2f s" %
+        (time.monotonic() - startup_started), flush=True)
 
     cv2.setNumThreads(args.cpu_threads)
     torch.set_num_threads(args.cpu_threads)
@@ -116,8 +120,11 @@ def run(args, stop):
         log("[DETECTION] Loaded %d class names from %s" %
             (len(names), model_path.with_suffix(".names.json")))
         log("[DETECTION] Warming up model before opening the live stream", flush=True)
+        warmup_started = time.monotonic()
         model.predict(source=np.zeros((args.imgsz, args.imgsz, 3), dtype=np.uint8),
                       imgsz=args.imgsz, conf=args.conf, device=0, rect=False, verbose=False)
+        log("[DETECTION] Model ready; warmup=%.2f s startup=%.2f s" %
+            (time.monotonic() - warmup_started, time.monotonic() - startup_started), flush=True)
         if stop.is_set():
             return
         capture = LatestFrameCapture(CaptureConfig(

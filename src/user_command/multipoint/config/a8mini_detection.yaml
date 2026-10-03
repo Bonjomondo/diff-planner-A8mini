@@ -3,9 +3,9 @@
 # 工作空间搬迁后需同步更新此绝对路径。
 python_executable: /home/ly/Documents/diff-planner-A8miniV2/.venv-a8mini/bin/python
 source: rtsp://192.168.144.25:8554/main.264
-# 当前使用 FFmpeg 后端；目标 Python 的 OpenCV/GStreamer 能力以现场检查为准。
-# 目标机 OpenCV 支持 GStreamer 且 nvv4l2decoder/nvvidconv 可用后可改为 gstreamer。
-backend: ffmpeg
+# 优先 Jetson GStreamer/NVDEC 硬解，失败后自动回退 FFmpeg。
+# pip OpenCV 无 GStreamer 时使用系统 python3-gi / Gst appsink，保持采集进程隔离。
+backend: auto
 # 真机流是 H.265，不能根据 main.264 文件名判断；GStreamer 后端需要此参数。
 codec: h265
 imgsz: 640

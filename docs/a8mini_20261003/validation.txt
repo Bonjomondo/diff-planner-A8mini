@@ -1,0 +1,9 @@
+2026-10-03 verification
+Command: .venv-a8mini/bin/python -m unittest discover -s src/user_command/multipoint/test -p test_a8mini_*.py
+Result: 38 tests passed (13.054 s).
+Includes real GI BGR row padding, EOS, pipeline error, spawn/shared slot/cleanup; existing watchdog and reconnect regression.
+Python AST, configuration YAML, JSON artifacts and git diff --check passed.
+Native Jetson NVDEC: local synthetic 1080p25 H.265, 150 frames, approximately 25.8 FPS; no flight stack.
+Camera RTSP open probe: server response timed out; real camera and full flight stack performance are not verified.
+Existing engine offline: first predict 5.501 s, 30 subsequent predictions median 30.42 ms (synthetic black 1920x1080, imgsz=640, rect=False).
+No system power mode switch or engine replacement.

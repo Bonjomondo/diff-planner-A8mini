@@ -37,7 +37,7 @@
     },
     {
       "pid": 17940,
-      "name": "unavailable: [Errno 2] No such file or directory: '/proc/17940/comm'",
+      "name": "python (RTSP capture worker)",
       "mean_cpu_one_core": 22.4,
       "max_cpu_one_core": 39.94,
       "n": 23

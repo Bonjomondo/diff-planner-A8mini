@@ -85,9 +85,11 @@ save_detection_video: false       # 改为 true 才保存带识别框的视频�
   连续没有合格帧也会触发独立 watchdog，约读取超时加 250 ms 宽限后开始清理连接。
   这是故障检测预算，实际恢复还需等待进程重启、RTSP 握手和可解码帧。
   无新帧时显示 `stalled`，而不是长期 `Waiting: streaming`。
-- 当前检查到 OpenCV 为 `GStreamer: NO`，保留 `backend: ffmpeg`。
-  只有目标 Python 的 OpenCV 支持 GStreamer、且 `nvv4l2decoder` / `nvvidconv`
-  插件可运行时才切换 `backend: gstreamer`。`codec: h265` 选择解码器，不修改相机编码。
+- 当前默认 `backend: auto`，优先 GStreamer / NVIDIA 硬解，连续失败后回退 FFmpeg。
+  OpenCV 为 `GStreamer: NO` 时，采集子进程通过系统 `python3-gi` / `GstVideo`
+  直接读取 appsink；仍需 `nvv4l2decoder` / `nvvidconv` 等插件可用。
+  `codec: h265` 选择解码器，不修改相机编码。见
+  [10 月 3 日视频卡顿分析](../docs/20261003_170857_A8mini视频卡顿分析.md)。
   `latency_ms` 仅作用于 GStreamer，FFmpeg 路径不使用它。
 - `video_dir: ~/Videos/a8mini_detection`：开启保存后输出带框 AVI/MJPEG 和逐帧时间 CSV，
   每 60 秒或画面尺寸变化时结束当前片段。写盘使用独立线程和两帧有界队列，慢盘丢帧；

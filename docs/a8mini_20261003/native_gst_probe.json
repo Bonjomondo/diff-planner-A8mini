@@ -1,0 +1,9 @@
+{
+  "source": "local synthetic 1080p25 H.265; NVENC to NVDEC through native GI appsink",
+  "frames": 150,
+  "duration_sec": 5.808,
+  "first_frame_sec": 0.513,
+  "fps": 25.83,
+  "cpu_percent_one_core": 87.8,
+  "real_camera_verified": false
+}

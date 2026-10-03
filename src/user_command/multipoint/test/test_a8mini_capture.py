@@ -60,6 +60,72 @@ def fake_worker(config, backend, slot, connection):
     rtsp.capture_worker(config, backend, slot, connection)
 
 
+def native_test_worker(config, backend, slot, connection):
+    rtsp.open_capture = lambda cfg, _: rtsp.NativeGStreamerCapture(
+        cfg, pipeline="videotestsrc is-live=true pattern=white ! "
+                      "video/x-raw,format=BGR,width=3,height=2,framerate=25/1 ! "
+                      "appsink name=frames drop=true max-buffers=1 sync=false wait-on-eos=false")
+    rtsp.capture_worker(config, backend, slot, connection)
+
+
+class NativeGStreamerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import gi
+            gi.require_version("Gst", "1.0")
+            gi.require_version("GstVideo", "1.0")
+            from gi.repository import Gst
+            Gst.init(None)
+            if not Gst.ElementFactory.find("videotestsrc") or not Gst.ElementFactory.find("appsink"):
+                raise RuntimeError("test source/appsink missing")
+        except (ImportError, ValueError, RuntimeError) as error:
+            raise unittest.SkipTest("optional system GStreamer unavailable: " + str(error))
+
+    def test_real_gi_video_padding_and_eos(self):
+        cap = rtsp.NativeGStreamerCapture(
+            rtsp.CaptureConfig("test", open_timeout_ms=1000, read_timeout_ms=100),
+            pipeline="videotestsrc num-buffers=1 pattern=white ! "
+                     "video/x-raw,format=BGR,width=3,height=2 ! "
+                     "appsink name=frames sync=false wait-on-eos=false")
+        try:
+            ok, frame = cap.read()
+            self.assertTrue(ok)
+            self.assertEqual(frame.shape, (2, 3, 3))
+            np.testing.assert_array_equal(frame, np.full((2, 3, 3), 255, np.uint8))
+            self.assertEqual(cap.read(), (False, None))
+        finally:
+            cap.release()
+        self.assertFalse(cap.isOpened())
+        self.assertIsNone(cap.pipeline)
+        cap.release()
+
+    def test_real_gi_pipeline_error_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(RuntimeError, "GStreamer"):
+            rtsp.NativeGStreamerCapture(
+                rtsp.CaptureConfig("test", open_timeout_ms=100, read_timeout_ms=100),
+                pipeline='filesrc location="%s/missing.raw" ! '
+                         'appsink name=frames sync=false' % directory)
+
+    def test_real_gi_spawn_shared_slot_and_cleanup(self):
+        before = {p.pid for p in mp.active_children()}
+        capture = rtsp.LatestFrameCapture(rtsp.CaptureConfig(
+            "test", backend="gstreamer", open_timeout_ms=2000,
+            read_timeout_ms=1000, max_pixels=6), worker=native_test_worker).start()
+        try:
+            deadline = time.monotonic() + 5
+            packet = None
+            while packet is None and time.monotonic() < deadline:
+                packet = capture.read_latest()
+                time.sleep(0.01)
+            self.assertIsNotNone(packet, capture.status)
+            np.testing.assert_array_equal(packet.frame, np.full((2, 3, 3), 255, np.uint8))
+            self.assertEqual(packet.backend, "gstreamer")
+        finally:
+            capture.close()
+        self.assertEqual({p.pid for p in mp.active_children()}, before)
+
+
 class CaptureTests(unittest.TestCase):
     def config(self, source, **kwargs):
         return rtsp.CaptureConfig(source, open_timeout_ms=80, read_timeout_ms=80,
@@ -206,11 +272,34 @@ class CaptureTests(unittest.TestCase):
     def test_both_backends_receive_unclamped_open_timeouts(self):
         config = rtsp.CaptureConfig("rtsp://camera/main.264", read_timeout_ms=800)
         for backend in ("gstreamer", "ffmpeg"):
-            with patch.object(rtsp.cv2, "VideoCapture") as constructor, patch.dict(rtsp.os.environ):
+            with patch.object(rtsp.cv2, "VideoCapture") as constructor, \
+                    patch.object(rtsp.cv2, "getBuildInformation", return_value="GStreamer: YES"), \
+                    patch.dict(rtsp.os.environ):
                 rtsp.open_capture(config, backend)
                 params = constructor.call_args.args[2]
                 self.assertEqual(params, [rtsp.cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 2000,
                                           rtsp.cv2.CAP_PROP_READ_TIMEOUT_MSEC, 800])
+
+    def test_native_gstreamer_used_when_opencv_has_no_gstreamer(self):
+        config = rtsp.CaptureConfig("rtsp://camera/main.264", codec="h265")
+        with patch.object(rtsp.cv2, "getBuildInformation", return_value="GStreamer: NO"), \
+                patch.object(rtsp.cv2, "VideoCapture") as cv_capture, \
+                patch.object(rtsp, "NativeGStreamerCapture") as native:
+            self.assertIs(rtsp.open_capture(config, "gstreamer"), native.return_value)
+            native.assert_called_once_with(config)
+            cv_capture.assert_not_called()
+
+    def test_gst_buffer_padding_is_not_pixels_and_frame_owns_its_memory(self):
+        data = bytearray([99, 98, 1, 2, 3, 4, 5, 6, 90, 91, 7, 8, 9, 10, 11, 12, 92, 93])
+        frame = rtsp.copy_gst_frame(data, height=2, width=2, stride=8, offset=2)
+        np.testing.assert_array_equal(frame, [[[1, 2, 3], [4, 5, 6]],
+                                              [[7, 8, 9], [10, 11, 12]]])
+        data[:] = bytes(len(data))
+        self.assertEqual(int(frame[0, 0, 0]), 1)
+        for height, width, stride, offset in ((2, 2, 5, 0), (3, 2, 8, 0),
+                                              (2, 2, 8, -1), (0, 2, 8, 0)):
+            with self.subTest(layout=(height, width, stride, offset)), self.assertRaises(ValueError):
+                rtsp.copy_gst_frame(data, height, width, stride, offset)
 
     def test_codecs(self):
         for codec in ("h264", "h265"):

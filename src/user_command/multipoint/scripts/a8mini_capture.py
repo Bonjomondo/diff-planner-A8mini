@@ -7,6 +7,7 @@ independently of individual reads. No ROS, CUDA or camera control imports.
 
 import multiprocessing as mp
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -42,8 +43,106 @@ def build_gstreamer_pipeline(rtsp_url, latency_ms, read_timeout_ms=1000,
         f"rtp{codec}depay ! {codec}parse ! nvv4l2decoder ! "
         "nvvidconv ! video/x-raw,format=BGRx ! "
         "videoconvert ! video/x-raw,format=BGR ! "
-        "appsink drop=true max-buffers=1 sync=false"
+        "appsink name=frames drop=true max-buffers=1 sync=false wait-on-eos=false"
     )
+
+
+def copy_gst_frame(data, height, width, stride, offset=0):
+    """Own the BGR pixels before unmapping; Gst rows may include padding."""
+    if height <= 0 or width <= 0 or stride < width * 3:
+        raise ValueError("invalid GStreamer BGR dimensions/stride")
+    if offset < 0 or offset + (height - 1) * stride + width * 3 > len(data):
+        raise ValueError("GStreamer frame buffer is shorter than its layout")
+    return np.ndarray((height, width, 3), dtype=np.uint8, buffer=data,
+                      offset=offset, strides=(stride, 3, 1)).copy()
+
+
+class NativeGStreamerCapture:
+    """Jetson NVDEC through GI when the pip OpenCV wheel lacks GStreamer.
+
+    Lives only in the disposable capture process. The existing parent watchdog
+    also bounds native pipeline open/read/release calls that fail to return.
+    """
+
+    def __init__(self, config, pipeline=None):
+        import gi
+        gi.require_version("Gst", "1.0")
+        gi.require_version("GstVideo", "1.0")
+        from gi.repository import Gst, GstVideo
+        self.Gst, self.GstVideo = Gst, GstVideo
+        self.pipeline = None
+        self.pending = None
+        self.opened = False
+        self.read_timeout_ns = config.read_timeout_ms * Gst.MSECOND
+        Gst.init(None)
+        source = pipeline or build_gstreamer_pipeline(
+            config.source, config.latency_ms, config.read_timeout_ms, config.codec)
+        try:
+            self.pipeline = Gst.parse_launch(source)
+            self.sink = self.pipeline.get_by_name("frames")
+            if self.sink is None:
+                raise RuntimeError("GStreamer pipeline has no frames appsink")
+            self.bus = self.pipeline.get_bus()
+            if self.pipeline.set_state(Gst.State.PLAYING) == Gst.StateChangeReturn.FAILURE:
+                self._check_error()
+                raise RuntimeError("GStreamer could not enter PLAYING state")
+            # Match VideoCapture.open(): wait for the initial image using the
+            # OPEN timeout, rather than spending the shorter READ budget on it.
+            self.pending = self.sink.emit("try-pull-sample",
+                                          config.open_timeout_ms * Gst.MSECOND)
+            self._check_error()
+            if self.pending is None:
+                raise RuntimeError("GStreamer open timed out before the first frame")
+            self.opened = True
+            log("[RTSP] native GStreamer appsink")
+        except Exception:
+            self.release()
+            raise
+
+    def _check_error(self):
+        message = self.bus.pop_filtered(self.Gst.MessageType.ERROR)
+        if message is not None:
+            error, detail = message.parse_error()
+            raise RuntimeError("GStreamer: %s; %s" % (error.message, detail))
+
+    def isOpened(self):
+        return self.opened
+
+    def read(self):
+        self._check_error()
+        sample, self.pending = self.pending, None
+        if sample is None:
+            sample = self.sink.emit("try-pull-sample", self.read_timeout_ns)
+        if sample is None:
+            self._check_error()
+            return False, None
+        info = self.GstVideo.VideoInfo()
+        if not info.from_caps(sample.get_caps()) or info.finfo.name != "BGR":
+            raise RuntimeError("GStreamer appsink must produce BGR video")
+        buffer = sample.get_buffer()
+        video_meta = self.GstVideo.buffer_get_video_meta(buffer)
+        stride, offset = info.stride[0], info.offset[0]
+        if video_meta is not None:
+            if (video_meta.format != self.GstVideo.VideoFormat.BGR or
+                    video_meta.width != info.width or video_meta.height != info.height):
+                raise RuntimeError("GStreamer video metadata disagrees with BGR caps")
+            stride, offset = video_meta.stride[0], video_meta.offset[0]
+        ok, mapped = buffer.map(self.Gst.MapFlags.READ)
+        if not ok:
+            raise RuntimeError("cannot map GStreamer video buffer")
+        try:
+            frame = copy_gst_frame(mapped.data, info.height, info.width,
+                                   stride, offset)
+        finally:
+            buffer.unmap(mapped)
+        return True, frame
+
+    def release(self):
+        self.opened = False
+        self.pending = None
+        if self.pipeline is not None:
+            self.pipeline.set_state(self.Gst.State.NULL)
+            self.pipeline = None
 
 
 def open_capture(config, backend):
@@ -51,6 +150,8 @@ def open_capture(config, backend):
     params = [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, config.open_timeout_ms,
               cv2.CAP_PROP_READ_TIMEOUT_MSEC, config.read_timeout_ms]
     if backend == "gstreamer":
+        if not re.search(r"GStreamer:\s+YES\b", cv2.getBuildInformation()):
+            return NativeGStreamerCapture(config)
         source = build_gstreamer_pipeline(
             config.source, config.latency_ms, config.read_timeout_ms, config.codec)
         return cv2.VideoCapture(source, cv2.CAP_GSTREAMER, params)
