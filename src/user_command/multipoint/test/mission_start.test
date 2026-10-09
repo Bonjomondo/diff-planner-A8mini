@@ -8,5 +8,5 @@
     <param name="enable_rc" value="false" />
     <remap from="odom_topic" to="/test/odom" />
   </node>
-  <test pkg="multipoint" type="test_mission_start.py" name="mission_start" time-limit="40" />
+  <test pkg="multipoint" type="test_mission_start.py" test-name="mission_start" name="mission_start" time-limit="40" />
 </launch>

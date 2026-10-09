@@ -152,12 +152,13 @@ rostopic pub -1 /mission/start_clicked_route std_msgs/Empty '{}'
 
 **完成降落或任务故障锁止后，清空点击点不会解除控制锁。** 确认落地且上锁，退出并重新启动整套飞行栈，再进行下一次飞行；不要只重启 multipoint。
 
-## 3. 可选：一键自动起飞
+## 3. 可选：脚本自动起飞
 
-如果希望脚本在准备条件满足后主动发送一次起飞请求，省略 `--start-only`：
+默认入口不会自行起飞，需要你把 RC8 从 DOWN 拨到 MIDDLE。若想让脚本在准备条件
+满足后主动发送一次起飞请求（无需拨 RC8），加 `--takeoff`：
 
 ```bash
-MISSION_SOURCE=clicked ./sh_files/one_click_takeoff.sh
+MISSION_SOURCE=clicked ./sh_files/one_click_takeoff.sh --takeoff
 ```
 
 这个命令会尝试自动起飞，不是单纯启动软件。启动前保持 CH8 DOWN、CH5/CH6 高值、摇杆居中。脚本只负责起飞，不会自动执行航线。等到确认完成悬停，再按第二节的 Publish Point → 开始执行流程操作。

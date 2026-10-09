@@ -9,6 +9,16 @@ inline bool fresh(double age, double timeout)
     return std::isfinite(age) && age >= 0.0 && age <= timeout;
 }
 
+// Sensor stamps are mapped from the FCU clock to ROS time by MAVROS. Small
+// synchronization errors can put a freshly received message ahead of ROS time.
+// Keep receipt-time/heartbeat checks strict; apply this tolerance only to stamps.
+inline bool stampedFresh(double age, double timeout, double future_tolerance)
+{
+    return std::isfinite(age) && std::isfinite(timeout) && timeout >= 0.0 &&
+           std::isfinite(future_tolerance) && future_tolerance >= 0.0 &&
+           age >= -future_tolerance && age <= timeout;
+}
+
 struct FlightStatus
 {
     bool fresh_state = false;

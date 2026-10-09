@@ -2,7 +2,7 @@
 # ⭐⭐⭐  Set parameters carefully for satisfied performance!   ⭐⭐⭐ #
 #########################################################################
 
-mass        : 1.694 # kg 
+mass        : 1.33 # kg 
 gra         : 9.81
 pose_solver : 0    # 1:From ZhepeiWang, 2:From rotor-drag    
 ctrl_freq_max   : 200.0

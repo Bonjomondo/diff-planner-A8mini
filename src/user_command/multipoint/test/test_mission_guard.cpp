@@ -30,4 +30,22 @@ int main()
     assert(!fresh(0.6, 0.5));
     assert(!fresh(-0.1, 0.5));
     assert(!fresh(std::numeric_limits<double>::quiet_NaN(), 0.5));
+
+    // 20261009_174026: stop at 1791538910.685905022, newest odom stamp
+    // 1791538910.687395334. Strict negative-age rejection aborted a valid mission.
+    const double recorded_age = -0.001490312;
+    assert(!fresh(recorded_age, 0.5));
+    assert(stampedFresh(recorded_age, 0.5, 0.02));
+    assert(stampedFresh(-0.004368782, 0.5, 0.02));
+    assert(stampedFresh(-0.02, 0.5, 0.02));
+    assert(stampedFresh(0.5, 0.5, 0.02));
+    assert(!stampedFresh(-0.020001, 0.5, 0.02));
+    assert(!stampedFresh(0.500001, 0.5, 0.02));
+    assert(!stampedFresh(-1.0, 0.5, 0.02));
+    assert(!stampedFresh(recorded_age, 0.5, 0.0));
+    assert(!stampedFresh(0.0, 0.5, -0.02));
+    assert(!stampedFresh(std::numeric_limits<double>::quiet_NaN(), 0.5, 0.02));
+    assert(!stampedFresh(std::numeric_limits<double>::infinity(), 0.5, 0.02));
+    assert(!stampedFresh(0.0, std::numeric_limits<double>::infinity(), 0.02));
+    assert(!stampedFresh(0.0, 0.5, std::numeric_limits<double>::quiet_NaN()));
 }

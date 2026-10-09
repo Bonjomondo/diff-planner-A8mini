@@ -105,6 +105,7 @@ public:
         pnh_.param("enable_gimbal_actions", enable_gimbal_actions_, true);
         pnh_.param("require_flight_ready", require_flight_ready_, true);
         pnh_.param("odom_timeout_sec", odom_timeout_sec_, 0.5);
+        pnh_.param("odom_future_tolerance_sec", odom_future_tolerance_sec_, 0.02);
         pnh_.param("flight_state_timeout_sec", flight_state_timeout_sec_, 2.5);
         pnh_.param("waypoint_timeout_sec", waypoint_timeout_sec_, 120.0);
         pnh_.param("gimbal_timeout_sec", gimbal_timeout_sec_, 90.0);
@@ -112,6 +113,8 @@ public:
             goal_frame_id_ != "world" ||
             (mission_source_ == "clicked" && !enable_rviz_click_route_) ||
             !finite(odom_timeout_sec_) || odom_timeout_sec_ <= 0.0 ||
+            !finite(odom_future_tolerance_sec_) || odom_future_tolerance_sec_ < 0.0 ||
+            odom_future_tolerance_sec_ > odom_timeout_sec_ ||
             !finite(flight_state_timeout_sec_) || flight_state_timeout_sec_ <= 0.0 ||
             !finite(waypoint_timeout_sec_) || waypoint_timeout_sec_ <= 0.0 ||
             !finite(gimbal_timeout_sec_) || gimbal_timeout_sec_ <= 0.0)
@@ -435,8 +438,9 @@ private:
     bool odomFresh() const
     {
         return odom_received_ && fresh(odom_receive_time_, odom_timeout_sec_) &&
-            !odom_stamp_.isZero() && mission_guard::fresh(
-                (ros::Time::now() - odom_stamp_).toSec(), odom_timeout_sec_);
+            !odom_stamp_.isZero() && mission_guard::stampedFresh(
+                (ros::Time::now() - odom_stamp_).toSec(), odom_timeout_sec_,
+                odom_future_tolerance_sec_);
     }
 
     bool flightReady(bool starting) const
@@ -792,9 +796,38 @@ private:
         {
             return;
         }
-        if (!odomFresh() || !flightReady(false) || !fresh(heartbeat_receive_time_, 0.5))
+        if (!odomFresh())
         {
-            abortMission("odometry, controller, FCU or planner heartbeat is no longer valid");
+            ROS_ERROR("Odometry guard: valid_world_pose=%s stamp_zero=%s "
+                      "receive_age=%.6f s stamp_age=%.6f s timeout=%.3f s "
+                      "future_tolerance=%.3f s",
+                      odom_received_ ? "true" : "false", odom_stamp_.isZero() ? "true" : "false",
+                      (ros::WallTime::now() - odom_receive_time_).toSec(),
+                      (ros::Time::now() - odom_stamp_).toSec(), odom_timeout_sec_,
+                      odom_future_tolerance_sec_);
+            abortMission("odometry invalid, stale or timestamp outside allowed range");
+            return;
+        }
+        if (!flightReady(false))
+        {
+            ROS_ERROR("Flight guard: connected=%s armed=%s mode=%s landed_state=%u "
+                      "controller=%s fcu_age=%.3f s extended_age=%.3f s "
+                      "controller_age=%.3f s ready_age=%.3f s",
+                      fcu_state_.connected ? "true" : "false", fcu_state_.armed ? "true" : "false",
+                      fcu_state_.mode.c_str(), static_cast<unsigned int>(landed_state_),
+                      controller_state_.c_str(),
+                      (ros::WallTime::now() - fcu_receive_time_).toSec(),
+                      (ros::WallTime::now() - extended_receive_time_).toSec(),
+                      (ros::WallTime::now() - controller_receive_time_).toSec(),
+                      (ros::WallTime::now() - ready_receive_time_).toSec());
+            abortMission("controller or FCU flight state is no longer valid");
+            return;
+        }
+        if (!fresh(heartbeat_receive_time_, 0.5))
+        {
+            ROS_ERROR("Planner heartbeat guard: receive_age=%.6f s timeout=0.500 s",
+                      (ros::WallTime::now() - heartbeat_receive_time_).toSec());
+            abortMission("planner heartbeat is no longer valid");
             return;
         }
 
@@ -1240,7 +1273,8 @@ private:
     ros::WallTime controller_receive_time_, ready_receive_time_, heartbeat_receive_time_;
     ros::WallTime goal_publish_time_, gimbal_wait_time_;
     ros::Time odom_stamp_;
-    double odom_timeout_sec_, flight_state_timeout_sec_, waypoint_timeout_sec_, gimbal_timeout_sec_;
+    double odom_timeout_sec_, odom_future_tolerance_sec_, flight_state_timeout_sec_;
+    double waypoint_timeout_sec_, gimbal_timeout_sec_;
 
     RC_EIGHT_STATE rc_eight_pre_;
     bool rc_initialized_;

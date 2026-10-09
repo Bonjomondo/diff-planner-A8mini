@@ -148,24 +148,26 @@ cd Diff-Planner
 ./sh_files/run_single_lio.sh #请先按照配套的产品手册教程配置途径点位
 ```
 
-如果希望开机后只执行一个文件完成“启动飞行栈并自动起飞”，可直接运行：
+开机后只执行一个文件即可启动飞行栈；默认不自动起飞，等遥控器 RC8 从 DOWN
+拨到 MIDDLE 再请求起飞：
 
 ```bash
-cd /home/q/Documents/diff-planner-A8miniV2
+cd /home/ly/Documents/diff-planner-A8miniV2
 ./sh_files/one_click_takeoff.sh
 ```
 
 该入口会自动加载 ROS 和当前工作空间，不需要另外执行 `source`。它会等待
-MAVROS、LIO/EKF、RC、里程计和飞控地面状态满足条件后才发送一次起飞指令；
-脚本随后保持运行，按 `Ctrl+C` 可正常停止节点并保存调试日志。只启动系统而不
-发送起飞指令时使用：
+MAVROS、LIO/EKF、RC、里程计和飞控地面状态满足条件，然后停在“等待 RC8 触发”；
+把 RC8 从 DOWN 拨到 MIDDLE 即触发一次自动起飞。脚本随后保持运行，按 `Ctrl+C`
+可正常停止节点并保存调试日志。若要让脚本在条件满足后自行发送一次起飞指令
+（无需拨 RC8）：
 
 ```bash
-./sh_files/one_click_takeoff.sh --start-only
+./sh_files/one_click_takeoff.sh --takeoff
 ```
 
-起飞前仍需确认桨叶、场地、电池和遥控器安全；遥控器摇杆应居中，模式/指令开关
-应打开，RC 8 通道应处于 DOWN。该脚本只负责起飞，不会自动开始航点任务；
+`--start-only` 与默认行为一致。起飞前仍需确认桨叶、场地、电池和遥控器安全；
+遥控器摇杆应居中，模式/指令开关应打开，RC 8 通道应处于 DOWN。该脚本只负责起飞，不会自动开始航点任务；
 确认 OFFBOARD、IN_AIR 和 `/px4ctrl/mission_ready=True` 后，先标点再将 RC8 拨到 UP，
 或手动发布任务触发消息。落地上锁后再 Ctrl+C 退出；Ctrl+C 不负责降落。
 

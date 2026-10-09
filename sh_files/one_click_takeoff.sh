@@ -1,16 +1,17 @@
 #!/bin/zsh
 
-# Start the complete real-flight LIO stack and request one automatic takeoff.
+# Start the complete real-flight LIO stack and wait for the RC8 DOWN -> MIDDLE
+# request to take off. Pass --takeoff to send the automatic takeoff command
+# instead of using the RC switch.
 #
 # The script is intentionally a zsh script because the existing flight stack
 # scripts use zsh. It can be launched from any directory, including by using
 # its absolute path after boot:
 #
-#   /home/q/Documents/diff-planner-A8miniV2/sh_files/one_click_takeoff.sh
+#   /home/ly/Documents/diff-planner-A8miniV2/sh_files/one_click_takeoff.sh
 #
-# Use --start-only when the stack should be brought up without sending a
-# takeoff command. The stack stays in the foreground so Ctrl+C still performs
-# the normal debug-log and rosbag cleanup.
+# The stack stays in the foreground so Ctrl+C still performs the normal
+# debug-log and rosbag cleanup.
 
 setopt PIPE_FAIL
 unsetopt BG_NICE
@@ -23,7 +24,7 @@ STACK_SCRIPT="${SCRIPT_DIR}/run_single_lio_debug.sh"
 typeset -g STACK_PID=""
 typeset -g STACK_EXIT_STATUS=0
 typeset -gi CLEANED_UP=0
-typeset -g RUN_MODE="takeoff"
+typeset -g RUN_MODE="rc"
 
 integer READY_TIMEOUT="${ONE_CLICK_READY_TIMEOUT:-180}"
 integer READY_STABLE_SEC="${ONE_CLICK_READY_STABLE_SEC:-3}"
@@ -32,8 +33,9 @@ integer TAKEOFF_TIMEOUT="${ONE_CLICK_TAKEOFF_TIMEOUT:-30}"
 usage() {
     cat <<'EOF'
 用法:
-  ./sh_files/one_click_takeoff.sh              启动完整栈并自动起飞
-  ./sh_files/one_click_takeoff.sh --start-only 只启动，不发送起飞指令
+  ./sh_files/one_click_takeoff.sh              启动完整栈，等待 RC8 DOWN→MIDDLE 触发起飞
+  ./sh_files/one_click_takeoff.sh --takeoff    启动完整栈并自动发送起飞指令
+  ./sh_files/one_click_takeoff.sh --start-only 同默认：只启动，由 RC8 触发
 
 可选环境变量:
   ONE_CLICK_READY_TIMEOUT=180       等待系统就绪的最长秒数
@@ -49,9 +51,9 @@ EOF
 while (( $# > 0 )); do
     case "$1" in
         --start-only|--no-takeoff)
-            RUN_MODE="start-only"
+            RUN_MODE="rc"
             ;;
-        --takeoff)
+        --takeoff|--auto)
             RUN_MODE="takeoff"
             ;;
         -h|--help)
@@ -315,8 +317,10 @@ if ! wait_for_stack_ready; then
     exit 1
 fi
 
-if [[ "${RUN_MODE}" == "start-only" ]]; then
-    echo "[one-click] 仅启动模式：未发送起飞指令。按 Ctrl+C 结束并保存日志。"
+if [[ "${RUN_MODE}" == "rc" ]]; then
+    echo "[one-click] 默认模式：未发送起飞指令，等待 RC8 触发。"
+    echo "[one-click] 请把 RC8 从 DOWN 拨到 MIDDLE 请求自动起飞，确认悬停后再执行航线。"
+    echo "[one-click] 标点用 Publish Point，开始用 2D Nav Goal 或 RC8 UP；按 Ctrl+C 结束并保存日志。"
     wait "${STACK_PID}"
     STACK_EXIT_STATUS=$?
     exit "${STACK_EXIT_STATUS}"

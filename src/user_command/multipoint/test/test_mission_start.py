@@ -18,6 +18,7 @@ class MissionStartTest(unittest.TestCase):
         self.position = (0.0, 0.0, 0.0)
         self.airborne = False
         self.publish_odom = True
+        self.odom_stamp_offset = 0.0
         self.subscribers = [
             rospy.Subscriber('/goal', PoseStamped, self.goals.append),
             rospy.Subscriber('/planning/stop', Empty, self.stops.append)]
@@ -61,7 +62,7 @@ class MissionStartTest(unittest.TestCase):
         self.heartbeat.publish(Empty())
         if self.publish_odom:
             odom = Odometry()
-            odom.header.stamp = stamp
+            odom.header.stamp = stamp + rospy.Duration(self.odom_stamp_offset)
             odom.header.frame_id = 'world'
             odom.pose.pose.orientation.w = 1
             odom.pose.pose.position.x, odom.pose.pose.position.y, odom.pose.pose.position.z = self.position
@@ -85,6 +86,10 @@ class MissionStartTest(unittest.TestCase):
         self.click(2.0, 0.0)
         self.trigger_without_goal(0)  # Disarmed, ground, ALTCTL (recorded bug).
         self.airborne = True
+        self.odom_stamp_offset = 1.0
+        rospy.sleep(0.3)
+        self.trigger_without_goal(0)  # Large future stamps must still block startup.
+        self.odom_stamp_offset = 0.015
         rospy.sleep(0.3)
         self.start.publish(PoseStamped())
         self.until(lambda: len(self.goals) == 1)
@@ -92,6 +97,7 @@ class MissionStartTest(unittest.TestCase):
         self.assertAlmostEqual(self.goals[0].pose.position.z, 1.0)
         self.position = (2.0, 0.0, 1.0)
         rospy.sleep(1.0)  # Finish the route after stable arrival.
+        self.assertFalse(self.stops)  # Small clock skew must not abort the mission.
         self.trigger_without_goal(1)  # Consumed route must not fall back to YAML.
         self.clear.publish(Empty())
         rospy.sleep(0.2)

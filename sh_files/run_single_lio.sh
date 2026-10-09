@@ -35,7 +35,7 @@ A8MINI_START_DETECTION="${A8MINI_START_DETECTION:-${_yaml_detection:-true}}"
 if [[ "${A8MINI_START_GIMBAL_NODE}" == "false" ]]; then
   A8MINI_START_DETECTION="false"
 fi
-MISSION_SOURCE="${MISSION_SOURCE:-clicked}"
+MISSION_SOURCE="${MISSION_SOURCE:-preset}"
 echo "[startup] Configuration: gimbal=${A8MINI_START_GIMBAL_NODE} detection=${A8MINI_START_DETECTION} mission_source=${MISSION_SOURCE}"
 typeset -a LAUNCH_PIDS LAUNCH_NAMES
 
