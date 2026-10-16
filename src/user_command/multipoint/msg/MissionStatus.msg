@@ -1,0 +1,17 @@
+string frame_id
+string map_session_id
+string mission_id
+uint32 revision
+string state
+uint32 current_waypoint_id
+uint32 completed
+uint32 total
+string reason
+bool odom_fresh
+bool flight_ready
+float64 world_x
+float64 world_y
+float64 world_z
+float64 max_abs_xy
+float64 min_z
+float64 max_z

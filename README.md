@@ -91,6 +91,21 @@ A8MINI_START_DETECTION=false \
 `start_gimbal_node:=false start_detection:=false`。
 
 
+### 2.2 地面站上传与动态航线
+
+`mission_source=remote` 对接 `agri_gcs_visual` 的室内局部航线页面，支持完整
+航线上传、机载确认、人工起飞后开始任务、执行中更新未完成航点和进度回传。
+仿真入口：
+
+```bash
+roslaunch diff_planner run_sim_single.launch mission_source:=remote
+```
+
+实机可通过 `MISSION_SOURCE=remote ./sh_files/one_click_takeoff.sh` 启动完整栈，
+上传不会自动起飞。TCP 8765 网关、SSH 隧道、动态更新接口和验证步骤见
+[地面站动态航线接入](docs/GCS动态航线接入.md)。当前前端已有上传、开始和查询；
+执行中更新通过新增 `update` 接口使用，前端按钮尚待接入。
+
 ### 3. 单机预设点飞行：
 在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 的 `waypoints`
 列表中配置航点坐标、悬停时间和云台动作；`gimbal_mode: angle` 转到指定

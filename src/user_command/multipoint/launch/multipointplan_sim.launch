@@ -12,6 +12,13 @@
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps_sim.csv" />
     <arg name="goal_frame_id" default="world" />
     <arg name="mission_source" default="preset" />
+    <!-- remote accepts protocol 2 routes; uploads never trigger takeoff. -->
+    <arg name="gcs_bind_host" default="127.0.0.1" />
+    <arg name="gcs_port" default="8765" />
+    <arg name="remote_max_abs_xy" default="30.0" />
+    <arg name="remote_min_z" default="0.3" />
+    <arg name="remote_max_z" default="2.5" />
+    <arg name="remote_reset_jump_m" default="5.0" />
     <arg name="enable_rviz_click_route" default="true" />
     <arg name="clicked_point_topic" default="/clicked_point" />
     <arg name="clicked_point_height" default="1.0" />
@@ -27,6 +34,10 @@
         <param name="yaml_path" value="$(arg yaml_path)" />
         <param name="goal_frame_id" value="$(arg goal_frame_id)" />
         <param name="mission_source" value="$(arg mission_source)" />
+        <param name="remote_max_abs_xy" value="$(arg remote_max_abs_xy)" />
+        <param name="remote_min_z" value="$(arg remote_min_z)" />
+        <param name="remote_max_z" value="$(arg remote_max_z)" />
+        <param name="remote_reset_jump_m" value="$(arg remote_reset_jump_m)" />
         <param name="require_flight_ready" value="false" />
         <param name="enable_gimbal_actions" value="$(arg start_gimbal_node)" />
         <param name="position_tolerance" value="$(arg next_distance)" />
@@ -55,4 +66,8 @@
             <param name="dry_run" value="true" />
         </node>
     </group>
+    <include if="$(eval arg('mission_source') == 'remote')" file="$(find multipoint)/launch/gcs_gateway.launch">
+        <arg name="bind_host" value="$(arg gcs_bind_host)" />
+        <arg name="port" value="$(arg gcs_port)" />
+    </include>
 </launch>

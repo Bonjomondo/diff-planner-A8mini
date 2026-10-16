@@ -1,0 +1,13 @@
+string request_id
+string operation
+string map_session_id
+string mission_id
+uint32 revision
+string frame_id
+RemoteWaypoint[] waypoints
+# Zero-based index. update replaces [replace_from, end) atomically.
+uint32 replace_from
+---
+bool accepted
+string reason
+MissionStatus mission

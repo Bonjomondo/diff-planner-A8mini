@@ -1,0 +1,9 @@
+<launch>
+    <arg name="bind_host" default="127.0.0.1" />
+    <arg name="port" default="8765" />
+    <!-- Requires multipointplan with mission_source:=remote in the same ROS graph. -->
+    <node pkg="multipoint" name="gcs_gateway" type="gcs_gateway_node.py" output="screen" required="true">
+        <param name="bind_host" value="$(arg bind_host)" />
+        <param name="port" value="$(arg port)" />
+    </node>
+</launch>

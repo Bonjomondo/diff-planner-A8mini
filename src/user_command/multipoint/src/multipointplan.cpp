@@ -7,7 +7,10 @@
 #include <mavros_msgs/RCIn.h>
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/ExtendedState.h>
+#include <multipoint/MissionCommand.h>
+#include <multipoint/MissionStatus.h>
 #include <nav_msgs/Odometry.h>
+#include <ros/serialization.h>
 #include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
@@ -20,15 +23,18 @@
 
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <random>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 #include "mission_guard.h"
+#include "remote_mission.h"
 
 enum MissionState
 {
@@ -109,7 +115,14 @@ public:
         pnh_.param("flight_state_timeout_sec", flight_state_timeout_sec_, 2.5);
         pnh_.param("waypoint_timeout_sec", waypoint_timeout_sec_, 120.0);
         pnh_.param("gimbal_timeout_sec", gimbal_timeout_sec_, 90.0);
-        if ((mission_source_ != "clicked" && mission_source_ != "preset") ||
+        pnh_.param("remote_max_abs_xy", remote_mission_.max_abs_xy, 30.0);
+        pnh_.param("remote_min_z", remote_mission_.min_z, 0.3);
+        pnh_.param("remote_max_z", remote_mission_.max_z, 2.5);
+        pnh_.param("remote_reset_jump_m", remote_reset_jump_m_, 5.0);
+        remote_mission_.validateLimits();
+        if (mission_source_ == "remote") remote_mission_.session = newMapSession();
+        if ((mission_source_ != "clicked" && mission_source_ != "preset" &&
+             mission_source_ != "remote") ||
             goal_frame_id_ != "world" ||
             (mission_source_ == "clicked" && !enable_rviz_click_route_) ||
             !finite(odom_timeout_sec_) || odom_timeout_sec_ <= 0.0 ||
@@ -117,9 +130,10 @@ public:
             odom_future_tolerance_sec_ > odom_timeout_sec_ ||
             !finite(flight_state_timeout_sec_) || flight_state_timeout_sec_ <= 0.0 ||
             !finite(waypoint_timeout_sec_) || waypoint_timeout_sec_ <= 0.0 ||
-            !finite(gimbal_timeout_sec_) || gimbal_timeout_sec_ <= 0.0)
+            !finite(gimbal_timeout_sec_) || gimbal_timeout_sec_ <= 0.0 ||
+            !finite(remote_reset_jump_m_) || remote_reset_jump_m_ <= 0.0)
         {
-            throw std::runtime_error("Invalid mission source/frame/timeout: use clicked|preset and world");
+            throw std::runtime_error("Invalid mission source/frame/timeout: use clicked|preset|remote and world");
         }
 
         if (position_tolerance_ <= 0.0 || velocity_tolerance_ < 0.0 ||
@@ -130,7 +144,9 @@ public:
             throw std::runtime_error("Invalid mission tolerance or timing parameter");
         }
 
-        loadWaypoints();
+        // Remote routes do not depend on a preset YAML or payload configuration.
+        if (mission_source_ != "remote") loadWaypoints();
+        else enable_gimbal_actions_ = false;
 
         point_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/goal", 10);
         gimbal_task_pub_ =
@@ -174,7 +190,7 @@ public:
         {
             rc_sub_ = nh_.subscribe("/mavros/rc/in", 10, &MultipointPlanner::rcCallback, this);
         }
-        if (enable_rviz_click_route_)
+        if (enable_rviz_click_route_ && mission_source_ != "remote")
         {
             clicked_point_sub_ = nh_.subscribe(clicked_point_topic_, 50,
                                                 &MultipointPlanner::clickedPointCallback, this);
@@ -185,6 +201,15 @@ public:
                 "/mission/clear_clicked_route", 1,
                 &MultipointPlanner::clearClickedRouteCallback, this);
             publishClickedMarkers();
+        }
+
+        if (mission_source_ == "remote")
+        {
+            remote_status_pub_ = nh_.advertise<multipoint::MissionStatus>(
+                "/mission/remote/status", 1, true);
+            remote_command_srv_ = nh_.advertiseService("/mission/remote/command",
+                &MultipointPlanner::remoteCommandCallback, this);
+            publishRemoteStatus();
         }
 
         timer_ = nh_.createTimer(ros::Duration(0.05), &MultipointPlanner::timerCallback, this);
@@ -199,6 +224,171 @@ public:
     }
 
 private:
+    static std::string newMapSession()
+    {
+        std::ostringstream session;
+        session << std::hex << ros::WallTime::now().toNSec() << "-" << std::random_device{}();
+        return session.str();
+    }
+
+    bool remoteStartReady() const
+    {
+        return !landing_latched_ && !mission_fault_ && odomFresh() && flightReady(true) &&
+               fresh(heartbeat_receive_time_, 0.5) && point_pub_.getNumSubscribers() > 0;
+    }
+
+    multipoint::MissionStatus remoteStatus() const
+    {
+        multipoint::MissionStatus status;
+        status.frame_id = goal_frame_id_;
+        status.map_session_id = remote_mission_.session;
+        status.mission_id = remote_mission_.id;
+        status.revision = remote_mission_.revision;
+        status.state = remote_mission_.state;
+        status.completed = remote_mission_.completed;
+        status.total = remote_mission_.points.size();
+        status.current_waypoint_id = remote_mission_.active() && status.completed < status.total
+            ? remote_mission_.points[status.completed].id : 0;
+        status.reason = remote_mission_.reason;
+        status.odom_fresh = odomFresh();
+        status.flight_ready = remoteStartReady();
+        status.world_x = odom_received_ ? odom_position_.x() : 0.0;
+        status.world_y = odom_received_ ? odom_position_.y() : 0.0;
+        status.world_z = odom_received_ ? odom_position_.z() : 0.0;
+        status.max_abs_xy = remote_mission_.max_abs_xy;
+        status.min_z = remote_mission_.min_z;
+        status.max_z = remote_mission_.max_z;
+        return status;
+    }
+
+    void publishRemoteStatus()
+    {
+        if (mission_source_ != "remote") return;
+        remote_status_pub_.publish(remoteStatus());
+        remote_status_time_ = ros::WallTime::now();
+    }
+
+    std::vector<Waypoint> remoteWaypoints() const
+    {
+        std::vector<Waypoint> route;
+        for (const auto &point : remote_mission_.points)
+        {
+            Waypoint waypoint{};
+            waypoint.id = point.id;
+            waypoint.x = point.x;
+            waypoint.y = point.y;
+            waypoint.z = point.z;
+            waypoint.hover_sec = point.hover_sec;
+            waypoint.gimbal_mode = GIMBAL_ANGLE;
+            waypoint.run_gimbal = false;
+            route.push_back(waypoint);
+        }
+        return route;
+    }
+
+    void startRemoteMission()
+    {
+        remote_mission_.checkStart(remote_mission_.session, remote_mission_.id,
+                                  remote_mission_.revision);
+        if (!startMission(remoteWaypoints(), false))
+            throw std::runtime_error("Start rejected: confirm airborne hover, fresh world odometry, controller and planner");
+    }
+
+    void applyRemoteCommand(const multipoint::MissionCommand::Request &request)
+    {
+        if (request.operation == "get_status") return;
+        if (landing_latched_ || mission_fault_)
+            throw std::runtime_error("Landing/failure is latched; land and restart the stack");
+        if (!odomFresh()) throw std::runtime_error("Fresh world odometry is required");
+        if (request.operation == "start")
+        {
+            remote_mission_.checkStart(request.map_session_id, request.mission_id, request.revision);
+            startRemoteMission();
+            return;
+        }
+        if (request.operation != "upload" && request.operation != "update")
+            throw std::runtime_error("Unsupported operation; use upload, start, get_status or update");
+        if (request.frame_id != goal_frame_id_)
+            throw std::runtime_error("Route must use frame_id=world");
+        std::vector<remote_mission::Point> route;
+        for (const auto &p : request.waypoints)
+            route.push_back({p.id, p.x, p.y, p.z, p.hover_sec});
+        if (request.operation == "upload")
+        {
+            remote_mission_.upload(request.map_session_id, request.mission_id, request.revision, route);
+            return;
+        }
+        if (remote_mission_.active() && (!flightReady(false) ||
+            !fresh(heartbeat_receive_time_, 0.5) || point_pub_.getNumSubscribers() == 0))
+            throw std::runtime_error("Cannot update while flight/controller/planner state is invalid");
+        const bool active = remote_mission_.active();
+        const bool retarget = remote_mission_.state == "FLYING" &&
+                              request.replace_from == current_index_;
+        remote_mission_.update(request.map_session_id, request.mission_id, request.revision,
+                               request.replace_from, route);
+        if (active)
+        {
+            active_waypoints_ = remoteWaypoints();
+            if (retarget) publishCurrentGoal();  // Diff-Planner replans from its current state.
+        }
+    }
+
+    bool remoteCommandCallback(multipoint::MissionCommand::Request &request,
+                               multipoint::MissionCommand::Response &response)
+    {
+        // Cache at the authoritative executor, including across TCP reconnects.
+        // Reusing an ID with different content must never cause a second action.
+        if (request.request_id.empty() || request.request_id.size() > 80 ||
+            request.map_session_id.size() > 80 || request.mission_id.size() > 80 ||
+            request.waypoints.size() > 200 ||
+            ros::serialization::serializationLength(request) > 65536)
+        {
+            response.accepted = false;
+            response.reason = "Invalid request ID or oversized command";
+            response.mission = remoteStatus();
+            return true;
+        }
+        std::vector<uint8_t> bytes(ros::serialization::serializationLength(request));
+        ros::serialization::OStream stream(bytes.data(), bytes.size());
+        ros::serialization::serialize(stream, request);
+        for (const auto &cached : remote_requests_)
+        {
+            if (cached.id != request.request_id) continue;
+            response.accepted = cached.bytes == bytes && cached.accepted;
+            response.reason = cached.bytes == bytes ? cached.reason : "request_id reused with different content";
+            response.mission = remoteStatus();  // Never rewind the client's progress on a retry.
+            return true;
+        }
+        try
+        {
+            applyRemoteCommand(request);
+            response.accepted = true;
+            response.reason = "Accepted by mission executor";
+        }
+        catch (const std::exception &error)
+        {
+            response.accepted = false;
+            response.reason = error.what();
+        }
+        remote_requests_.push_back({request.request_id, bytes, response.accepted, response.reason});
+        if (remote_requests_.size() > 256) remote_requests_.pop_front();
+        response.mission = remoteStatus();
+        ROS_INFO("Remote command %s: accepted=%s mission=%s revision=%u reason=%s",
+                 request.operation.c_str(), response.accepted ? "true" : "false",
+                 remote_mission_.id.c_str(), remote_mission_.revision, response.reason.c_str());
+        publishRemoteStatus();
+        return true;
+    }
+
+    void invalidateRemoteSession(const std::string &reason)
+    {
+        if (mission_source_ != "remote") return;
+        if (state_ != FINISHED) abortMission(reason.c_str());
+        remote_had_fresh_odom_ = false;
+        remote_mission_.invalidate(newMapSession(), reason);
+        publishRemoteStatus();
+    }
+
     static bool finite(double value)
     {
         return std::isfinite(value);
@@ -389,6 +579,13 @@ private:
 
     void odomCallback(const nav_msgs::OdometryConstPtr &msg)
     {
+        const Eigen::Vector3d next(msg->pose.pose.position.x, msg->pose.pose.position.y,
+                                   msg->pose.pose.position.z);
+        if (mission_source_ == "remote" && odom_received_ && next.allFinite() &&
+            ((remote_had_fresh_odom_ && !fresh(odom_receive_time_, odom_timeout_sec_)) ||
+             (next - odom_position_).norm() > remote_reset_jump_m_ ||
+             (!odom_stamp_.isZero() && (odom_stamp_ - msg->header.stamp).toSec() > 0.5)))
+            invalidateRemoteSession("World odometry gap, jump or clock reset; recheck the map session");
         odom_position_ << msg->pose.pose.position.x, msg->pose.pose.position.y,
             msg->pose.pose.position.z;
         odom_velocity_ << msg->twist.twist.linear.x, msg->twist.twist.linear.y,
@@ -470,6 +667,12 @@ private:
         arrival_candidate_time_ = ros::Time(0);
         planning_stop_pub_.publish(std_msgs::Empty());
         closeMissionCsv();
+        if (mission_source_ == "remote")
+        {
+            remote_mission_.state = "FAILED";
+            remote_mission_.reason = reason;
+            publishRemoteStatus();
+        }
     }
 
     void startCallback(const geometry_msgs::PoseStamped::ConstPtr &)
@@ -482,6 +685,13 @@ private:
         if (state_ != FINISHED)
         {
             ROS_WARN("Ignoring start trigger because a mission is already active");
+            return;
+        }
+        if (mission_source_ == "remote")
+        {
+            try { startRemoteMission(); }
+            catch (const std::exception &error) { ROS_WARN("Remote start: %s", error.what()); }
+            publishRemoteStatus();
             return;
         }
         if (mission_source_ == "clicked")
@@ -699,6 +909,11 @@ private:
 
     void backCallback(const geometry_msgs::PoseStamped::ConstPtr &)
     {
+        if (mission_source_ == "remote")
+        {
+            ROS_WARN("Remote missions have no preset return route; use the existing landing/RC procedure");
+            return;
+        }
         if (landing_latched_)
         {
             ROS_WARN("Ignoring return trigger because landing is latched");
@@ -769,6 +984,7 @@ private:
         goal_publish_time_ = ros::WallTime::now();
 
         state_ = FLYING;
+        if (mission_source_ == "remote") remote_mission_.state = "FLYING";
         arrival_candidate_time_ = ros::Time(0);
         ROS_INFO("Published waypoint %u goal: [x %.2f, y %.2f, z %.2f]",
                  waypoint.id, waypoint.x, waypoint.y, waypoint.z);
@@ -777,6 +993,15 @@ private:
     void timerCallback(const ros::TimerEvent &)
     {
         const ros::Time now = ros::Time::now();
+        if (mission_source_ == "remote")
+        {
+            const bool valid = odomFresh();
+            if (remote_had_fresh_odom_ && !valid)
+                invalidateRemoteSession("World odometry became stale/invalid; recheck and upload again");
+            remote_had_fresh_odom_ = valid;
+            if ((ros::WallTime::now() - remote_status_time_).toSec() >= 0.2)
+                publishRemoteStatus();
+        }
         if (landing_latched_ && automatic_landing_ &&
             fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
             fresh(extended_receive_time_, flight_state_timeout_sec_) &&
@@ -855,6 +1080,7 @@ private:
                     arrived_time_ = now;
                     hover_start_time_ = now;
                     state_ = HOVERING;
+                    if (mission_source_ == "remote") remote_mission_.state = "HOVERING";
                     ROS_INFO("Waypoint %u arrived, ros_time=%.3f, distance=%.3f, speed=%.3f",
                              waypoint.id, arrived_time_.toSec(), distance, speed);
                 }
@@ -873,6 +1099,7 @@ private:
                 odom_velocity_.norm() > velocity_tolerance_)
             {
                 state_ = FLYING;
+                if (mission_source_ == "remote") remote_mission_.state = "FLYING";
                 arrival_candidate_time_ = ros::Time(0);
                 return;
             }
@@ -967,10 +1194,16 @@ private:
     void advanceWaypoint()
     {
         ++current_index_;
+        if (mission_source_ == "remote") remote_mission_.completed = current_index_;
         if (current_index_ >= active_waypoints_.size())
         {
             state_ = FINISHED;
             closeMissionCsv();
+            if (mission_source_ == "remote")
+            {
+                remote_mission_.state = "COMPLETED";
+                publishRemoteStatus();
+            }
             ROS_INFO("Waypoint mission finished, ros_time=%.3f", ros::Time::now().toSec());
             return;
         }
@@ -1083,6 +1316,12 @@ private:
         closeMissionCsv();
         landing_latched_ = true;
         automatic_landing_ = automatic;
+        if (mission_source_ == "remote")
+        {
+            remote_mission_.state = "LANDING";
+            remote_mission_.reason = automatic ? "LAND requested" : "Manual RC landing/takeover";
+            publishRemoteStatus();
+        }
         last_land_publish_time_ = ros::Time(0);
 
         // Stop the trajectory command source for both automatic and manual landing.
@@ -1214,6 +1453,20 @@ private:
     ros::Publisher startcommand_pub_;
     ros::Publisher backcommand_pub_;
     ros::Publisher clicked_markers_pub_;
+    ros::Publisher remote_status_pub_;
+    ros::ServiceServer remote_command_srv_;
+    remote_mission::Mission remote_mission_;
+    struct RemoteRequest
+    {
+        std::string id;
+        std::vector<uint8_t> bytes;
+        bool accepted;
+        std::string reason;
+    };
+    std::deque<RemoteRequest> remote_requests_;
+    bool remote_had_fresh_odom_ = false;
+    double remote_reset_jump_m_;
+    ros::WallTime remote_status_time_;
     ros::Subscriber odom_sub_;
     ros::Subscriber gimbal_done_sub_;
     ros::Subscriber startcommand_sub_;

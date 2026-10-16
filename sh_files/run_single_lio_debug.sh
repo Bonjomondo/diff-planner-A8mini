@@ -248,6 +248,7 @@ BAG_TOPICS=(
     /mission/clear_clicked_route
     /mission/land
     /mission/clicked_waypoints
+    /mission/remote/status
     /back_trigger
     /planning/stop
     /planning/yaw
