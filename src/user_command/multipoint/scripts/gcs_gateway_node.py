@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """ROS1 adapter for the ground station's TCP JSON-lines protocol 2."""
 import math
+from pathlib import Path
+import sys
 import threading
 import time
 
@@ -10,6 +12,8 @@ from sensor_msgs.msg import BatteryState
 from multipoint.msg import MissionStatus, RemoteWaypoint
 from multipoint.srv import MissionCommand, MissionCommandRequest
 
+# Catkin's devel relay changes __file__ but not sys.path; import the source helper.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gcs_protocol import GatewayServer
 
 
