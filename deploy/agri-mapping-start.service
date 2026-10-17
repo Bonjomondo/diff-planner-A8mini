@@ -1,0 +1,24 @@
+[Unit]
+Description=Agri GCS sensor mapping startup API
+After=network.target
+
+[Service]
+Type=simple
+User=ly
+Environment=PYTHONUNBUFFERED=1
+Environment=ROS_MASTER_URI=http://127.0.0.1:11311
+Environment=ROS_IP=127.0.0.1
+Environment=ROS_HOME=/home/ly/.local/state/agri-gcs/mapping-start/ros
+ExecStart=/usr/bin/python3 /home/ly/Documents/diff-planner-A8mini-gcs-mission/tools/mapping_start_service.py --script /home/ly/Documents/diff-planner-A8mini-gcs-mission/sh_files/start_mapping_only.sh
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ly/.local/state/agri-gcs/mapping-start /home/ly/Documents/diff-planner-A8mini-gcs-mission
+
+[Install]
+WantedBy=multi-user.target
