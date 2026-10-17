@@ -23,6 +23,9 @@
 #include <message_filters/time_synchronizer.h>
 
 #include <plan_env/raycast.h>
+#include <plan_env/mission_box.h>
+#include <std_msgs/Float64MultiArray.h>
+#include <nav_msgs/GetPlan.h>
 
 #define logit(x) (log((x) / (1 - (x))))
 #define GRID_MAP_OBS_FLAG 32767
@@ -152,6 +155,22 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
+  MissionBox mission_box_;
+  ros::Publisher mission_fence_pub_;
+  ros::ServiceServer mission_check_srv_;
+  std::vector<unsigned char> mission_observed_;
+  bool checkMissionEndpoints(nav_msgs::GetPlan::Request &req, nav_msgs::GetPlan::Response &res) {
+    res.plan.poses.clear();
+    if (!mission_box_.enabled || req.start.header.frame_id != "world" || req.goal.header.frame_id != "world") return true;
+    for (const auto &pose : {req.start, req.goal}) {
+      Eigen::Vector3d p(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+      if (!p.allFinite() || !isInBuf(p) || !isInInfBuf(p) || getInflateOccupancy(p) != 0
+          || !mission_observed_[globalIdx2BufIdx(pos2GlobalIdx(p))]) return true;
+    }
+    res.plan.header.frame_id = "world";
+    res.plan.poses = {req.start, req.goal}; // Endpoint checks only, not a planned path.
+    return true;
+  }
   MappingParameters mp_;
   MappingData md_;
 
@@ -243,6 +262,7 @@ inline int GridMap::setCacheOccupancy(Eigen::Vector3d pos, int occ)
 
   Eigen::Vector3i id = pos2GlobalIdx(pos);
   int idx_ctns = globalIdx2BufIdx(id);
+  mission_observed_[idx_ctns] = 1;
 
   md_.count_hit_and_miss_[idx_ctns] += 1;
 
@@ -392,6 +412,7 @@ inline Eigen::Vector3i GridMap::infBufIdx2GlobalIdx(size_t address)
 
 inline int GridMap::getOccupancy(Eigen::Vector3d pos)
 {
+  if (mission_box_.excludes(pos.x(), pos.y(), pos.z())) return 1;
   if (mp_.enable_virtual_wall_ && (pos(2) >= mp_.virtual_ceil_ || pos(2) <= mp_.virtual_ground_))
     return -1;
 
@@ -403,6 +424,9 @@ inline int GridMap::getOccupancy(Eigen::Vector3d pos)
 
 inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos)
 {
+  if (mission_box_.excludes(pos.x(), pos.y(), pos.z())) return 1;
+  if (mission_box_.enabled && (!isInBuf(pos) || !isInInfBuf(pos)
+      || !mission_observed_[globalIdx2BufIdx(pos2GlobalIdx(pos))])) return 1;
   if (mp_.enable_virtual_wall_ && (pos(2) >= mp_.virtual_ceil_ || pos(2) <= mp_.virtual_ground_))
     return -1;
   

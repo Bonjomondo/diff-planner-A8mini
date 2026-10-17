@@ -25,9 +25,13 @@ class RosError(Exception):
 def load_adapter():
     ros = types.ModuleType('rospy')
     ros.Subscriber, ros.ServiceProxy, ros.wait_for_service = Mock(), Mock(), Mock()
+    ros.Publisher, ros.Timer, ros.Duration = Mock(), Mock(), Mock()
+    ros.Time = Mock()
+    ros.Time.now.return_value.to_sec.return_value = 100.
     ros.ROSException = ros.ServiceException = RosError
     replacements = {'rospy': ros}
     for package, names in [('mavros_msgs', ['State']), ('sensor_msgs', ['BatteryState']),
+                           ('nav_msgs', ['Odometry']), ('std_msgs', ['Float64MultiArray', 'Bool']),
                            ('multipoint', ['MissionStatus', 'RemoteWaypoint'])]:
         replacements[package] = types.ModuleType(package)
         messages = types.ModuleType(package + '.msg')
@@ -37,6 +41,9 @@ def load_adapter():
     services = types.ModuleType('multipoint.srv')
     services.MissionCommand = services.MissionCommandRequest = Message
     replacements['multipoint.srv'] = services
+    nav_services = types.ModuleType('nav_msgs.srv')
+    nav_services.GetPlan = nav_services.GetPlanRequest = Message
+    replacements['nav_msgs.srv'] = nav_services
     spec = importlib.util.spec_from_file_location('tested_gcs_adapter', str(SCRIPTS / 'gcs_gateway_node.py'))
     module = importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules, replacements):

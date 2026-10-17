@@ -1,0 +1,15 @@
+<launch>
+  <!-- Run only with an isolated ROS master. FCU/controller topics are mock data. -->
+  <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
+    <param name="mission_source" value="remote" />
+    <param name="enable_rc" value="false" />
+    <param name="require_flight_ready" value="true" />
+    <param name="require_map_coordinates" value="false" /> <!-- Isolated generic executor regression only. -->
+    <param name="position_tolerance" value="0.2" />
+    <param name="arrival_stable_sec" value="0.1" />
+    <remap from="odom_topic" to="/test/odom" />
+  </node>
+  <include file="$(find multipoint)/launch/gcs_gateway.launch"><arg name="port" value="18765" /></include>
+  <test pkg="multipoint" type="test_remote_integration.py" test-name="remote_cancel"
+        name="remote_integration" time-limit="50"><param name="cancel_instead_of_odom_loss" value="true" /></test>
+</launch>

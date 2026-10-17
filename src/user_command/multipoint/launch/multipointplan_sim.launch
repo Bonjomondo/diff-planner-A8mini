@@ -39,6 +39,7 @@
         <param name="remote_max_z" value="$(arg remote_max_z)" />
         <param name="remote_reset_jump_m" value="$(arg remote_reset_jump_m)" />
         <param name="require_flight_ready" value="false" />
+        <param name="require_map_coordinates" value="false" /> <!-- Generic simulator lacks real LIO/EKF inputs. -->
         <param name="enable_gimbal_actions" value="$(arg start_gimbal_node)" />
         <param name="position_tolerance" value="$(arg next_distance)" />
         <param name="velocity_tolerance" value="$(arg velocity_tolerance)" />

@@ -47,11 +47,11 @@ add_executable(diff_planner_node
 target_link_libraries(diff_planner_node 
   ${catkin_LIBRARIES}
   )
-#add_dependencies(diff_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(diff_planner_node ${catkin_EXPORTED_TARGETS})
 
 add_executable(traj_server src/traj_server.cpp)
 target_link_libraries(traj_server ${catkin_LIBRARIES})
-# add_dependencies(traj_server ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(traj_server ${catkin_EXPORTED_TARGETS})
 # add_executable(monitor_node src/monitor_node.cpp)
 # target_link_libraries(monitor_node ${catkin_LIBRARIES})
 

@@ -3,14 +3,21 @@
 import math
 import threading
 import time
+import sys
+from pathlib import Path
 
 import rospy
 from mavros_msgs.msg import State
 from sensor_msgs.msg import BatteryState
+from nav_msgs.msg import Odometry
+from nav_msgs.srv import GetPlan, GetPlanRequest
+from std_msgs.msg import Float64MultiArray, Bool
 from multipoint.msg import MissionStatus, RemoteWaypoint
 from multipoint.srv import MissionCommand, MissionCommandRequest
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gcs_protocol import GatewayServer
+from gcs_map_guard import MapGuard, valid_bounds, inside
 
 
 STATUS_FIELDS = ('frame_id', 'map_session_id', 'mission_id', 'revision', 'state',
@@ -30,11 +37,35 @@ class RosBackend:
         self.status_time = self.state_time = self.battery_time = 0.0
         self.state = State()
         self.battery = -1.0
+        self.map_guard = MapGuard()
+        self.fence = []
+        self.map_route = None
+        self.map_route_points = []
+        self.map_ready_pub = rospy.Publisher('/indoor_mission/map_ready', Bool, queue_size=1)
+        self.map_timer = rospy.Timer(rospy.Duration(.2), self.publish_map_ready)
         self.proxy = rospy.ServiceProxy('/mission/remote/command', MissionCommand)
         self.subscribers = [
             rospy.Subscriber('/mission/remote/status', MissionStatus, self.on_status, queue_size=1),
             rospy.Subscriber('/mavros/state', State, self.on_state, queue_size=1),
-            rospy.Subscriber('/mavros/battery', BatteryState, self.on_battery, queue_size=1)]
+            rospy.Subscriber('/mavros/battery', BatteryState, self.on_battery, queue_size=1),
+            rospy.Subscriber('/laserMapping/odometry', Odometry, lambda msg: self.on_odom('map', msg), queue_size=10),
+            rospy.Subscriber('/ekf/ekf_odom', Odometry, lambda msg: self.on_odom('planner', msg), queue_size=50),
+            rospy.Subscriber('/indoor_mission/fence', Float64MultiArray, self.on_fence, queue_size=1)]
+
+    def on_odom(self, source, msg):
+        p, q = msg.pose.pose.position, msg.pose.pose.orientation
+        with self.lock:
+            self.map_guard.observe(source, msg.header.stamp.to_sec(), msg.header.frame_id,
+                                   (p.x, p.y, p.z), (q.x, q.y, q.z, q.w), msg.header.seq)
+
+    def on_fence(self, msg):
+        with self.lock:
+            self.fence = list(msg.data) if valid_bounds(msg.data) else []
+
+    def publish_map_ready(self, _):
+        with self.lock:
+            ready = self.map_guard.snapshot(rospy.Time.now().to_sec())['map_coordinates_valid'] and bool(self.fence)
+        self.map_ready_pub.publish(Bool(data=ready))
 
     def on_status(self, message):
         with self.lock:
@@ -74,11 +105,40 @@ class RosBackend:
                         battery_percent=self.battery if now - self.battery_time <= 5 else -1.0,
                         mission_ready=mission['flight_ready'], odom_fresh=mission['odom_fresh'],
                         world_x=mission['world_x'], world_y=mission['world_y'],
-                        world_z=mission['world_z'], mission=mission)
+                        world_z=mission['world_z'], mission=mission, flight_bounds=list(self.fence),
+                        **self.map_guard.snapshot(rospy.Time.now().to_sec()))
 
     def command(self, command):
         with self.lock:
             stale = time.monotonic() - self.status_time > 1.0
+            guarded = command.get('require_map_alignment', False)
+            verified = self.map_guard.snapshot(rospy.Time.now().to_sec())['map_coordinates_valid'] and bool(self.fence)
+            bounds = tuple(self.fence)
+            identity = (command['map_session_id'], command['mission_id'], command['revision'], bounds)
+            route_matches = self.map_route == identity
+            route_points = command['waypoints'] if command['operation'] == 'upload' else self.map_route_points
+        if guarded and command['operation'] in ('upload', 'start', 'update'):
+            if command['operation'] == 'update':
+                return False, 'Upload a new bounded route while idle; guarded update is not supported', self.telemetry()['mission']
+            if not verified or (command['operation'] == 'start' and not route_matches):
+                return False, 'Map coordinates/fence changed; confirm and upload again', self.telemetry()['mission']
+            if any(not inside((p['x'], p['y'], p['z']), bounds) for p in route_points):
+                return False, 'Waypoint outside planner flight fence', self.telemetry()['mission']
+            if command['operation'] in ('upload', 'start'):
+                try:
+                    rospy.wait_for_service('/indoor_mission/check_endpoints', timeout=1.)
+                    check = rospy.ServiceProxy('/indoor_mission/check_endpoints', GetPlan)
+                    for point in route_points:
+                        query = GetPlanRequest()
+                        query.start.header.frame_id = query.goal.header.frame_id = 'world'
+                        query.start.pose.orientation.w = query.goal.pose.orientation.w = 1.
+                        for key in ('x', 'y', 'z'):
+                            setattr(query.start.pose.position, key, point[key])
+                            setattr(query.goal.pose.position, key, point[key])
+                        if not check(query).plan.poses:
+                            return False, 'Goal/return point is occupied, unknown or outside local planner map', self.telemetry()['mission']
+                except (rospy.ROSException, rospy.ServiceException):
+                    return False, 'Planner endpoint check unavailable', self.telemetry()['mission']
         if stale:
             return False, 'Mission executor status stale; query after recovery', self.telemetry()['mission']
         request = MissionCommandRequest()
@@ -89,6 +149,10 @@ class RosBackend:
         try:
             rospy.wait_for_service('/mission/remote/command', timeout=1.0)
             response = self.proxy(request)
+            if response.accepted and guarded and command['operation'] in ('upload', 'update'):
+                with self.lock:
+                    self.map_route = identity
+                    self.map_route_points = [dict(point) for point in command['waypoints']]
             # Telemetry is fed exclusively by the executor's ordered status topic.
             return response.accepted, response.reason, status_dict(response.mission)
         except (rospy.ROSException, rospy.ServiceException) as error:

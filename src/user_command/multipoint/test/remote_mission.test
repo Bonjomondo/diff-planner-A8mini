@@ -4,6 +4,7 @@
     <param name="mission_source" value="remote" />
     <param name="enable_rc" value="false" />
     <param name="require_flight_ready" value="true" />
+    <param name="require_map_coordinates" value="false" /> <!-- Isolated generic executor regression only. -->
     <param name="position_tolerance" value="0.2" />
     <param name="arrival_stable_sec" value="0.1" />
     <remap from="odom_topic" to="/test/odom" />

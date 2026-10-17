@@ -156,9 +156,14 @@ class RemoteIntegrationTest(unittest.TestCase):
         self.assertTrue(self.command('upload', mission='route-2', frame_id='world', waypoints=[point(8, 6)])['accepted'])
         self.assertTrue(self.command('start', mission='route-2')['accepted'])
         old_session = self.status.map_session_id
-        self.publish_odom = False
+        cancel = rospy.get_param('~cancel_instead_of_odom_loss', False)
+        if cancel:
+            self.assertFalse(self.command('cancel', mission='route-2', revision=99)['accepted'])
+            self.assertTrue(self.command('cancel', mission='route-2')['accepted'])
+        else:
+            self.publish_odom = False
         self.until(lambda: self.status.state == 'FAILED')
-        self.until(lambda: self.status.map_session_id != old_session)
+        if not cancel: self.until(lambda: self.status.map_session_id != old_session)
         self.assertTrue(self.stops)
         self.assertFalse(self.takeoff_land)
         self.assertFalse(self.command('start', mission='route-2')['accepted'])

@@ -1,0 +1,6 @@
+# Calibrate and inset from the actual nets/ceiling before enabling.
+# Order: xmin, ymin, zmin, xmax, ymax, zmax; planner world frame in meters.
+# Empty bounds deliberately prevent point missions until configured.
+indoor_mission:
+  enabled: false
+  bounds: []

@@ -110,6 +110,11 @@ public:
         pnh_.param<std::string>("mission_source", mission_source_, "clicked");
         pnh_.param("enable_gimbal_actions", enable_gimbal_actions_, true);
         pnh_.param("require_flight_ready", require_flight_ready_, true);
+        pnh_.param("require_map_coordinates", require_map_coordinates_, mission_source_ == "remote");
+        map_ready_sub_ = nh_.subscribe<std_msgs::Bool>("/indoor_mission/map_ready", 1,
+            [this](const std_msgs::Bool::ConstPtr &msg) {
+                map_ready_ = msg->data; map_ready_time_ = ros::WallTime::now();
+            });
         pnh_.param("odom_timeout_sec", odom_timeout_sec_, 0.5);
         pnh_.param("odom_future_tolerance_sec", odom_future_tolerance_sec_, 0.02);
         pnh_.param("flight_state_timeout_sec", flight_state_timeout_sec_, 2.5);
@@ -224,6 +229,10 @@ public:
     }
 
 private:
+    bool mapCoordinatesReady() const
+    {
+        return !require_map_coordinates_ || (map_ready_ && fresh(map_ready_time_, 0.7));
+    }
     static std::string newMapSession()
     {
         std::ostringstream session;
@@ -233,7 +242,7 @@ private:
 
     bool remoteStartReady() const
     {
-        return !landing_latched_ && !mission_fault_ && odomFresh() && flightReady(true) &&
+        return mapCoordinatesReady() && !landing_latched_ && !mission_fault_ && odomFresh() && flightReady(true) &&
                fresh(heartbeat_receive_time_, 0.5) && point_pub_.getNumSubscribers() > 0;
     }
 
@@ -297,9 +306,19 @@ private:
     void applyRemoteCommand(const multipoint::MissionCommand::Request &request)
     {
         if (request.operation == "get_status") return;
+        if (request.operation == "cancel")
+        {
+            remote_mission_.requireIdentity(request.map_session_id, request.mission_id);
+            if (request.revision != remote_mission_.revision)
+                throw std::runtime_error("Cancel requires current revision");
+            if (remote_mission_.active()) abortMission("Cancelled by ground station; pilot takeover required");
+            else if (remote_mission_.state == "READY") invalidateRemoteSession("Draft mission cancelled");
+            return;
+        }
         if (landing_latched_ || mission_fault_)
             throw std::runtime_error("Landing/failure is latched; land and restart the stack");
         if (!odomFresh()) throw std::runtime_error("Fresh world odometry is required");
+        if (!mapCoordinatesReady()) throw std::runtime_error("Point-cloud coordinates or planner fence not verified");
         if (request.operation == "start")
         {
             remote_mission_.checkStart(request.map_session_id, request.mission_id, request.revision);
@@ -1021,6 +1040,11 @@ private:
         {
             return;
         }
+        if (!mapCoordinatesReady())
+        {
+            abortMission("point-cloud coordinates or fence verification lost");
+            return;
+        }
         if (!odomFresh())
         {
             ROS_ERROR("Odometry guard: valid_world_pose=%s stamp_zero=%s "
@@ -1445,6 +1469,9 @@ private:
     }
 
     ros::NodeHandle nh_;
+    bool require_map_coordinates_ = false, map_ready_ = false;
+    ros::WallTime map_ready_time_;
+    ros::Subscriber map_ready_sub_;
     ros::NodeHandle pnh_;
     ros::Publisher point_pub_;
     ros::Publisher gimbal_task_pub_;

@@ -41,6 +41,8 @@ if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
   add_rostest(test/mission_start.test)
   add_rostest(test/remote_mission.test)
+  add_rostest(test/remote_cancel.test)
+  add_rostest(test/point_roundtrip_planner.test)
   add_executable(test_mission_guard test/test_mission_guard.cpp)
   target_compile_options(test_mission_guard PRIVATE -UNDEBUG)
   add_test(NAME mission_guard COMMAND test_mission_guard)
@@ -49,6 +51,7 @@ if(CATKIN_ENABLE_TESTING)
   add_test(NAME remote_mission COMMAND test_remote_mission)
   catkin_add_nosetests(test/test_gcs_protocol.py)
   catkin_add_nosetests(test/test_gcs_gateway_node.py)
+  catkin_add_nosetests(test/test_gcs_map_guard.py)
   catkin_add_nosetests(test/test_a8mini_gimbal_node.py)
   catkin_add_nosetests(test/test_a8mini_detection.py)
   catkin_add_nosetests(test/test_a8mini_capture.py)
@@ -58,7 +61,7 @@ catkin_install_python(
   PROGRAMS scripts/a8mini_gimbal_node.py scripts/a8mini_detection_node.py
            scripts/a8mini_detection.py scripts/a8mini_video.py scripts/a8mini_capture.py
            scripts/a8mini_diagnostics.py scripts/a8mini_labels.py
-           scripts/gcs_gateway_node.py scripts/gcs_protocol.py
+           scripts/gcs_gateway_node.py scripts/gcs_protocol.py scripts/gcs_map_guard.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

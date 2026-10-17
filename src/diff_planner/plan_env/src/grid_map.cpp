@@ -3,6 +3,15 @@
 void GridMap::initMap(ros::NodeHandle &nh)
 {
   node_ = nh;
+  bool fence_enabled = false;
+  std::vector<double> fence;
+  ros::param::param("/indoor_mission/enabled", fence_enabled, false);
+  ros::param::get("/indoor_mission/bounds", fence);
+  mission_box_.configure(fence_enabled, fence);
+  mission_fence_pub_ = node_.advertise<std_msgs::Float64MultiArray>("/indoor_mission/fence", 1, true);
+  std_msgs::Float64MultiArray fence_message;
+  fence_message.data = mission_box_.bounds;
+  mission_fence_pub_.publish(fence_message);
 
   /* get parameter */
   // double x_size, y_size, z_size;
@@ -75,6 +84,8 @@ void GridMap::initMap(ros::NodeHandle &nh)
   md_.ringbuffer_inf_origin3i_ = Eigen::Vector3i(0, 0, 0);
 
   md_.occupancy_buffer_ = vector<double>(buffer_size, mp_.clamp_min_log_);
+  mission_observed_.assign(buffer_size, 0);
+  mission_check_srv_ = node_.advertiseService("/indoor_mission/check_endpoints", &GridMap::checkMissionEndpoints, this);
   md_.occupancy_buffer_inflate_ = vector<uint16_t>(buffer_inf_size, 0);
 
   md_.count_hit_and_miss_ = vector<short>(buffer_size, 0);
@@ -361,6 +372,10 @@ void GridMap::cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg)
     md_.proj_points_[md_.proj_points_cnt_++] = Eigen::Vector3d(pt.x, pt.y, pt.z);
   }
   moveRingBuffer();          
+  // RayCaster excludes its terminal sensor voxel. The current sensor origin
+  // is directly known from odometry; mark only that voxel as observed, without
+  // clearing any occupancy or inflation. Otherwise a valid hover cannot be R.
+  mission_observed_[globalIdx2BufIdx(pos2GlobalIdx(md_.camera_pos_))] = 1;
   raycastFromCloud();// TODO by glq        
   clearAndInflateLocalMap(); 
   md_.occ_need_update_ = true; 
@@ -822,6 +837,7 @@ void GridMap::clearBuffer(char casein, int bound)
         md_.flag_traverse_[id_buf] = md_.raycast_num_;
         md_.flag_rayend_[id_buf] = md_.raycast_num_;
         md_.occupancy_buffer_[id_buf] = mp_.clamp_min_log_;
+        mission_observed_[id_buf] = 0;
 
         if (md_.occupancy_buffer_inflate_[id_buf_inf] > GRID_MAP_OBS_FLAG)
         {
