@@ -14,6 +14,7 @@ from quadrotor_msgs.msg import PositionCommand, TakeoffLand
 from std_msgs.msg import Bool, Empty, String
 from std_srvs.srv import Trigger
 from traj_utils.msg import PolyTraj
+from visualization_msgs.msg import MarkerArray
 
 
 class FlightResetTest(unittest.TestCase):
@@ -22,15 +23,18 @@ class FlightResetTest(unittest.TestCase):
         self.connected, self.armed = True, False
         self.landed = ExtendedState.LANDED_STATE_ON_GROUND
         self.rc8, self.channels = 1999, 8
+        self.rc9 = 999
         self.send_fcu = self.send_extended = self.send_rc = True
         self.goals, self.commands, self.takeoffs, self.plans = [], [], [], []
         self.status = None
+        self.markers = []
         self.subs = [
             rospy.Subscriber('/goal', PoseStamped, self.goals.append),
             rospy.Subscriber('/position_cmd', PositionCommand, self.commands.append),
             rospy.Subscriber('/px4ctrl/takeoff_land', TakeoffLand, self.takeoffs.append),
             rospy.Subscriber('/drone_0_planning/trajectory', PolyTraj, self.plans.append),
             rospy.Subscriber('/mission/remote/status', MissionStatus, self.on_status)]
+        self.subs.append(rospy.Subscriber('/mission/clicked_waypoints', MarkerArray, self.markers.append))
         self.fcu = rospy.Publisher('/mavros/state', State, queue_size=1)
         self.extended = rospy.Publisher('/mavros/extended_state', ExtendedState, queue_size=1)
         self.rc = rospy.Publisher('/mavros/rc/in', RCIn, queue_size=1)
@@ -77,7 +81,7 @@ class FlightResetTest(unittest.TestCase):
         if self.send_extended:
             self.extended.publish(ExtendedState(landed_state=self.landed))
         if self.send_rc:
-            self.rc.publish(RCIn(channels=([1500] * 5 + [1999, 1500, self.rc8])[:self.channels]))
+            self.rc.publish(RCIn(channels=([1500] * 5 + [1999, 1500, self.rc8, self.rc9])[:self.channels]))
         self.controller.publish(String(data='AUTO_HOVER' if self.armed else 'MANUAL_CTRL'))
         self.ready.publish(Bool(data=self.armed))
         odom = Odometry()
@@ -145,6 +149,19 @@ class FlightResetTest(unittest.TestCase):
         self.armed = True
         self.rejected_reset()
         self.rejected_reset(direct=True)
+        # A full SWB gesture while armed cannot clear the lock or fire on landing.
+        self.channels = 9
+        marker_count = len(self.markers)
+        self.rc9 = 1999
+        rospy.sleep(2.3)
+        self.armed = False
+        rospy.sleep(.35)
+        self.rc9 = 999
+        rospy.sleep(.4)
+        self.assertEqual(len(self.markers), marker_count)
+        if self.remote:
+            self.assertEqual(self.status.state, 'LANDING')
+        self.channels = 8  # Existing RC-only setups must still support the service guard.
         self.armed = False
         for state in (ExtendedState.LANDED_STATE_IN_AIR, ExtendedState.LANDED_STATE_UNDEFINED,
                       ExtendedState.LANDED_STATE_LANDING):
@@ -171,8 +188,20 @@ class FlightResetTest(unittest.TestCase):
         self.rc8 = 1999
         rospy.sleep(.2)
         before = len(self.takeoffs)
-        result = self.reset()
-        self.assertTrue(result.success, result.message)
+        # Use SWB on CH9 for this reset; keep the service for the next cycle below.
+        self.channels, self.rc9 = 9, 999
+        rospy.sleep(.35)  # Establish the home endpoint after the missing-channel samples.
+        marker_count = len(self.markers)
+        self.rc9 = 1999
+        rospy.sleep(.35)
+        self.rc9 = 999
+        rospy.sleep(.35)
+        self.assertEqual(len(self.markers), marker_count)  # A short flick is ignored.
+        self.rc9 = 1999
+        rospy.sleep(2.3)
+        self.assertEqual(len(self.markers), marker_count)  # Holding alone cannot reset.
+        self.rc9 = 999
+        self.until(lambda: len(self.markers) > marker_count)
         rospy.sleep(.2)
         self.assertEqual(len(self.takeoffs), before)  # Reset cannot take off or land.
         old_stops = []

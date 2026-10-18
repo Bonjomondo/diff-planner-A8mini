@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 #include "mission_guard.h"
+#include "rc_reset_gesture.h"
 #include "remote_mission.h"
 
 enum MissionState
@@ -103,6 +104,9 @@ public:
         pnh_.param("start_plan", enable_start_trigger_, 1);
         pnh_.param("back_plan", enable_back_trigger_, 1);
         pnh_.param("enable_rc", enable_rc_, true);
+        pnh_.param("rc_reset_channel", rc_reset_channel_, 9);
+        if (rc_reset_channel_ != 0 && (rc_reset_channel_ < 9 || rc_reset_channel_ > 18))
+            throw std::runtime_error("rc_reset_channel must be 0 (disabled) or an unused channel in 9..18");
         pnh_.param("enable_rviz_click_route", enable_rviz_click_route_, true);
         pnh_.param<std::string>("clicked_point_topic", clicked_point_topic_,
                                 "/clicked_point");
@@ -225,6 +229,9 @@ public:
         ROS_INFO("Mission configuration: source=%s gimbal_actions=%s flight_gate=%s",
                  mission_source_.c_str(), enable_gimbal_actions_ ? "true" : "false",
                  require_flight_ready_ ? "true" : "false");
+        if (enable_rc_ && rc_reset_channel_ != 0)
+            ROS_INFO("RC reset: CH%d endpoint -> opposite endpoint for 2 s -> return; "
+                     "requires a locked mission, ground, disarmed and CH8 DOWN", rc_reset_channel_);
     }
 
 private:
@@ -605,12 +612,15 @@ private:
     {
         fcu_state_ = *msg;
         fcu_receive_time_ = ros::WallTime::now();
+        if (!fcu_state_.connected || fcu_state_.armed) rc_reset_gesture_.cancel();
     }
 
     void extendedCallback(const mavros_msgs::ExtendedStateConstPtr &msg)
     {
         landed_state_ = msg->landed_state;
         extended_receive_time_ = ros::WallTime::now();
+        if (landed_state_ != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
+            rc_reset_gesture_.cancel();
     }
 
     void controllerCallback(const std_msgs::StringConstPtr &msg)
@@ -673,6 +683,7 @@ private:
 
     bool resetCallback(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &response)
     {
+        rc_reset_gesture_.cancel();
         if (state_ != FINISHED || !resetReady())
         {
             response.message = "Reset requires fresh connected FCU, ON_GROUND, disarmed, fresh RC8 DOWN and no active mission";
@@ -1066,6 +1077,7 @@ private:
 
     void timerCallback(const ros::TimerEvent &)
     {
+        if (!resetReady()) rc_reset_gesture_.cancel();
         const ros::Time now = ros::Time::now();
         if (mission_source_ == "remote")
         {
@@ -1427,6 +1439,28 @@ private:
                          std::all_of(msg->channels.begin(), msg->channels.begin() + 8,
                              [](uint16_t pwm) { return pwm >= 900 && pwm <= 2100; }) &&
                          isInRcState(RC_EIGHT_DOWN, msg->channels[7]);
+        const bool has_reset_channel = rc_reset_channel_ != 0 &&
+            msg->channels.size() >= static_cast<std::size_t>(rc_reset_channel_);
+        const bool reset_eligible = enable_rc_ && has_reset_channel &&
+            (landing_latched_ || mission_fault_) && state_ == FINISHED && resetReady();
+        const int reset_pwm = has_reset_channel ? msg->channels[rc_reset_channel_ - 1] : 0;
+        if (rc_reset_gesture_.update(rc_receive_time_.toSec(), reset_pwm, reset_eligible))
+        {
+            std_srvs::Trigger::Request request;
+            std_srvs::Trigger::Response response;
+            resetCallback(request, response);  // Same coordinator and guards as /mission/reset.
+            if (response.success)
+                ROS_INFO("RC CH%d: mission reset succeeded; confirm a new route, then trigger TAKEOFF separately",
+                         rc_reset_channel_);
+            else
+                ROS_WARN("RC CH%d: mission reset rejected: %s", rc_reset_channel_, response.message.c_str());
+            return;  // A reset sample can never also issue TAKEOFF or start a mission.
+        }
+        if (enable_rc_ && rc_reset_channel_ != 0 && !has_reset_channel &&
+            (landing_latched_ || mission_fault_))
+            ROS_WARN_THROTTLE(10.0, "RC reset needs CH%d but received only %zu channels; "
+                              "check transmitter/receiver mapping or use /mission/reset",
+                              rc_reset_channel_, msg->channels.size());
         if (!enable_rc_) return;
         if (msg->channels.size() <= 7)
         {
@@ -1598,6 +1632,8 @@ private:
     int enable_start_trigger_;
     int enable_back_trigger_;
     bool enable_rc_;
+    int rc_reset_channel_;
+    mission_guard::RcResetGesture rc_reset_gesture_;
     std::string mission_source_, controller_state_;
     bool enable_gimbal_actions_, require_flight_ready_;
     bool controller_ready_ = false;

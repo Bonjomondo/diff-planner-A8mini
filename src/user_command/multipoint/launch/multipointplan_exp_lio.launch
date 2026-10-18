@@ -9,6 +9,7 @@
     <arg name="start_plan" default="1" />
     <arg name="back_plan" default="1" />
     <arg name="enable_rc" default="true" />
+    <arg name="rc_reset_channel" default="9" />
     <arg name="mission_csv_path" default="/tmp/a8mini_mission_timestamps.csv" />
     <arg name="goal_frame_id" default="world" />
     <!-- preset flies the YAML waypoints directly; clicked requires RViz Publish Point first. -->
@@ -71,6 +72,7 @@
         <param name="start_plan" value="$(arg start_plan)" />
         <param name="back_plan" value="$(arg back_plan)" />
         <param name="enable_rc" value="$(arg enable_rc)" />
+        <param name="rc_reset_channel" value="$(arg rc_reset_channel)" />
         <param name="mission_csv_path" value="$(arg mission_csv_path)" />
         <param name="enable_rviz_click_route" value="$(arg enable_rviz_click_route)" />
         <param name="clicked_point_topic" value="$(arg clicked_point_topic)" />
