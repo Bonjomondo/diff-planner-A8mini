@@ -1,0 +1,17 @@
+<launch>
+  <!-- Manual takeoff/landing only. Pilot-controlled OFFBOARD via CH5. -->
+  <node pkg="px4ctrl" type="px4ctrl_node" name="px4ctrl" output="screen">
+    <rosparam command="load" file="$(find px4ctrl)/config/ctrl_param_fpv.yaml" />
+    <param name="auto_takeoff_land/enable" value="false" />
+    <param name="auto_takeoff_land/enable_auto_arm" value="false" />
+    <param name="auto_takeoff_land/no_RC" value="false" />
+    <param name="max_manual_vel" value="0.3" />
+    <param name="max_angle" value="20.0" />
+    <remap from="~odom" to="/ekf/ekf_odom" />
+    <remap from="~cmd" to="/setpoints_cmd" />
+    <!-- No automatic takeoff/landing or FCU arming/reboot from this profile. -->
+    <remap from="~takeoff_land" to="/indoor_roundtrip/manual_only/disabled_takeoff_land" />
+    <remap from="/mavros/cmd/arming" to="/indoor_roundtrip/manual_only/disabled_arming" />
+    <remap from="/mavros/cmd/command" to="/indoor_roundtrip/manual_only/disabled_fcu_command" />
+  </node>
+</launch>

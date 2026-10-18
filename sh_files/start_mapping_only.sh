@@ -73,6 +73,9 @@ for attempt in $(seq 1 12); do
     sleep 0.5
 done
 [[ "$connected" == true ]] || { echo 'ERROR: 飞控未连接，请检查供电和 USB'; exit 1; }
+# /imu/data follows ATTITUDE_QUATERNION; HIGHRES_IMU alone leaves it at 50 Hz.
+# Match the existing full-flight startup requests without starting flight nodes.
+timeout 8 rosrun mavros mavcmd long 511 31 5000 0 0 0 0 0 >/dev/null 2>&1 || true
 timeout 8 rosrun mavros mavcmd long 511 105 5000 0 0 0 0 0 >/dev/null 2>&1 || true
 wait_topic 8 /mavros/imu/data/header || { echo 'ERROR: 未收到飞控 IMU'; exit 1; }
 echo 'STAGE: 正在启动 MID-360 和 Faster-LIO'

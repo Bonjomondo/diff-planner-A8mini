@@ -1,6 +1,12 @@
-# Calibrate and inset from the actual nets/ceiling before enabling.
-# Order: xmin, ymin, zmin, xmax, ymax, zmax; planner world frame in meters.
-# Empty bounds deliberately prevent point missions until configured.
+# Center-only first-flight region; current continuous 2026-10-18 world only.
+# Floor fit shows ~3.47 degree slope in this world; do not reuse after map restart.
+# 2.00 m conservative ceiling, body top height 0.22 m. Disabled on persistent load.
 indoor_mission:
   enabled: false
-  bounds: []
+  bounds:
+  - 7.3
+  - -3.4
+  - 0.3
+  - 10.3
+  - -1.6
+  - 0.7
