@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find multipoint)/test/flight_reset.test">
+    <arg name="mission_source" value="clicked" />
+  </include>
+</launch>

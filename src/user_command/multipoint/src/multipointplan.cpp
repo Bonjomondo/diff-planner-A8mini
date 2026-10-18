@@ -17,11 +17,13 @@
 #include <std_msgs/String.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <std_msgs/UInt32.h>
+#include <std_srvs/Trigger.h>
 #include <tf/transform_listener.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
 #include <cmath>
+#include <algorithm>
 #include <cstdint>
 #include <deque>
 #include <fstream>
@@ -154,6 +156,10 @@ public:
         takeoff_land_pub_ =
             nh_.advertise<quadrotor_msgs::TakeoffLand>("/px4ctrl/takeoff_land", 10);
         planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
+        reset_srv_ = nh_.advertiseService("/mission/reset",
+            &MultipointPlanner::resetCallback, this);
+        planner_reset_client_ = nh_.serviceClient<std_srvs::Trigger>("/planning/reset_planner");
+        trajectory_reset_client_ = nh_.serviceClient<std_srvs::Trigger>("/planning/reset_trajectory");
         startcommand_pub_ =
             nh_.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
         backcommand_pub_ =
@@ -186,10 +192,8 @@ public:
             backcommand_sub_ = nh_.subscribe("/back_trigger", 10,
                                              &MultipointPlanner::backCallback, this);
         }
-        if (enable_rc_)
-        {
-            rc_sub_ = nh_.subscribe("/mavros/rc/in", 10, &MultipointPlanner::rcCallback, this);
-        }
+        // Always observe RC for the reset guard, even when RC mission actions are disabled.
+        rc_sub_ = nh_.subscribe("/mavros/rc/in", 1, &MultipointPlanner::rcCallback, this);
         if (enable_rviz_click_route_ && mission_source_ != "remote")
         {
             clicked_point_sub_ = nh_.subscribe(clicked_point_topic_, 50,
@@ -298,7 +302,7 @@ private:
     {
         if (request.operation == "get_status") return;
         if (landing_latched_ || mission_fault_)
-            throw std::runtime_error("Landing/failure is latched; land and restart the stack");
+            throw std::runtime_error("Landing/failure is latched; ground + disarmed + RC8 DOWN, then call /mission/reset");
         if (!odomFresh()) throw std::runtime_error("Fresh world odometry is required");
         if (request.operation == "start")
         {
@@ -658,9 +662,79 @@ private:
         return mission_guard::flightReady(status, starting);
     }
 
+    bool resetReady() const
+    {
+        return fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
+               fresh(extended_receive_time_, flight_state_timeout_sec_) &&
+               fcu_state_.connected && !fcu_state_.armed &&
+               landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND &&
+               fresh(rc_receive_time_, 0.5) && rc_reset_down_;
+    }
+
+    bool resetCallback(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &response)
+    {
+        if (state_ != FINISHED || !resetReady())
+        {
+            response.message = "Reset requires fresh connected FCU, ON_GROUND, disarmed, fresh RC8 DOWN and no active mission";
+            return true;
+        }
+        // Keep the mission closed until both downstream nodes acknowledge cleanup.
+        landing_latched_ = true;
+        automatic_landing_ = false;
+        mission_fault_ = true;
+        std_srvs::Trigger reset;
+        if (!planner_reset_client_.call(reset) || !reset.response.success)
+        {
+            response.message = "Planner reset failed; mission remains locked: " + reset.response.message;
+            planning_stop_pub_.publish(std_msgs::Empty());
+            return true;
+        }
+        reset = std_srvs::Trigger();
+        if (!resetReady() || !trajectory_reset_client_.call(reset) || !reset.response.success || !resetReady())
+        {
+            response.message = "Trajectory reset failed or flight state expired; mission remains locked: " + reset.response.message;
+            planning_stop_pub_.publish(std_msgs::Empty());
+            return true;
+        }
+        closeMissionCsv();
+        active_waypoints_.clear();
+        clicked_waypoints_.clear();
+        clicked_route_started_ = false;
+        current_index_ = 0;
+        arrival_candidate_time_ = arrived_time_ = hover_start_time_ = ros::Time(0);
+        last_gimbal_publish_time_ = last_land_publish_time_ = ros::Time(0);
+        goal_publish_time_ = gimbal_wait_time_ = ros::WallTime(0);
+        mission_uses_gimbal_ = false;
+        // Retain the payload's one-shot guard: its separate executor is not reset here.
+        rc_initialized_ = true;
+        rc_eight_pre_ = RC_EIGHT_DOWN;
+        // Retire the cached stop only after both executors acknowledge reset.
+        // Otherwise a late subscriber would relatch a stop from the previous flight.
+        planning_stop_pub_.shutdown();
+        planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
+        landing_latched_ = mission_fault_ = false;
+        if (mission_source_ == "remote")
+        {
+            const double xy = remote_mission_.max_abs_xy;
+            const double min_z = remote_mission_.min_z, max_z = remote_mission_.max_z;
+            remote_mission_ = remote_mission::Mission();
+            remote_mission_.max_abs_xy = xy;
+            remote_mission_.min_z = min_z;
+            remote_mission_.max_z = max_z;
+            remote_mission_.session = newMapSession();
+            // Keep request deduplication: delayed retries must never replay old actions.
+            publishRemoteStatus();
+        }
+        publishClickedMarkers();
+        response.success = true;
+        response.message = "Mission reset to standby. Recheck origin and upload/confirm a new route; trigger TAKEOFF separately";
+        ROS_INFO("%s", response.message.c_str());
+        return true;
+    }
+
     void abortMission(const char *reason)
     {
-        ROS_ERROR("Mission stopped: %s. Check aircraft/RC; land and restart the stack before a new mission.", reason);
+        ROS_ERROR("Mission stopped: %s. Land, disarm, set RC8 DOWN and call /mission/reset before a new mission.", reason);
         state_ = FINISHED;
         mission_fault_ = true;
         automatic_landing_ = false;
@@ -1009,7 +1083,7 @@ private:
             landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
         {
             automatic_landing_ = false;
-            ROS_INFO("Landing complete: ground + disarmed; LAND retries stopped. Restart stack for next flight.");
+            ROS_INFO("Landing complete: ground + disarmed; LAND retries stopped. Set RC8 DOWN and call /mission/reset for next flight.");
         }
         if (landing_latched_ && automatic_landing_ &&
             (now - last_land_publish_time_).toSec() >= land_command_retry_sec_)
@@ -1348,6 +1422,12 @@ private:
 
     void rcCallback(const mavros_msgs::RCInConstPtr &msg)
     {
+        rc_receive_time_ = ros::WallTime::now();
+        rc_reset_down_ = msg->channels.size() > 7 &&
+                         std::all_of(msg->channels.begin(), msg->channels.begin() + 8,
+                             [](uint16_t pwm) { return pwm >= 900 && pwm <= 2100; }) &&
+                         isInRcState(RC_EIGHT_DOWN, msg->channels[7]);
+        if (!enable_rc_) return;
         if (msg->channels.size() <= 7)
         {
             ROS_WARN_THROTTLE(5.0, "RC message has fewer than eight channels");
@@ -1400,6 +1480,7 @@ private:
             }
             return;
         }
+        if (mission_fault_ && current != RC_EIGHT_DOWN) return;
         if (current == rc_eight_pre_)
         {
             return;
@@ -1455,6 +1536,8 @@ private:
     ros::Publisher clicked_markers_pub_;
     ros::Publisher remote_status_pub_;
     ros::ServiceServer remote_command_srv_;
+    ros::ServiceServer reset_srv_;
+    ros::ServiceClient planner_reset_client_, trajectory_reset_client_;
     remote_mission::Mission remote_mission_;
     struct RemoteRequest
     {
@@ -1523,6 +1606,8 @@ private:
     uint8_t landed_state_ = mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED;
     mavros_msgs::State fcu_state_;
     ros::WallTime odom_receive_time_, fcu_receive_time_, extended_receive_time_;
+    ros::WallTime rc_receive_time_;
+    bool rc_reset_down_ = false;
     ros::WallTime controller_receive_time_, ready_receive_time_, heartbeat_receive_time_;
     ros::WallTime goal_publish_time_, gimbal_wait_time_;
     ros::Time odom_stamp_;

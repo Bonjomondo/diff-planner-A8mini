@@ -6,6 +6,11 @@
 #include <std_msgs/Empty.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <mavros_msgs/State.h>
+#include <mavros_msgs/ExtendedState.h>
+#include <mavros_msgs/RCIn.h>
+#include <std_srvs/Trigger.h>
 #include <algorithm>
 #include <cmath>
 
@@ -22,6 +27,13 @@ quadrotor_msgs::PositionCommand cmd;
 
 bool receive_traj_ = false;
 bool landing_requested_ = false;
+bool awaiting_takeoff_ = false;
+bool awaiting_goal_ = false;
+ros::Time flight_epoch_(0), goal_epoch_(0);
+mavros_msgs::State fcu_state_;
+uint8_t landed_state_ = mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED;
+ros::WallTime fcu_received_, extended_received_, rc_received_;
+bool rc_down_ = false;
 boost::shared_ptr<poly_traj::Trajectory> traj_;
 double traj_duration_;
 ros::Time start_time_;
@@ -51,6 +63,72 @@ void stopCommandOutput(const char *reason)
   landing_requested_ = true;
   receive_traj_ = false;
   receive_yaw_ = false;
+  traj_.reset();
+}
+
+bool receiptFresh(const ros::WallTime &stamp, double timeout)
+{
+  const double age = (ros::WallTime::now() - stamp).toSec();
+  return !stamp.isZero() && age >= 0.0 && age <= timeout;
+}
+
+void fcuCallback(const mavros_msgs::StateConstPtr &msg)
+{
+  fcu_state_ = *msg;
+  fcu_received_ = ros::WallTime::now();
+}
+
+void extendedCallback(const mavros_msgs::ExtendedStateConstPtr &msg)
+{
+  landed_state_ = msg->landed_state;
+  extended_received_ = ros::WallTime::now();
+}
+
+void rcCallback(const mavros_msgs::RCInConstPtr &msg)
+{
+  rc_received_ = ros::WallTime::now();
+  rc_down_ = msg->channels.size() > 7 &&
+             std::all_of(msg->channels.begin(), msg->channels.begin() + 8,
+                 [](uint16_t pwm) { return pwm >= 900 && pwm <= 2100; }) &&
+             msg->channels[7] > 1899 && msg->channels[7] < 2099;
+}
+
+bool resetTrajectory(std_srvs::Trigger::Request &, std_srvs::Trigger::Response &response)
+{
+  if (!receiptFresh(fcu_received_, 2.5) || !receiptFresh(extended_received_, 2.5) ||
+      !fcu_state_.connected || fcu_state_.armed ||
+      landed_state_ != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND ||
+      !receiptFresh(rc_received_, 0.5) || !rc_down_)
+  {
+    response.message = "Trajectory reset requires fresh connected FCU, ON_GROUND, disarmed and fresh RC8 DOWN";
+    return true;
+  }
+  receive_traj_ = receive_yaw_ = false;
+  traj_.reset();
+  heartbeat_time_ = receive_yaw_time_ = start_time_ = ros::Time(0);
+  traj_duration_ = 0.0;
+  traj_id_ = 0;
+  last_yaw_ = last_yawdot_ = yaw_custom_ = 0.0;
+  last_pos_.setZero();
+  flight_epoch_ = ros::Time::now();
+  goal_epoch_ = ros::Time(0);
+  awaiting_takeoff_ = awaiting_goal_ = true;
+  landing_requested_ = false;
+  response.success = true;
+  response.message = "Trajectory cleared; waiting for separate TAKEOFF and a new world goal";
+  return true;
+}
+
+void newGoalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
+{
+  if (landing_requested_ || awaiting_takeoff_ || !awaiting_goal_ ||
+      msg->header.frame_id != "world" || msg->header.stamp <= flight_epoch_ ||
+      msg->header.stamp > ros::Time::now() ||
+      !std::isfinite(msg->pose.position.x) || !std::isfinite(msg->pose.position.y) ||
+      !std::isfinite(msg->pose.position.z))
+    return;
+  goal_epoch_ = msg->header.stamp;
+  awaiting_goal_ = false;
 }
 
 void planningStopCallback(const std_msgs::EmptyConstPtr &)
@@ -71,16 +149,21 @@ void takeoffLandCallback(const quadrotor_msgs::TakeoffLandConstPtr &msg)
     if (landing_requested_)
     {
       ROS_WARN("[traj_server] TAKEOFF cannot clear the stop/landing latch. "
-               "After ground + disarmed, restart the complete flight stack for a new flight.");
+               "After ground + disarmed + RC8 DOWN, call /mission/reset for a new flight.");
       return;
     }
     receive_traj_ = false;
+    if (awaiting_takeoff_)
+    {
+      flight_epoch_ = ros::Time::now();
+      awaiting_takeoff_ = false;
+    }
   }
 }
 
 void yawCallback(const quadrotor_msgs::PositionCommandPtr msg)
 {
-  if (landing_requested_)
+  if (landing_requested_ || awaiting_takeoff_ || awaiting_goal_)
     return;
 
   receive_yaw_ = true;
@@ -91,11 +174,14 @@ void yawCallback(const quadrotor_msgs::PositionCommandPtr msg)
 
 void polyTrajCallback(traj_utils::PolyTrajPtr msg)
 {
-  if (landing_requested_)
+  if (landing_requested_ || awaiting_takeoff_ || awaiting_goal_)
   {
     ROS_WARN_THROTTLE(2.0, "[traj_server] Ignore trajectory while LAND is active.");
     return;
   }
+  // Exclude queued trajectories from the previous flight, even after reset/TAKEOFF.
+  if (!goal_epoch_.isZero() && msg->start_time < goal_epoch_)
+    return;
 
   if (msg->order != 5)
   {
@@ -407,6 +493,11 @@ int main(int argc, char **argv)
       nh.subscribe("/planning/stop", 10, planningStopCallback);
   ros::Subscriber takeoff_land_sub =
       nh.subscribe("/px4ctrl/takeoff_land", 10, takeoffLandCallback);
+  ros::Subscriber goal_sub = nh.subscribe("/goal", 1, newGoalCallback);
+  ros::Subscriber fcu_sub = nh.subscribe("/mavros/state", 1, fcuCallback);
+  ros::Subscriber extended_sub = nh.subscribe("/mavros/extended_state", 1, extendedCallback);
+  ros::Subscriber rc_sub = nh.subscribe("/mavros/rc/in", 1, rcCallback);
+  ros::ServiceServer reset_srv = nh.advertiseService("/planning/reset_trajectory", resetTrajectory);
   
   pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
 

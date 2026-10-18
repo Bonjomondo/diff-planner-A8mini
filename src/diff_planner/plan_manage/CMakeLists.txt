@@ -12,6 +12,8 @@ find_package(PCL 1.7 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
+  std_srvs
+  mavros_msgs
   geometry_msgs
   quadrotor_msgs
   plan_env

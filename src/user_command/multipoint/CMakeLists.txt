@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  std_srvs
   tf
   visualization_msgs
 )
@@ -23,7 +24,7 @@ add_service_files(FILES MissionCommand.srv)
 generate_messages()
 
 catkin_package(
-  CATKIN_DEPENDS geometry_msgs mavros_msgs message_runtime nav_msgs quadrotor_msgs roscpp rospy sensor_msgs std_msgs tf
+  CATKIN_DEPENDS geometry_msgs mavros_msgs message_runtime nav_msgs quadrotor_msgs roscpp rospy sensor_msgs std_msgs std_srvs tf
                  visualization_msgs
   DEPENDS EIGEN3
 )
@@ -41,6 +42,8 @@ if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
   add_rostest(test/mission_start.test)
   add_rostest(test/remote_mission.test)
+  add_rostest(test/flight_reset.test)
+  add_rostest(test/clicked_flight_reset.test)
   add_executable(test_mission_guard test/test_mission_guard.cpp)
   target_compile_options(test_mission_guard PRIVATE -UNDEBUG)
   add_test(NAME mission_guard COMMAND test_mission_guard)

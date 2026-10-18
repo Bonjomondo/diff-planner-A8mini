@@ -94,6 +94,12 @@ ROS 侧接口：
 | `/mission/remote/status` | `multipoint/MissionStatus`，5 Hz、latched | 权威任务状态，由 TCP 网关转发 |
 | `/goal` | `geometry_msgs/PoseStamped` | 当前目标点，Diff-Planner 按原入口规划/重新规划 |
 | `/planning/stop` | `std_msgs/Empty` | 沿用原有定位/飞控/规划器异常或降落停止逻辑 |
+| `/mission/reset` | `std_srvs/Trigger` 服务 | 落地、未解锁、RC8 下档且状态新鲜时显式复位；清除旧航线并生成新的地图会话 |
+
+降落锁定后，在机载端运行 `./sh_files/reset_mission.sh`，确认响应 `success: True`。
+随后查询新 `map_session_id`、重新核对原点并上传航线，再按原流程人工起飞、开始任务。
+复位不会触发起飞，TCP 重连、重复 `start` 和 RC8 中档都不能代替复位。
+该操作通过机载 ROS 服务提供，现有 protocol 2 的四种操作保持不变。
 
 TCP ACK 为 `type=ack`、`protocol=2`，包含原 `request_id`、布尔 `accepted`、`reason` 和 `mission`。ACK 来自 ROS 执行器的服务响应，不在网关提前确认。执行器缓存最近 256 个请求结果；重试返回原接受结果和**当前**任务状态，相同 ID 携带不同有效内容会被拒绝。当前定位会话内已经使用的任务 ID 也不能再次上传，避免旧航线重放。
 
@@ -168,7 +174,7 @@ with socket.create_connection(("127.0.0.1", 8765), timeout=5) as sock:
 
 开始任务要求新鲜 `world` 里程计、规划器心跳与 `/goal` 订阅者，以及 FCU connected、armed、OFFBOARD、IN_AIR、控制器 AUTO_HOVER/CMD_CTRL 和 mission_ready。未满足时拒绝开始并保留 READY 航线，条件恢复后使用**新的 request_id** 重试。相同 request_id 的拒绝结果也会被缓存。
 
-每次任务节点重启生成新定位会话；定位失效/超时、位置大幅跳变或时间戳回退超过 0.5 s 也会更新会话。未开始的航线被清空；执行中的任务停止并进入 FAILED，需按原流程降落并重启完整栈。小幅/快速的定位原点重置未必能被检测，重启定位后仍应人工核对坐标并重启完整定位、规划和控制链路。
+每次任务节点重启生成新定位会话；定位失效/超时、位置大幅跳变或时间戳回退超过 0.5 s 也会更新会话。未开始的航线被清空；执行中的任务停止并进入 FAILED，需降落、未解锁、RC8 下档后调用 `/mission/reset`，重新核对原点并上传。小幅/快速的定位原点重置未必能被检测，重启定位后仍应人工核对坐标并重启完整定位、规划和控制链路。
 
 仅 Wi-Fi/TCP 断开时，已经开始的任务在定位和控制正常的情况下继续执行。此版没有可恢复暂停机制，不自动把断网解释为停机或降落。网关超过 1 s 未收到执行器状态时，关闭遥测中的就绪/定位有效标志并拒绝新控制命令；ROS 调用丢失回复会提示结果未知，应查询最新状态。
 

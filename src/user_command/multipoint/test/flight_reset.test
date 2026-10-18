@@ -1,0 +1,53 @@
+<launch>
+  <!-- Real executors; mock flight topics only, no MAVROS, controller or motors. -->
+  <arg name="mission_source" default="remote" />
+  <include file="$(find diff_planner)/launch/include/advanced_param_sim.xml">
+    <arg name="map_size_x_" value="10.0" />
+    <arg name="map_size_y_" value="10.0" />
+    <arg name="map_size_z_" value="4.0" />
+    <arg name="odometry_topic" value="test_odom" />
+    <arg name="camera_pose_topic" value="test_pose" />
+    <arg name="depth_topic" value="test_depth" />
+    <arg name="cloud_topic" value="test_cloud" />
+    <arg name="cx" value="320.0" />
+    <arg name="cy" value="240.0" />
+    <arg name="fx" value="320.0" />
+    <arg name="fy" value="320.0" />
+    <arg name="max_vel" value="1.0" />
+    <arg name="max_acc" value="2.0" />
+    <arg name="max_jer" value="4.0" />
+    <arg name="planning_horizon" value="3.0" />
+    <arg name="point_num" value="0" />
+    <arg name="flight_type" value="1" />
+    <arg name="use_multitopology_trajs" value="false" />
+    <arg name="drone_id" value="0" />
+    <arg name="point0_x" value="0.0" />
+    <arg name="point0_y" value="0.0" />
+    <arg name="point0_z" value="0.0" />
+    <arg name="point1_x" value="0.0" />
+    <arg name="point1_y" value="0.0" />
+    <arg name="point1_z" value="0.0" />
+    <arg name="point2_x" value="0.0" />
+    <arg name="point2_y" value="0.0" />
+    <arg name="point2_z" value="0.0" />
+    <arg name="point3_x" value="0.0" />
+    <arg name="point3_y" value="0.0" />
+    <arg name="point3_z" value="0.0" />
+    <arg name="point4_x" value="0.0" />
+    <arg name="point4_y" value="0.0" />
+    <arg name="point4_z" value="0.0" />
+  </include>
+  <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
+    <param name="yaml_path" value="$(find multipoint)/config/points.yaml" />
+    <param name="mission_source" value="$(arg mission_source)" />
+    <param name="enable_gimbal_actions" value="false" />
+    <param name="flight_state_timeout_sec" value="0.3" />
+    <remap from="odom_topic" to="/drone_0_test_odom" />
+  </node>
+  <node pkg="diff_planner" type="traj_server" name="drone_0_traj_server" output="screen">
+    <remap from="~planning/trajectory" to="/test/trajectory" />
+    <param name="traj_server/time_forward" value="1.0" />
+  </node>
+  <test pkg="multipoint" type="test_flight_reset.py" test-name="flight_reset_$(arg mission_source)"
+        name="flight_reset_test" time-limit="75" />
+</launch>

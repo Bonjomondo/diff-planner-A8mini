@@ -54,6 +54,9 @@ namespace diff_planner
 
     odom_sub_ = nh.subscribe("odom_world", 1, &DiffReplanFSM::odometryCallback, this);
     mandatory_stop_sub_ = nh.subscribe("mandatory_stop", 1, &DiffReplanFSM::mandatoryStopCallback, this);
+    mission_stop_sub_ = nh.subscribe("/planning/stop", 1, &DiffReplanFSM::missionStopCallback, this);
+    mission_reset_srv_ = nh.advertiseService("/planning/reset_planner",
+        &DiffReplanFSM::resetMissionCallback, this);
 
     /* Use MINCO trajectory to minimize the message size in wireless communication */
     broadcast_ploytraj_pub_ = nh.advertise<traj_utils::MINCOTraj>("planning/broadcast_traj_send", 10);
@@ -94,6 +97,11 @@ namespace diff_planner
     exec_timer_.stop(); // To avoid blockage
     std_msgs::Empty heartbeat_msg;
     heartbeat_pub_.publish(heartbeat_msg);
+    if (mission_stopped_)
+    {
+      exec_timer_.start();
+      return;
+    }
 
     static int fsm_num = 0;
     fsm_num++;
@@ -419,6 +427,7 @@ namespace diff_planner
 
   void DiffReplanFSM::checkCollisionCallback(const ros::TimerEvent &e)
   {
+    if (mission_stopped_) return;
     // check ground height by the way
     if (enable_ground_height_measurement_)
     {
@@ -633,6 +642,8 @@ namespace diff_planner
 
     bool DiffReplanFSM::planNextWaypoint(const Eigen::Vector3d next_wp, bool flag_2replan)
   {
+    const unsigned int generation = mission_generation_;
+    if (mission_stopped_) return false;
     bool success = false;
     std::vector<Eigen::Vector3d> one_pt_wps;
     one_pt_wps.push_back(next_wp);
@@ -661,6 +672,7 @@ namespace diff_planner
         while (exec_state_ != EXEC_TRAJ)
         {
           ros::spinOnce();
+          if (mission_stopped_ || generation != mission_generation_) return false;
           ros::Duration(0.001).sleep();
           if (ros::Time::now() - start_time > timeout)
           {
@@ -727,6 +739,8 @@ namespace diff_planner
 
   void DiffReplanFSM::waypointCallback(const geometry_msgs::PoseStampedPtr &msg)
   {
+    if (mission_stopped_ || (!mission_epoch_.isZero() && msg->header.stamp <= mission_epoch_))
+      return;
     Eigen::Vector3d end_wp(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
     if (msg->header.frame_id != "world" || !end_wp.allFinite())
     {
@@ -781,6 +795,43 @@ namespace diff_planner
     enable_fail_safe_ = false;
   }
 
+  void DiffReplanFSM::clearMissionTarget()
+  {
+    ++mission_generation_;
+    have_target_ = have_trigger_ = have_new_target_ = touch_goal_ = false;
+    need_hover_stop_ = false;
+    replan_fail_count_ = 0;
+    wps_.clear();
+    wpt_id_ = 0;
+    planner_manager_->traj_.global_traj = GlobalTrajData();
+    planner_manager_->traj_.local_traj = LocalTrajData();
+    if (!mandatory_stop_)
+      changeFSMExecState(have_odom_ ? WAIT_TARGET : INIT, "Mission cleanup");
+  }
+
+  void DiffReplanFSM::missionStopCallback(const std_msgs::Empty &)
+  {
+    mission_stopped_ = true;
+    clearMissionTarget();
+  }
+
+  bool DiffReplanFSM::resetMissionCallback(std_srvs::Trigger::Request &,
+                                         std_srvs::Trigger::Response &response)
+  {
+    // A mandatory emergency stop has its own recovery procedure.
+    if (mandatory_stop_)
+    {
+      response.message = "Mandatory emergency stop remains latched; restart and inspect the planner";
+      return true;
+    }
+    clearMissionTarget();
+    mission_epoch_ = ros::Time::now();
+    mission_stopped_ = false;
+    response.success = true;
+    response.message = "Planner target and trajectories cleared; waiting for a new goal";
+    return true;
+  }
+
   void DiffReplanFSM::odometryCallback(const nav_msgs::OdometryConstPtr &msg)
   {
     odom_pos_(0) = msg->pose.pose.position.x;
@@ -796,6 +847,8 @@ namespace diff_planner
 
   void DiffReplanFSM::triggerCallback(const geometry_msgs::PoseStampedPtr &msg)
   {
+    if (mission_stopped_ || (!mission_epoch_.isZero() &&
+        (msg->header.stamp <= mission_epoch_ || !have_target_))) return;
     have_trigger_ = true;
     cout << "Triggered!" << endl;
   }

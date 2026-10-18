@@ -106,6 +106,33 @@ roslaunch diff_planner run_sim_single.launch mission_source:=remote
 [地面站动态航线接入](docs/GCS动态航线接入.md)。当前前端已有上传、开始和查询；
 执行中更新通过新增 `update` 接口使用，前端按钮尚待接入。
 
+### 2.3 降落后准备下一轮
+
+降落锁定和任务故障锁定需要显式复位。确认飞机已落地、未解锁，RC8 保持下档，
+且 MAVROS 飞控连接、落地状态和遥控器数据持续更新后，在机载工作空间执行：
+
+```bash
+./sh_files/reset_mission.sh
+# 等价：source devel/setup.bash 后执行 rosservice call /mission/reset '{}'
+```
+
+只有返回 `success: True` 才完成复位。复位统一清除任务锁定、规划器目标、旧轨迹和
+点选/远程航线，停止 LAND 重试；远程模式返回 `IDLE` 并更换 `map_session_id`。
+失败时保持锁定，按响应中的原因检查后重新调用；规划器强制急停仍需检查并重启。
+此服务不会起飞，也不会绕过真实飞控状态检查，即使仿真关闭了任务起飞门限。
+
+复位成功后重新核对原点和航线：远程模式取得新会话并重新上传，点选模式重新标点，
+预设模式重新确认 YAML 航点。先满足自动悬停、指令控制、摇杆回中条件，再单独将
+RC8 从下档拨到中档起飞，悬停确认后开始任务。仅拨中档不能解除降落锁定。
+本接口不复位独立云台执行器，已执行过的预设云台任务仍保留一次性保护。
+
+验证命令（均使用模拟飞控/遥控器话题，不启动实际飞控或电机）：
+
+```bash
+rostest multipoint flight_reset.test
+rostest multipoint clicked_flight_reset.test
+```
+
 ### 3. 单机预设点飞行：
 在 **[points.yaml](src/user_command/multipoint/config/points.yaml)** 的 `waypoints`
 列表中配置航点坐标、悬停时间和云台动作；`gimbal_mode: angle` 转到指定
