@@ -1,0 +1,20 @@
+<launch>
+  <!-- Independent payload modules; never launch a flight controller or mission here. -->
+  <arg name="module" />
+  <arg name="auto_record" default="false" />
+  <arg name="save_video" default="false" />
+  <group if="$(eval arg('module') == 'gimbal')">
+    <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen" required="true">
+      <rosparam command="load" file="$(find multipoint)/config/points.yaml" />
+      <param name="enable_auto_recording" value="$(arg auto_record)" type="bool" />
+      <param name="dry_run" value="false" type="bool" />
+    </node>
+  </group>
+  <group if="$(eval arg('module') == 'yolo')">
+    <include file="$(find multipoint)/launch/a8mini_detection.launch">
+      <arg name="enabled" value="true" />
+      <arg name="display" value="false" />
+      <arg name="save_video" value="$(arg save_video)" />
+    </include>
+  </group>
+</launch>

@@ -80,7 +80,7 @@ public:
     void checkStart(const std::string &map, const std::string &mission, uint32_t rev) const
     {
         requireIdentity(map, mission);
-        if (rev != revision || state != "READY")
+        if (rev != revision || state != "READY" || completed >= points.size())
             throw std::runtime_error("Start requires READY and the exact uploaded revision");
     }
 
@@ -88,8 +88,8 @@ public:
                 std::size_t from, const std::vector<Point> &suffix)
     {
         requireIdentity(map, mission);
-        if (state != "READY" && !active())
-            throw std::runtime_error("Update requires READY, FLYING or HOVERING");
+        if (state != "READY" && state != "COMPLETED" && !active())
+            throw std::runtime_error("Update requires READY, COMPLETED, FLYING or HOVERING");
         if (revision == std::numeric_limits<uint32_t>::max() || rev != revision + 1)
             throw std::runtime_error("Update revision must be current revision + 1");
         if (from > points.size() || from < completed ||
@@ -98,11 +98,28 @@ public:
         std::vector<Point> candidate(points.begin(), points.begin() + from);
         candidate.insert(candidate.end(), suffix.begin(), suffix.end());
         validate(candidate);
-        if (active() && candidate.size() <= completed)
+        if ((active() || completed > 0) && candidate.size() <= completed)
             throw std::runtime_error("Update must retain an uncompleted waypoint");
         points.swap(candidate);
         revision = rev;
-        reason.clear();
+        if (state == "COMPLETED") state = "READY";
+        reason = completed > 0 && state == "READY" ? "Appended route ready; explicit start resumes unfinished waypoints" : "";
+    }
+
+    void prepareReturn(const std::string &mission, const Point &home)
+    {
+        if (state != "IDLE" && state != "READY" && state != "COMPLETED" && !active())
+            throw std::runtime_error("Cannot return from a failed or landing mission");
+        if (mission.empty() || mission.size() > 80 || mission_ids_.count(mission))
+            throw std::runtime_error("Return requires a new mission ID");
+        validate({home});
+        points = {home};
+        mission_ids_.insert(mission);
+        id = mission;
+        revision = 1;
+        completed = 0;
+        state = "FLYING";
+        reason = "Returning to takeoff position; hover on arrival";
     }
 
     void invalidate(const std::string &new_session, const std::string &why)

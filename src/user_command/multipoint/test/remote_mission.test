@@ -2,7 +2,7 @@
   <!-- No motors, MAVROS connection, camera or actual planner: flight topics are mocked. -->
   <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
     <param name="mission_source" value="remote" />
-    <param name="enable_rc" value="false" />
+    <param name="enable_rc" value="true" />
     <param name="require_flight_ready" value="true" />
     <param name="position_tolerance" value="0.2" />
     <param name="arrival_stable_sec" value="0.1" />
@@ -12,5 +12,5 @@
     <arg name="port" value="18765" />
   </include>
   <test pkg="multipoint" type="test_remote_integration.py" test-name="remote_integration"
-        name="remote_integration" time-limit="50" />
+        name="remote_integration" time-limit="75" />
 </launch>

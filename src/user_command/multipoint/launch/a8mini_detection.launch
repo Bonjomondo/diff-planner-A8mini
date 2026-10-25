@@ -2,9 +2,15 @@
     <arg name="yaml_path" default="$(find multipoint)/config/points.yaml" />
     <arg name="detection_config" default="$(find multipoint)/config/a8mini_detection.yaml" />
     <arg name="model" default="$(find multipoint)/models/yolo11s.engine" />
+    <arg name="enabled" default="" />
+    <arg name="display" default="" />
+    <arg name="save_video" default="" />
     <node pkg="multipoint" name="a8mini_detection" type="a8mini_detection_node.py" output="screen">
         <rosparam command="load" file="$(arg detection_config)" />
         <rosparam command="load" file="$(arg yaml_path)" />
         <param name="model" value="$(arg model)" />
+        <param if="$(eval arg('enabled') != '')" name="enable_realtime_detection" value="$(arg enabled)" type="bool" />
+        <param if="$(eval arg('display') != '')" name="display" value="$(arg display)" type="bool" />
+        <param if="$(eval arg('save_video') != '')" name="save_detection_video" value="$(arg save_video)" type="bool" />
     </node>
 </launch>

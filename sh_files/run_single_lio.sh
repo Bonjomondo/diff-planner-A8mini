@@ -9,6 +9,15 @@ unsetopt BG_NICE
 trap 'exit 130' INT TERM HUP
 cd "${SCRIPT_DIR:h}" || exit 1
 source devel/setup.zsh || exit 1
+# Non-interactive SSH/services do not inherit ~/.bashrc hardware exports.
+if [[ -r "${SCRIPT_DIR}/onboard.env" ]]; then
+  source "${SCRIPT_DIR}/onboard.env" || exit 1
+fi
+if [[ -z "${BD_LIST:-}" ]]; then
+  echo "[startup] ERROR: Configure BD_LIST in sh_files/onboard.env before starting the MID360." >&2
+  exit 1
+fi
+export BD_LIST
 # Device access must be configured once (dialout/udev), not chmod /dev/tty*.
 if [[ ! -r /dev/ttyACM0 || ! -w /dev/ttyACM0 ]]; then
   echo "[startup] ERROR: /dev/ttyACM0 must exist and be readable/writable by this user." >&2
@@ -31,10 +40,7 @@ fi
 # Priority: env var > YAML > default (true)
 A8MINI_START_GIMBAL_NODE="${A8MINI_START_GIMBAL_NODE:-${_yaml_gimbal:-true}}"
 A8MINI_START_DETECTION="${A8MINI_START_DETECTION:-${_yaml_detection:-true}}"
-# When gimbal is disabled, detection also cannot work (no RTSP source).
-if [[ "${A8MINI_START_GIMBAL_NODE}" == "false" ]]; then
-  A8MINI_START_DETECTION="false"
-fi
+# Detection uses the camera video stream independently of the gimbal controller.
 MISSION_SOURCE="${MISSION_SOURCE:-preset}"
 echo "[startup] Configuration: gimbal=${A8MINI_START_GIMBAL_NODE} detection=${A8MINI_START_DETECTION} mission_source=${MISSION_SOURCE}"
 typeset -a LAUNCH_PIDS LAUNCH_NAMES
@@ -146,7 +152,14 @@ start_launch multipoint multipointplan_exp_lio.launch \
   start_detection:="${A8MINI_START_DETECTION}"
 sleep 2
 check_launches || exit 1
-start_launch diff_planner exp_rviz.launch rviz_args:="${UAV_RVIZ_ARGS:-}"
+# Visualization is optional and must never be part of the critical flight group.
+UAV_START_RVIZ="${UAV_START_RVIZ:-$([[ "${MISSION_SOURCE}" == "remote" ]] && echo false || echo true)}"
+if [[ "${UAV_START_RVIZ}" == "true" ]]; then
+  roslaunch diff_planner exp_rviz.launch rviz_args:="${UAV_RVIZ_ARGS:-}" &
+  echo "[startup] Optional RViz launched independently; its exit will not stop flight."
+else
+  echo "[startup] Headless mode: RViz disabled."
+fi
 while check_launches; do
   sleep 1
 done

@@ -9,7 +9,7 @@ import uuid
 import rospy
 import rostest
 from geometry_msgs.msg import PoseStamped
-from mavros_msgs.msg import ExtendedState, State
+from mavros_msgs.msg import ExtendedState, State, RCIn
 from multipoint.msg import MissionStatus
 from nav_msgs.msg import Odometry
 from quadrotor_msgs.msg import TakeoffLand
@@ -22,7 +22,9 @@ def point(ident, x, hover=0):
 
 class RemoteIntegrationTest(unittest.TestCase):
     def setUp(self):
-        self.position = (0., 0., 1.)
+        self.position = (.3, -.2, 0.)
+        self.rc8 = 1999
+        self.command_mode = False
         self.airborne = False
         self.publish_odom = True
         self.goals, self.stops, self.takeoff_land = [], [], []
@@ -32,6 +34,7 @@ class RemoteIntegrationTest(unittest.TestCase):
             rospy.Subscriber('/planning/stop', Empty, self.stops.append),
             rospy.Subscriber('/px4ctrl/takeoff_land', TakeoffLand, self.takeoff_land.append),
             rospy.Subscriber('/mission/remote/status', MissionStatus, self.on_status)]
+        self.rc = rospy.Publisher('/mavros/rc/in', RCIn, queue_size=1)
         self.odom = rospy.Publisher('/test/odom', Odometry, queue_size=1)
         self.fcu = rospy.Publisher('/mavros/state', State, queue_size=1)
         self.extended = rospy.Publisher('/mavros/extended_state', ExtendedState, queue_size=1)
@@ -76,6 +79,10 @@ class RemoteIntegrationTest(unittest.TestCase):
                 rospy.sleep(.1)
 
     def tick(self, _):
+        rc = RCIn()
+        rc.channels = [1500] * 9
+        rc.channels[5], rc.channels[7] = 1999, self.rc8
+        self.rc.publish(rc)
         state = State()
         state.connected, state.armed = True, self.airborne
         state.mode = 'OFFBOARD' if self.airborne else 'ALTCTL'
@@ -83,8 +90,8 @@ class RemoteIntegrationTest(unittest.TestCase):
         extended = ExtendedState()
         extended.landed_state = ExtendedState.LANDED_STATE_IN_AIR if self.airborne else ExtendedState.LANDED_STATE_ON_GROUND
         self.extended.publish(extended)
-        self.controller.publish(String(data='AUTO_HOVER' if self.airborne else 'MANUAL_CTRL'))
-        self.ready.publish(Bool(data=self.airborne))
+        self.controller.publish(String(data=('CMD_CTRL' if self.command_mode else 'AUTO_HOVER') if self.airborne else 'MANUAL_CTRL'))
+        self.ready.publish(Bool(data=self.airborne and not self.command_mode))
         self.heartbeat.publish(Empty())
         if self.publish_odom:
             odom = Odometry()
@@ -112,6 +119,8 @@ class RemoteIntegrationTest(unittest.TestCase):
         self.assertFalse(self.goals)
         self.assertFalse(self.takeoff_land)  # Upload must never arm/take off.
         self.assertFalse(self.command('start')['accepted'])  # Ground trigger rejected.
+        self.assertFalse(self.command('return')['accepted'])
+        self.position = (.3, -.2, 1.)
         self.airborne = True
         self.until(lambda: self.status.flight_ready)
         self.assertFalse(self.command('start', revision=2)['accepted'])
@@ -153,8 +162,60 @@ class RemoteIntegrationTest(unittest.TestCase):
         self.assertEqual(ack['mission']['revision'], 3)
         self.assertEqual(ack['mission']['current_waypoint_id'], 0)
         self.assertFalse(self.command('start', revision=3)['accepted'])
+        # Completion-time appends preserve the flown prefix and wait for explicit start.
+        before = len(self.goals)
+        append_id = str(uuid.uuid4())
+        addition = dict(frame_id='world', replace_from=2, waypoints=[point(9, 5)])
+        self.assertFalse(self.command('update', revision=4, frame_id='world', replace_from=1,
+                                      waypoints=[point(9, 5)])['accepted'])
+        ack = self.command('update', revision=4, request_id=append_id, **addition)
+        self.assertTrue(ack['accepted'])
+        self.assertEqual((ack['mission']['state'], ack['mission']['completed'], ack['mission']['total']), ('READY', 2, 3))
+        self.assertTrue(self.command('update', revision=4, request_id=append_id, **addition)['accepted'])
+        rospy.sleep(.2)
+        self.assertEqual(len(self.goals), before)  # Accepting an append cannot fly by itself.
+        self.assertTrue(self.command('start', revision=4)['accepted'])
+        self.until(lambda: len(self.goals) == before + 1)
+        self.assertEqual(self.goals[-1].pose.position.x, 5)  # Skip already flown points 1 and 4.
+        self.position = (5., 0., 1.)
+        self.until(lambda: self.status.state == 'COMPLETED')
+        # RC8 UP -> MIDDLE returns to recorded ground XY at the CURRENT altitude.
+        self.rc8 = 999
+        rospy.sleep(.3)
+        self.position = (5., 0., 1.3)
+        self.command_mode = True  # Return also works during a moving CMD_CTRL segment.
+        rospy.sleep(.2)
+        self.rc8 = 1499
+        self.until(lambda: len(self.goals) == before + 2)
+        home = self.goals[-1].pose.position
+        self.assertAlmostEqual(home.x, .3)
+        self.assertAlmostEqual(home.y, -.2)
+        self.assertAlmostEqual(home.z, 1.3)
+        self.until(lambda: self.status.mission_id.startswith('return-'))
+        home_id = self.status.mission_id
+        self.assertTrue(self.command('return', mission=home_id)['accepted'])
+        self.assertFalse(self.command('update', mission=home_id, revision=2, frame_id='world',
+                                      replace_from=1, waypoints=[point(8, 6)])['accepted'])
+        self.assertFalse(self.command('return', mission='route-1', revision=4)['accepted'])
+        rospy.sleep(.2)
+        self.assertEqual(len(self.goals), before + 2)  # Duplicate return never republishes.
+        self.position = (.3, -.2, 1.3)
+        self.command_mode = False
+        self.until(lambda: self.status.state == 'COMPLETED')
+        self.assertIn('Returned', self.status.reason)
+        self.assertFalse(self.takeoff_land)  # Return hovers; no arm/takeoff/LAND.
         self.assertTrue(self.command('upload', mission='route-2', frame_id='world', waypoints=[point(8, 6)])['accepted'])
         self.assertTrue(self.command('start', mission='route-2')['accepted'])
+        # The TCP return operation must preempt an active route too, without a hover-ready flag.
+        self.position = (1., .2, 1.3)
+        self.command_mode = True
+        rospy.sleep(.15)
+        before_return = len(self.goals)
+        self.assertTrue(self.command('return', mission='route-2')['accepted'])
+        self.until(lambda: len(self.goals) == before_return + 1)
+        self.assertAlmostEqual(self.goals[-1].pose.position.x, .3)
+        self.assertAlmostEqual(self.goals[-1].pose.position.y, -.2)
+        self.assertAlmostEqual(self.goals[-1].pose.position.z, 1.3)
         old_session = self.status.map_session_id
         self.publish_odom = False
         self.until(lambda: self.status.state == 'FAILED')

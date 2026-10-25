@@ -313,17 +313,26 @@ fi
 "${STACK_SCRIPT}" &
 STACK_PID=$!
 
-if ! wait_for_stack_ready; then
-    exit 1
-fi
-
 if [[ "${RUN_MODE}" == "rc" ]]; then
-    echo "[one-click] 默认模式：未发送起飞指令，等待 RC8 触发。"
-    echo "[one-click] 请把 RC8 从 DOWN 拨到 MIDDLE 请求自动起飞，确认悬停后再执行航线。"
-    echo "[one-click] 标点用 Publish Point，开始用 2D Nav Goal 或 RC8 UP；按 Ctrl+C 结束并保存日志。"
+    # RC/manual startup must not retain a ground-only preflight deadline after
+    # the pilot has taken off. px4ctrl and the mission executor keep their gates.
+    echo "[one-click] 默认模式：未发送起飞指令，由 RC8 触发；不会因起飞前检查超时停止飞行栈。"
+    echo "[one-click] 起飞条件由 px4ctrl 检查；确认悬停后再执行航线。"
     wait "${STACK_PID}"
     STACK_EXIT_STATUS=$?
     exit "${STACK_EXIT_STATUS}"
+fi
+
+if ! wait_for_stack_ready; then
+    # A pilot may have taken off using RC while the explicit --takeoff mode
+    # was still waiting. A failed preflight check must never kill a live stack.
+    if stack_process_running; then
+        echo "[one-click] 起飞前检查未通过；不发送自动起飞指令，保留飞行栈供遥控接管和检查。" >&2
+        wait "${STACK_PID}"
+        STACK_EXIT_STATUS=$?
+        exit "${STACK_EXIT_STATUS}"
+    fi
+    exit 1
 fi
 
 if ! send_takeoff; then

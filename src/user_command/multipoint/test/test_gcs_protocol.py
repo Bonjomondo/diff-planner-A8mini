@@ -42,7 +42,7 @@ class ProtocolTest(unittest.TestCase):
         command = validate_command(upload())
         self.assertEqual(command['waypoints'][0]['x'], 1.25)
         self.assertEqual(command['replace_from'], 0)
-        for operation in ('start', 'get_status'):
+        for operation in ('start', 'get_status', 'return'):
             obj = upload()
             obj['operation'] = operation
             self.assertEqual(validate_command(obj)['waypoints'], [])
