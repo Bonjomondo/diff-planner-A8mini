@@ -20,7 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(FILES RemoteWaypoint.msg MissionStatus.msg)
 add_service_files(FILES MissionCommand.srv)
-generate_messages()
+generate_messages(DEPENDENCIES geometry_msgs)
 
 catkin_package(
   CATKIN_DEPENDS geometry_msgs mavros_msgs message_runtime nav_msgs quadrotor_msgs roscpp rospy sensor_msgs std_msgs tf
@@ -43,6 +43,19 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest(test/remote_mission.test)
   add_rostest(test/remote_cancel.test)
   add_rostest(test/point_roundtrip_planner.test)
+  add_rostest(test/automatic_cancel_takeoff.test)
+  add_rostest(test/automatic_takeoff_odom_loss.test)
+  add_rostest(test/automatic_takeoff_rc_loss.test)
+  add_rostest(test/automatic_takeoff_rejected.test)
+  add_rostest(test/automatic_cancel_landing.test)
+  add_rostest(test/automatic_landing_timeout.test)
+  add_rostest(test/automatic_landing_blocked.test)
+  add_rostest(test/automatic_roundtrip.test)
+  add_rostest(test/automatic_takeoff_corridor_blocked.test)
+  add_rostest(test/automatic_position_limit_removed.test)
+  add_rostest(test/automatic_controller.test)
+  add_rostest(test/automatic_controller_delayed.test)
+  add_rostest(test/automatic_roundtrip_delayed.test)
   add_executable(test_mission_guard test/test_mission_guard.cpp)
   target_compile_options(test_mission_guard PRIVATE -UNDEBUG)
   add_test(NAME mission_guard COMMAND test_mission_guard)

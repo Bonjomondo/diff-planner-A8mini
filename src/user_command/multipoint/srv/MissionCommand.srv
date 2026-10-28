@@ -7,6 +7,9 @@ string frame_id
 RemoteWaypoint[] waypoints
 # Zero-based index. update replaces [replace_from, end) atomically.
 uint32 replace_from
+# Explicit automatic lifecycle, bound to the uploaded mission identity.
+bool automatic
+geometry_msgs/Point ground_origin
 ---
 bool accepted
 string reason

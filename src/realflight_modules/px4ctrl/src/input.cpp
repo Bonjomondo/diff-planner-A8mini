@@ -219,6 +219,7 @@ State_Data_t::State_Data_t()
 void State_Data_t::feed(mavros_msgs::StateConstPtr pMsg)
 {
 
+    rcv_stamp = ros::Time::now();
     current_state = *pMsg;
 }
 
@@ -228,6 +229,7 @@ ExtendedState_Data_t::ExtendedState_Data_t()
 
 void ExtendedState_Data_t::feed(mavros_msgs::ExtendedStateConstPtr pMsg)
 {
+    rcv_stamp = ros::Time::now();
     current_extended_state = *pMsg;
 }
 

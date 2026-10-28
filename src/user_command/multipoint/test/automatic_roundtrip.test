@@ -1,0 +1,27 @@
+<launch>
+  <arg name="scenario" default="complete" />
+  <arg name="preparation_delay" default="0.0" />
+  <group if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')">
+  <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
+    <param name="mission_source" value="remote" />
+    <param name="automatic_roundtrip" value="true" />
+    <param name="enable_rc" value="false" />
+    <param name="start_plan" value="0" /><param name="back_plan" value="0" />
+    <param name="require_flight_ready" value="true" />
+    <param name="require_map_coordinates" value="true" />
+    <param name="enable_gimbal_actions" value="false" />
+    <param name="position_tolerance" value="0.15" />
+    <param name="arrival_stable_sec" value="0.15" />
+    <param name="land_command_retry_sec" value="0.3" />
+    <param name="takeoff_timeout_sec" value="5.0" />
+    <param name="landing_timeout_sec" value="3.0" />
+    <remap from="odom_topic" to="/ekf/ekf_odom" />
+  </node>
+  <include file="$(find multipoint)/launch/gcs_gateway.launch"><arg name="port" value="18765" /></include>
+  <test pkg="multipoint" type="test_automatic_roundtrip.py" name="automatic_roundtrip"
+        test-name="automatic_roundtrip" time-limit="30">
+    <param name="scenario" value="$(arg scenario)" />
+    <param name="preparation_delay" value="$(arg preparation_delay)" />
+  </test>
+  </group>
+</launch>

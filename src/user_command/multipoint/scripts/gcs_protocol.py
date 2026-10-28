@@ -74,6 +74,18 @@ def validate_command(obj):
         if type(obj['require_map_alignment']) is not bool:
             raise ProtocolError('require_map_alignment must be boolean')
         result['require_map_alignment'] = obj['require_map_alignment']
+    if 'automatic' in obj:
+        if type(obj['automatic']) is not bool:
+            raise ProtocolError('automatic must be boolean')
+        result['automatic'] = obj['automatic']
+    if operation == 'upload' and result.get('automatic', False):
+        ground = obj.get('ground_origin')
+        if not isinstance(ground, dict) or set(ground) != {'x', 'y', 'z'}:
+            raise ProtocolError('automatic upload requires ground_origin x/y/z')
+        for value in ground.values():
+            if type(value) not in (int, float) or abs(value) > 1e6 or not math.isfinite(value):
+                raise ProtocolError('ground_origin must contain bounded finite numbers')
+        result['ground_origin'] = dict(ground)
     if operation in ('upload', 'update'):
         if obj.get('frame_id') != 'world':
             raise ProtocolError('frame_id must be world')

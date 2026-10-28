@@ -1,11 +1,14 @@
 <launch>
-  <!-- Task adapter only. Does not start flight control, arm or take off. -->
+  <!-- Automatic task adapter only; sensors/planner/controller are started separately. -->
+  <param name="/multipointplan/automatic_roundtrip" value="true" />
   <param name="/multipointplan/require_map_coordinates" value="true" />
   <include file="$(find multipoint)/launch/multipointplan_exp_lio.launch">
     <arg name="mission_source" value="remote" />
     <arg name="start_gimbal_node" value="false" />
     <arg name="start_detection" value="false" />
     <arg name="enable_rc" value="false" />
+    <arg name="start_plan" value="0" />
+    <arg name="back_plan" value="0" />
     <arg name="next_distance" value="0.2" />
   </include>
 </launch>

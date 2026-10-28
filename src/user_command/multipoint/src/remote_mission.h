@@ -26,7 +26,7 @@ public:
     std::vector<Point> points;
     double max_abs_xy = 30.0, min_z = 0.3, max_z = 2.5;
 
-    bool active() const { return state == "FLYING" || state == "HOVERING"; }
+    bool active() const { return state == "FLYING" || state == "HOVERING" || state == "TAKING_OFF" || state == "LANDING"; }
 
     void validateLimits() const
     {
@@ -88,7 +88,7 @@ public:
                 std::size_t from, const std::vector<Point> &suffix)
     {
         requireIdentity(map, mission);
-        if (state != "READY" && !active())
+        if (state != "READY" && state != "FLYING" && state != "HOVERING")
             throw std::runtime_error("Update requires READY, FLYING or HOVERING");
         if (revision == std::numeric_limits<uint32_t>::max() || rev != revision + 1)
             throw std::runtime_error("Update revision must be current revision + 1");

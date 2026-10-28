@@ -83,6 +83,7 @@ public:
 class State_Data_t
 {
 public:
+  ros::Time rcv_stamp;
   mavros_msgs::State current_state;
   mavros_msgs::State state_before_offboard;
 
@@ -93,6 +94,7 @@ public:
 class ExtendedState_Data_t
 {
 public:
+  ros::Time rcv_stamp;
   mavros_msgs::ExtendedState current_extended_state;
 
   ExtendedState_Data_t();

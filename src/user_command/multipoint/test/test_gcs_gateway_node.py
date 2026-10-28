@@ -15,6 +15,7 @@ class Message:
     def __init__(self, **fields):
         self.connected = self.armed = False
         self.mode = ''
+        self.ground_origin = types.SimpleNamespace(x=0., y=0., z=0.)
         self.__dict__.update(fields)
 
 
@@ -108,6 +109,17 @@ class AdapterTest(unittest.TestCase):
         self.assertTrue(accepted)
         self.assertEqual(status['mission_id'], 'route')
         self.assertEqual(reason, 'Accepted')
+
+    def test_automatic_metadata_is_forwarded_without_starting(self):
+        response = Message(accepted=True, reason='Accepted', mission=self.message)
+        self.backend.proxy = Mock(return_value=response)
+        command = self.command()
+        command.update(operation='upload', automatic=True, ground_origin=dict(x=.4, y=-.2, z=.1))
+        self.assertTrue(self.backend.command(command)[0])
+        request = self.backend.proxy.call_args[0][0]
+        self.assertTrue(request.automatic)
+        self.assertEqual(request.ground_origin.z, .1)
+        self.assertEqual(request.operation, 'upload')
 
     def test_stale_and_unknown_service_results(self):
         self.backend.proxy = Mock(side_effect=RosError('lost reply'))

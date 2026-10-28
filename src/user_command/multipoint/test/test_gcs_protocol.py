@@ -50,6 +50,17 @@ class ProtocolTest(unittest.TestCase):
         obj.update(operation='update', revision=2, replace_from=1, waypoints=[])
         self.assertEqual(validate_command(obj)['replace_from'], 1)
 
+    def test_explicit_automatic_upload_and_ground_origin(self):
+        obj = upload()
+        obj.update(automatic=True, ground_origin=dict(x=0., y=0., z=.2))
+        self.assertEqual(validate_command(obj)['ground_origin']['z'], .2)
+        for bad in (None, {}, dict(x=0., y=0.), dict(x=True, y=0., z=0.),
+                    dict(x=10**400, y=0., z=0.), dict(x=0., y=0., z=float('nan'))):
+            with self.subTest(bad=str(bad)), self.assertRaises(ProtocolError):
+                validate_command(dict(obj, ground_origin=bad))
+        with self.assertRaises(ProtocolError):
+            validate_command(dict(obj, automatic='true'))
+
     def test_strict_numbers_frames_and_envelopes(self):
         for field, value in [('protocol', True), ('protocol', 1), ('request_id', ''),
                              ('map_session_id', ''), ('mission_id', 'm' * 81),

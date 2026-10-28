@@ -1,0 +1,8 @@
+<launch>
+  <!-- All MAVROS topic/service names are resolved on isolated 11411; no MAVROS node. -->
+  <include if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')" file="$(find px4ctrl)/launch/run_ctrl_indoor_automatic.launch">
+    <arg name="takeoff_height" value="1.0" />
+  </include>
+  <test pkg="multipoint" type="test_automatic_controller.py" name="automatic_controller"
+        test-name="automatic_controller" time-limit="25" />
+</launch>

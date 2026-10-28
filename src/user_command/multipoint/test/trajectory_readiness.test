@@ -1,0 +1,6 @@
+<launch>
+  <group if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')">
+    <test pkg="multipoint" type="test_trajectory_readiness.py" name="trajectory_readiness"
+          test-name="trajectory_readiness" time-limit="35" />
+  </group>
+</launch>

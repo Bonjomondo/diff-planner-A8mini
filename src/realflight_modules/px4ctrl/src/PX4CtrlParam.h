@@ -53,6 +53,8 @@ public:
 	{
 		bool enable;
 		bool enable_auto_arm;
+        bool require_explicit_takeoff = false;
+        bool hold_attitude_during_spool = false;
 		bool no_RC;
 		double height;
 		double speed;

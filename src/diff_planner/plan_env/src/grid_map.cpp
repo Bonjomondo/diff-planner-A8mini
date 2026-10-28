@@ -8,6 +8,9 @@ void GridMap::initMap(ros::NodeHandle &nh)
   ros::param::param("/indoor_mission/enabled", fence_enabled, false);
   ros::param::get("/indoor_mission/bounds", fence);
   mission_box_.configure(fence_enabled, fence);
+  ros::param::param("/indoor_mission/skip_validation", skip_mission_validation_, false);
+  if (skip_mission_validation_)
+    ROS_WARN("[GridMap] MISSION VALIDATION BYPASS ENABLED: fence/observed checks skipped; inflated obstacles remain");
   mission_fence_pub_ = node_.advertise<std_msgs::Float64MultiArray>("/indoor_mission/fence", 1, true);
   std_msgs::Float64MultiArray fence_message;
   fence_message.data = mission_box_.bounds;

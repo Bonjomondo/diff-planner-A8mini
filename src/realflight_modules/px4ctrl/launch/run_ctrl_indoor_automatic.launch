@@ -1,0 +1,20 @@
+<launch>
+  <!-- Explicit deployment only. Opening the GCS never launches this controller. -->
+  <arg name="takeoff_height" />
+  <!-- Opt-in candidate. Leave disabled until ground/hardware validation. -->
+  <arg name="hold_attitude_during_spool" default="false" />
+  <node pkg="px4ctrl" type="px4ctrl_node" name="px4ctrl" output="screen">
+    <rosparam command="load" file="$(find px4ctrl)/config/ctrl_param_fpv.yaml" />
+    <param name="auto_takeoff_land/enable" value="true" />
+    <param name="auto_takeoff_land/enable_auto_arm" value="true" />
+    <param name="auto_takeoff_land/no_RC" value="false" />
+    <param name="auto_takeoff_land/require_explicit_takeoff" value="true" />
+    <param name="auto_takeoff_land/hold_attitude_during_spool" value="$(arg hold_attitude_during_spool)" />
+    <param name="auto_takeoff_land/takeoff_height" value="$(arg takeoff_height)" />
+    <param name="max_manual_vel" value="0.3" />
+    <param name="max_angle" value="20.0" />
+    <remap from="~odom" to="/ekf/ekf_odom" />
+    <remap from="~cmd" to="/setpoints_cmd" />
+    <remap from="/mavros/cmd/command" to="/indoor_roundtrip/disabled_fcu_reboot" />
+  </node>
+</launch>

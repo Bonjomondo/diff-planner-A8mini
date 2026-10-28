@@ -1,0 +1,10 @@
+<launch>
+  <!-- Slow real-world FCU feedback; all sensors/services stay on isolated 11411. -->
+  <include if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')" file="$(find px4ctrl)/launch/run_ctrl_indoor_automatic.launch">
+    <arg name="takeoff_height" value="1.0" />
+  </include>
+  <test pkg="multipoint" type="test_automatic_controller.py" name="automatic_controller_delayed"
+        test-name="automatic_controller_delayed" time-limit="40">
+    <param name="state_feedback_delay" value="0.7" />
+  </test>
+</launch>

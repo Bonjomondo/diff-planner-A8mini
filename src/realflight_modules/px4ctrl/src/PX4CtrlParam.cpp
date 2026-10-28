@@ -43,6 +43,8 @@ void Parameter_t::config_from_ros_handle(const ros::NodeHandle &nh)
 	read_essential_param(nh, "rc_reverse/yaw", rc_reverse.yaw);
 	read_essential_param(nh, "rc_reverse/throttle", rc_reverse.throttle);
 
+	nh.param("auto_takeoff_land/require_explicit_takeoff", takeoff_land.require_explicit_takeoff, false);
+    nh.param("auto_takeoff_land/hold_attitude_during_spool", takeoff_land.hold_attitude_during_spool, false);
 	read_essential_param(nh, "auto_takeoff_land/enable", takeoff_land.enable);
     read_essential_param(nh, "auto_takeoff_land/enable_auto_arm", takeoff_land.enable_auto_arm);
     read_essential_param(nh, "auto_takeoff_land/no_RC", takeoff_land.no_RC);

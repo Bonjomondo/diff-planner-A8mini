@@ -4,6 +4,7 @@
 #include <quadrotor_msgs/PositionCommand.h>
 #include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
 #include <algorithm>
@@ -12,6 +13,9 @@
 using namespace Eigen;
 
 ros::Publisher pos_cmd_pub;
+ros::Publisher output_ready_pub;
+
+void publishOutputReady();
 
 quadrotor_msgs::PositionCommand cmd;
 // double pos_gain[3] = {0, 0, 0};
@@ -51,6 +55,17 @@ void stopCommandOutput(const char *reason)
   landing_requested_ = true;
   receive_traj_ = false;
   receive_yaw_ = false;
+  publishOutputReady();
+}
+
+// This reports eligibility to accept trajectories, not proof of tracking quality.
+// Non-latched periodic feedback prevents a restarted/dead server appearing ready.
+void publishOutputReady()
+{
+  const double age = (ros::Time::now() - heartbeat_time_).toSec();
+  std_msgs::Bool ready;
+  ready.data = !landing_requested_ && !heartbeat_time_.isZero() && age >= 0.0 && age <= 0.5;
+  output_ready_pub.publish(ready);
 }
 
 void planningStopCallback(const std_msgs::EmptyConstPtr &)
@@ -399,6 +414,10 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "traj_server");
   // ros::NodeHandle node;
   ros::NodeHandle nh("~");
+
+  output_ready_pub = nh.advertise<std_msgs::Bool>("output_ready", 1);
+  ros::Timer ready_timer = nh.createTimer(ros::Duration(0.05),
+      [](const ros::TimerEvent &) { publishOutputReady(); });
 
   ros::Subscriber poly_traj_sub = nh.subscribe("planning/trajectory", 10, polyTrajCallback);
   ros::Subscriber yaw_sub = nh.subscribe("/planning/yaw", 10, yawCallback);

@@ -59,11 +59,16 @@ public:
 		AUTO_HOVER, // px4ctrl is actived, it will keep the drone hover from odom measurments while waiting for commands from PositionCommand topic.
 		CMD_CTRL,	// px4ctrl is actived, and controling the drone.
 		AUTO_TAKEOFF,
-		AUTO_LAND
+		AUTO_LAND,
+        PREPARING_TAKEOFF // Ground-only wait for fresh OFFBOARD feedback; no arming yet.
 	};
 
 	PX4CtrlFSM(Parameter_t &, Controller &);
 	void process();
+    bool abort_automatic = false;
+    bool ground_spool_attitude_held = false;
+    bool automaticControlOk(const ros::Time &now);
+    bool automaticTakeoffReady(const ros::Time &now);
 	bool rc_is_received(const ros::Time &now_time);
 	bool cmd_is_received(const ros::Time &now_time);
 	bool odom_is_received(const ros::Time &now_time);
@@ -76,6 +81,9 @@ public:
 private:
 	State_t state; // Should only be changed in PX4CtrlFSM::process() function!
 	AutoTakeoffLand_t takeoff_land;
+    ros::Time takeoff_mode_request_stamp;
+    ros::WallTime takeoff_mode_request_wall;
+    bool groundTakeoffInputsOk(const ros::Time &now);
 
 	// ---- control related ----
 	Desired_State_t get_hover_des();

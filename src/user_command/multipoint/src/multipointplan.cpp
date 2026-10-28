@@ -10,6 +10,8 @@
 #include <multipoint/MissionCommand.h>
 #include <multipoint/MissionStatus.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/GetPlan.h>
+#include <std_msgs/Float64.h>
 #include <ros/serialization.h>
 #include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
@@ -109,6 +111,12 @@ public:
         pnh_.param("clicked_max_points", clicked_max_points_, 50);
         pnh_.param<std::string>("mission_source", mission_source_, "clicked");
         pnh_.param("enable_gimbal_actions", enable_gimbal_actions_, true);
+        pnh_.param("automatic_roundtrip", automatic_roundtrip_, false);
+        pnh_.param("takeoff_timeout_sec", takeoff_timeout_sec_, 35.0);
+        pnh_.param("landing_timeout_sec", landing_timeout_sec_, 60.0);
+        if (!finite(takeoff_timeout_sec_) || takeoff_timeout_sec_ <= 0 ||
+            !finite(landing_timeout_sec_) || landing_timeout_sec_ <= 0)
+            throw std::runtime_error("Invalid automatic flight timeouts");
         pnh_.param("require_flight_ready", require_flight_ready_, true);
         pnh_.param("require_map_coordinates", require_map_coordinates_, mission_source_ == "remote");
         map_ready_sub_ = nh_.subscribe<std_msgs::Bool>("/indoor_mission/map_ready", 1,
@@ -177,6 +185,11 @@ public:
                                   &MultipointPlanner::readyCallback, this);
         heartbeat_sub_ = nh_.subscribe("/drone_0_traj_server/heartbeat", 1,
                                       &MultipointPlanner::heartbeatCallback, this);
+        output_ready_sub_ = nh_.subscribe<std_msgs::Bool>("/drone_0_traj_server/output_ready", 1,
+            [this](const std_msgs::Bool::ConstPtr &m) {
+                output_ready_ = m->data;
+                output_ready_time_ = ros::WallTime::now();
+            });
         land_sub_ = nh_.subscribe("/mission/land", 1,
                                  &MultipointPlanner::landCallback, this);
         gimbal_done_sub_ = nh_.subscribe("/mission/gimbal_done", 10,
@@ -217,6 +230,13 @@ public:
             publishRemoteStatus();
         }
 
+        abort_automatic_pub_ = nh_.advertise<std_msgs::Empty>("/px4ctrl/abort_automatic", 1);
+        takeoff_ready_sub_ = nh_.subscribe<std_msgs::Bool>("/px4ctrl/takeoff_ready", 1,
+            [this](const std_msgs::Bool::ConstPtr &m) { takeoff_ready_ = m->data; takeoff_ready_time_ = ros::WallTime::now(); });
+        auto_control_sub_ = nh_.subscribe<std_msgs::Bool>("/px4ctrl/automatic_control_ok", 1,
+            [this](const std_msgs::Bool::ConstPtr &m) { auto_control_ok_ = m->data; auto_control_time_ = ros::WallTime::now(); });
+        takeoff_height_sub_ = nh_.subscribe<std_msgs::Float64>("/px4ctrl/takeoff_height", 1,
+            [this](const std_msgs::Float64::ConstPtr &m) { takeoff_height_ = m->data; takeoff_height_time_ = ros::WallTime::now(); });
         timer_ = nh_.createTimer(ros::Duration(0.05), &MultipointPlanner::timerCallback, this);
 
         ROS_INFO("Mission ready: %zu YAML waypoint(s), position tolerance %.2f m, "
@@ -249,6 +269,10 @@ private:
     multipoint::MissionStatus remoteStatus() const
     {
         multipoint::MissionStatus status;
+        status.automatic_supported = automatic_roundtrip_;
+        status.automatic = uploaded_automatic_;
+        status.takeoff_ready = automaticStartReady();
+        status.takeoff_height = fresh(takeoff_height_time_, .5) && finite(takeoff_height_) ? takeoff_height_ : 0.0;
         status.frame_id = goal_frame_id_;
         status.map_session_id = remote_mission_.session;
         status.mission_id = remote_mission_.id;
@@ -295,10 +319,122 @@ private:
         return route;
     }
 
+    bool automaticInputsReady() const
+    {
+        return mapCoordinatesReady() && odomFresh() && fresh(heartbeat_receive_time_, .5) &&
+            point_pub_.getNumSubscribers() > 0 && fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
+            fresh(extended_receive_time_, flight_state_timeout_sec_) && fcu_state_.connected &&
+            fresh(controller_receive_time_, .5) && fresh(auto_control_time_, .5) && auto_control_ok_;
+    }
+
+    bool trajectoryOutputReady() const
+    {
+        return output_ready_ && fresh(output_ready_time_, .3);
+    }
+
+    bool automaticStartReady() const
+    {
+        return automatic_roundtrip_ && trajectoryOutputReady() && !landing_latched_ && !mission_fault_ && automaticInputsReady() &&
+            !fcu_state_.armed && landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND &&
+            controller_state_ == "MANUAL_CTRL" && fresh(takeoff_ready_time_, .5) && takeoff_ready_ &&
+            fresh(takeoff_height_time_, .5) && finite(takeoff_height_) && takeoff_height_ > .1 &&
+            odom_velocity_.norm() <= .1 && takeoff_land_pub_.getNumSubscribers() > 0;
+    }
+
+    // Endpoint-only check; this does not check the complete vertical segment.
+    bool verticalCorridorEndpointsClear(const Eigen::Vector3d &ground, const Eigen::Vector3d &hover)
+    {
+        nav_msgs::GetPlan query;
+        query.request.start.header.frame_id = query.request.goal.header.frame_id = "world";
+        query.request.start.pose.orientation.w = query.request.goal.pose.orientation.w = 1.;
+        query.request.start.pose.position.x = ground.x(); query.request.start.pose.position.y = ground.y();
+        query.request.start.pose.position.z = ground.z();
+        query.request.goal.pose.position.x = hover.x(); query.request.goal.pose.position.y = hover.y();
+        query.request.goal.pose.position.z = hover.z();
+        auto check = nh_.serviceClient<nav_msgs::GetPlan>("/indoor_mission/check_endpoints");
+        return check.call(query) && query.response.plan.poses.size() == 2;
+    }
+
+    void beginAutomaticTakeoff()
+    {
+        if (!automaticStartReady() || !uploaded_automatic_ ||
+            (odom_position_ - ground_origin_).norm() > .10)
+            throw std::runtime_error("Automatic start requires unchanged ground position, fresh preflight/RC and disarmed FCU");
+        const auto &home = remote_mission_.points.back();
+        const Eigen::Vector3d hover(home.x, home.y, home.z);
+        if (std::abs(home.z - ground_origin_.z() - takeoff_height_) > .03 ||
+            !verticalCorridorEndpointsClear(ground_origin_, hover))
+            throw std::runtime_error("Takeoff height changed or vertical takeoff/landing endpoints are occupied, unknown or outside fence");
+        remote_mission_.state = "TAKING_OFF";
+        automatic_phase_time_ = ros::WallTime::now();
+        last_corridor_check_ = ros::WallTime();
+        auto_hover_since_ = ros::WallTime();
+        takeoff_seen_ = false;
+        quadrotor_msgs::TakeoffLand command;
+        command.takeoff_land_cmd = quadrotor_msgs::TakeoffLand::TAKEOFF;
+        takeoff_land_pub_.publish(command); // One shot only, after explicit start.
+    }
+
+    void tickAutomaticFlight()
+    {
+        if (!uploaded_automatic_ || (remote_mission_.state != "TAKING_OFF" && remote_mission_.state != "LANDING")) return;
+        const bool taking_off = remote_mission_.state == "TAKING_OFF";
+        if (!taking_off && fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
+            fresh(extended_receive_time_, flight_state_timeout_sec_) && fcu_state_.connected &&
+            !fcu_state_.armed && landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
+        {
+            automatic_landing_ = false;
+            remote_mission_.state = "COMPLETED";
+            remote_mission_.reason = "Returned, landed and disarmed";
+            publishRemoteStatus();
+            return;
+        }
+        // Landing intentionally stops trajectory output. Takeoff requires it alive
+        // and unlatched, including while waiting for OFFBOARD/arming feedback.
+        if (taking_off && !trajectoryOutputReady())
+        { abortMission("Trajectory output unavailable or stop-latched during takeoff"); return; }
+        const double age = (ros::WallTime::now() - automatic_phase_time_).toSec();
+        if (!automaticInputsReady() || age > (taking_off ? takeoff_timeout_sec_ : landing_timeout_sec_))
+        { abortMission("Automatic phase inputs lost or timeout; pilot takeover required"); return; }
+        const auto &return_point = remote_mission_.points.back();
+        if ((ros::WallTime::now()-last_corridor_check_).toSec() >= .2)
+        {
+            last_corridor_check_ = ros::WallTime::now();
+            if (!verticalCorridorEndpointsClear(ground_origin_, Eigen::Vector3d(return_point.x, return_point.y, return_point.z)))
+            { abortMission("Vertical takeoff/landing corridor is no longer clear"); return; }
+        }
+        if (!taking_off)
+        {
+            if (!fcu_state_.armed || fcu_state_.mode != "OFFBOARD" ||
+                (controller_state_ != "AUTO_LAND" && controller_state_ != "AUTO_HOVER" && controller_state_ != "CMD_CTRL"))
+            { abortMission("Automatic landing interrupted; pilot takeover required"); return; }
+            return;
+        }
+        const bool preparing = controller_state_ == "PREPARING_TAKEOFF";
+        if (preparing || controller_state_ == "AUTO_TAKEOFF" || controller_state_ == "AUTO_HOVER") takeoff_seen_ = true;
+        // The controller waits at most 2.5 s for mode feedback; allow one further
+        // normal FCU heartbeat for arming feedback. Input/corridor guards stay active.
+        if ((takeoff_seen_ && !preparing && controller_state_ != "AUTO_TAKEOFF" && controller_state_ != "AUTO_HOVER") ||
+            (!takeoff_seen_ && age > 2.) || (age > 4. && (!fcu_state_.armed || fcu_state_.mode != "OFFBOARD")))
+        { abortMission("Takeoff rejected or interrupted; pilot takeover required"); return; }
+        const auto &home = remote_mission_.points.back();
+        const Eigen::Vector3d hover(home.x, home.y, home.z);
+        if (flightReady(true) && (odom_position_-hover).norm() <= .15 && odom_velocity_.norm() <= .1)
+        {
+            if (auto_hover_since_.isZero()) auto_hover_since_ = ros::WallTime::now();
+            if ((ros::WallTime::now()-auto_hover_since_).toSec() >= 1.)
+            {
+                if (!startMission(remoteWaypoints(), false)) abortMission("Airborne route start rejected");
+            }
+        }
+        else auto_hover_since_ = ros::WallTime();
+    }
+
     void startRemoteMission()
     {
         remote_mission_.checkStart(remote_mission_.session, remote_mission_.id,
                                   remote_mission_.revision);
+        if (automatic_roundtrip_) { beginAutomaticTakeoff(); return; }
         if (!startMission(remoteWaypoints(), false))
             throw std::runtime_error("Start rejected: confirm airborne hover, fresh world odometry, controller and planner");
     }
@@ -334,9 +470,29 @@ private:
             route.push_back({p.id, p.x, p.y, p.z, p.hover_sec});
         if (request.operation == "upload")
         {
+            if (automatic_roundtrip_)
+            {
+                if (!request.automatic || route.size() != 2 || !automaticStartReady())
+                    throw std::runtime_error("Automatic roundtrip requires exactly target/return points and ground preflight readiness");
+                const Eigen::Vector3d ground(request.ground_origin.x, request.ground_origin.y, request.ground_origin.z);
+                const auto &home = route.back();
+                const Eigen::Vector3d hover(home.x, home.y, home.z);
+                if (!ground.allFinite() || (ground-odom_position_).norm() > .1 ||
+                    (hover.head<2>()-ground.head<2>()).norm() > .03 ||
+                    std::abs(home.z-ground.z()-takeoff_height_) > .03 ||
+                    std::hypot(route.front().x-home.x, route.front().y-home.y) < .3 ||
+                    !verticalCorridorEndpointsClear(ground, hover))
+                    throw std::runtime_error("Invalid ground origin, return height or blocked/unknown vertical corridor");
+                remote_mission_.upload(request.map_session_id, request.mission_id, request.revision, route);
+                ground_origin_ = ground;
+                uploaded_automatic_ = true;
+                return;
+            }
+            if (request.automatic) throw std::runtime_error("Automatic roundtrip profile is not enabled");
             remote_mission_.upload(request.map_session_id, request.mission_id, request.revision, route);
             return;
         }
+        if (automatic_roundtrip_) throw std::runtime_error("Automatic roundtrip does not support route updates");
         if (remote_mission_.active() && (!flightReady(false) ||
             !fresh(heartbeat_receive_time_, 0.5) || point_pub_.getNumSubscribers() == 0))
             throw std::runtime_error("Cannot update while flight/controller/planner state is invalid");
@@ -402,7 +558,7 @@ private:
     void invalidateRemoteSession(const std::string &reason)
     {
         if (mission_source_ != "remote") return;
-        if (state_ != FINISHED) abortMission(reason.c_str());
+        if (state_ != FINISHED || remote_mission_.active()) abortMission(reason.c_str());
         remote_had_fresh_odom_ = false;
         remote_mission_.invalidate(newMapSession(), reason);
         publishRemoteStatus();
@@ -683,6 +839,7 @@ private:
         state_ = FINISHED;
         mission_fault_ = true;
         automatic_landing_ = false;
+        if (uploaded_automatic_) abort_automatic_pub_.publish(std_msgs::Empty());
         arrival_candidate_time_ = ros::Time(0);
         planning_stop_pub_.publish(std_msgs::Empty());
         closeMissionCsv();
@@ -1021,6 +1178,8 @@ private:
             if ((ros::WallTime::now() - remote_status_time_).toSec() >= 0.2)
                 publishRemoteStatus();
         }
+        tickAutomaticFlight();
+        if (remote_mission_.state == "TAKING_OFF") return;
         if (landing_latched_ && automatic_landing_ &&
             fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
             fresh(extended_receive_time_, flight_state_timeout_sec_) &&
@@ -1055,6 +1214,11 @@ private:
                       (ros::Time::now() - odom_stamp_).toSec(), odom_timeout_sec_,
                       odom_future_tolerance_sec_);
             abortMission("odometry invalid, stale or timestamp outside allowed range");
+            return;
+        }
+        if (uploaded_automatic_ && !trajectoryOutputReady())
+        {
+            abortMission("Trajectory output unavailable or stop-latched during mission");
             return;
         }
         if (!flightReady(false))
@@ -1225,7 +1389,16 @@ private:
             closeMissionCsv();
             if (mission_source_ == "remote")
             {
-                remote_mission_.state = "COMPLETED";
+                if (uploaded_automatic_)
+                {
+                    const auto &home = remote_mission_.points.back();
+                    const Eigen::Vector3d hover(home.x, home.y, home.z);
+                    if (!verticalCorridorEndpointsClear(ground_origin_, hover))
+                    { abortMission("Return landing corridor is no longer clear"); return; }
+                    automatic_phase_time_ = ros::WallTime::now();
+                    requestLanding(true);
+                }
+                else remote_mission_.state = "COMPLETED";
                 publishRemoteStatus();
             }
             ROS_INFO("Waypoint mission finished, ros_time=%.3f", ros::Time::now().toSec());
@@ -1502,6 +1675,9 @@ private:
     ros::Subscriber clicked_point_sub_;
     ros::Subscriber start_clicked_route_sub_;
     ros::Subscriber clear_clicked_route_sub_;
+    bool output_ready_ = false;
+    ros::WallTime output_ready_time_;
+    ros::Subscriber output_ready_sub_;
     ros::Subscriber fcu_sub_, extended_sub_, controller_sub_, ready_sub_, heartbeat_sub_, land_sub_;
     ros::Timer timer_;
     tf::TransformListener tf_listener_;
@@ -1560,6 +1736,13 @@ private:
     bool rc_initialized_;
     bool landing_latched_;
     bool automatic_landing_;
+    bool automatic_roundtrip_ = false, uploaded_automatic_ = false;
+    bool takeoff_ready_ = false, auto_control_ok_ = false, takeoff_seen_ = false;
+    double takeoff_height_ = 0., takeoff_timeout_sec_, landing_timeout_sec_;
+    Eigen::Vector3d ground_origin_ = Eigen::Vector3d::Zero();
+    ros::WallTime takeoff_ready_time_, auto_control_time_, takeoff_height_time_, automatic_phase_time_, auto_hover_since_, last_corridor_check_;
+    ros::Subscriber takeoff_ready_sub_, auto_control_sub_, takeoff_height_sub_;
+    ros::Publisher abort_automatic_pub_;
     std::ofstream mission_csv_;
 };
 

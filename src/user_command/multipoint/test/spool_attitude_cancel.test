@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find multipoint)/test/spool_attitude_hold.test">
+    <arg name="cancel_during_spool" value="true" />
+  </include>
+</launch>

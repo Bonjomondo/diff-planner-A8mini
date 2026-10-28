@@ -1,0 +1,14 @@
+<launch>
+  <arg name="enabled" default="true" />
+  <arg name="cancel_during_spool" default="false" />
+  <group if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')">
+    <include file="$(find px4ctrl)/launch/run_ctrl_indoor_automatic.launch">
+      <arg name="takeoff_height" value="1.0" />
+      <arg name="hold_attitude_during_spool" value="$(arg enabled)" />
+    </include>
+    <test pkg="multipoint" type="test_spool_attitude.py" name="spool_attitude" test-name="spool_attitude" time-limit="25">
+      <param name="enabled" value="$(arg enabled)" />
+      <param name="cancel_during_spool" value="$(arg cancel_during_spool)" />
+    </test>
+  </group>
+</launch>

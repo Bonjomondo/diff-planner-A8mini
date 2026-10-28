@@ -3,6 +3,8 @@
 #include <signal.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Float64.h>
+#include <std_msgs/Empty.h>
 
 void mySigintHandler(int sig)
 {
@@ -84,6 +86,12 @@ int main(int argc, char *argv[])
     // Non-latched: a fresh controller heartbeat is required before a mission.
     ros::Publisher fsm_state_pub = nh.advertise<std_msgs::String>("state", 1);
     ros::Publisher mission_ready_pub = nh.advertise<std_msgs::Bool>("mission_ready", 1);
+    ros::Publisher takeoff_ready_pub = nh.advertise<std_msgs::Bool>("takeoff_ready", 1);
+    ros::Publisher auto_control_pub = nh.advertise<std_msgs::Bool>("automatic_control_ok", 1);
+    ros::Publisher takeoff_height_pub = nh.advertise<std_msgs::Float64>("takeoff_height", 1);
+    ros::Publisher spool_hold_pub = nh.advertise<std_msgs::Bool>("ground_spool_attitude_held", 1);
+    ros::Subscriber abort_auto_sub = nh.subscribe<std_msgs::Empty>("abort_automatic", 1,
+        [&](const std_msgs::Empty::ConstPtr &) { fsm.abort_automatic = true; });
     ros::Time last_status_publish;
 
     fsm.set_FCU_mode_srv = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
@@ -130,7 +138,7 @@ int main(int argc, char *argv[])
         if ((now - last_status_publish).toSec() >= 0.1)
         {
             static const char *names[] = {"UNKNOWN", "MANUAL_CTRL", "AUTO_HOVER",
-                                          "CMD_CTRL", "AUTO_TAKEOFF", "AUTO_LAND"};
+                                          "CMD_CTRL", "AUTO_TAKEOFF", "AUTO_LAND", "PREPARING_TAKEOFF"};
             std_msgs::String status;
             status.data = names[static_cast<int>(fsm.get_state())];
             fsm_state_pub.publish(status);
@@ -145,6 +153,17 @@ int main(int argc, char *argv[])
                     fsm.rc_data.is_hover_mode && fsm.rc_data.is_command_mode &&
                     fsm.rc_data.check_centered()));
             mission_ready_pub.publish(ready);
+            std_msgs::Bool preflight, automatic_control;
+            preflight.data = fsm.automaticTakeoffReady(now);
+            automatic_control.data = param.takeoff_land.require_explicit_takeoff && fsm.automaticControlOk(now);
+            takeoff_ready_pub.publish(preflight);
+            auto_control_pub.publish(automatic_control);
+            std_msgs::Float64 height;
+            height.data = param.takeoff_land.height;
+            takeoff_height_pub.publish(height);
+            std_msgs::Bool spool_hold;
+            spool_hold.data = fsm.ground_spool_attitude_held;
+            spool_hold_pub.publish(spool_hold);
             last_status_publish = now;
         }
     }

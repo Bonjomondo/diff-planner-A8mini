@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find multipoint)/test/automatic_roundtrip.test">
+    <arg name="scenario" value="landing_timeout" />
+  </include>
+</launch>

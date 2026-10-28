@@ -1,3 +1,7 @@
+bool automatic_supported
+bool automatic
+bool takeoff_ready
+float64 takeoff_height
 string frame_id
 string map_session_id
 string mission_id

@@ -1,4 +1,5 @@
 #include "PX4CtrlFSM.h"
+#include "thrust_estimation_guard.h"
 #include <uav_utils/converters.h>
 
 using namespace std;
@@ -35,20 +36,82 @@ PX4CtrlFSM::PX4CtrlFSM(Parameter_t &param_, Controller &controller_) : param(par
 
 */
 
+bool PX4CtrlFSM::automaticControlOk(const ros::Time &now)
+{
+    auto fresh = [&](const ros::Time &stamp, double limit) {
+        double age = (now-stamp).toSec(); return !stamp.isZero() && age >= 0. && age <= limit;
+    };
+    return param.takeoff_land.enable && param.takeoff_land.enable_auto_arm && !param.takeoff_land.no_RC &&
+        state_data.current_state.connected && fresh(state_data.rcv_stamp,2.5) && fresh(extended_state_data.rcv_stamp,2.5) &&
+        odom_is_received(now) && imu_is_received(now) && rc_is_received(now) &&
+        fresh(odom_data.rcv_stamp,param.msg_timeout.odom) && fresh(imu_data.rcv_stamp,param.msg_timeout.imu) &&
+        fresh(rc_data.rcv_stamp,param.msg_timeout.rc) &&
+        odom_data.msg.header.frame_id == "world" &&
+        (now-odom_data.msg.header.stamp).toSec() >= -.02 &&
+        (now-odom_data.msg.header.stamp).toSec() <= param.msg_timeout.odom &&
+        (now-imu_data.msg.header.stamp).toSec() >= -.02 &&
+        (now-imu_data.msg.header.stamp).toSec() <= param.msg_timeout.imu &&
+        odom_data.p.allFinite() && odom_data.v.allFinite() && odom_data.q.coeffs().allFinite() &&
+        std::abs(odom_data.q.squaredNorm()-1.) < .05 && imu_data.a.allFinite() && imu_data.q.coeffs().allFinite() &&
+        rc_data.is_hover_mode && rc_data.is_command_mode && rc_data.check_centered();
+}
+
+bool PX4CtrlFSM::groundTakeoffInputsOk(const ros::Time &now)
+{
+    const double bat_age=(now-bat_data.rcv_stamp).toSec();
+    const bool ac=automaticControlOk(now);
+    const bool armed=state_data.current_state.armed;
+    const bool cmd=cmd_is_received(now);
+    const bool landed=get_landed();
+    const bool ext=extended_state_data.current_extended_state.landed_state == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND;
+    const bool ov=odom_data.v.norm() <= .1;
+    const bool bat=bat_is_received(now) && bat_age >= 0. &&
+        std::isfinite(bat_data.volt) && bat_data.volt > param.low_voltage;
+    const bool h=std::isfinite(param.takeoff_land.height) && param.takeoff_land.height > .1;
+    ROS_INFO_THROTTLE(1.0, "[px4ctrl] takeoff gate ac=%d armed=%d cmd=%d landed=%d ext=%d ov=%.3f bat=%d volt=%.2f h=%.2f",
+        ac, armed, cmd, landed, ext, odom_data.v.norm(), bat, bat_data.volt, param.takeoff_land.height);
+    return ac && !armed && !cmd && landed && ext && ov && bat && h;
+}
+
+bool PX4CtrlFSM::automaticTakeoffReady(const ros::Time &now)
+{
+    return param.takeoff_land.require_explicit_takeoff && state == MANUAL_CTRL && groundTakeoffInputsOk(now);
+}
+
 void PX4CtrlFSM::process()
 {
 
 	ros::Time now_time = ros::Time::now();
+    ground_spool_attitude_held = false;
 	Controller_Output_t u;
 	Desired_State_t des(odom_data);
-	bool rotor_low_speed_during_land = false;
+	bool rotor_low_speed_during_land = state == PREPARING_TAKEOFF;
 
-	// STEP1: state machine runs
+	// Automatic phases can be interrupted without sending a disarm command in air.
+    if (param.takeoff_land.require_explicit_takeoff &&
+        (abort_automatic || ((state == PREPARING_TAKEOFF || state == AUTO_TAKEOFF || state == AUTO_LAND) && !automaticControlOk(now_time))))
+    {
+        abort_automatic = false;
+        takeoff_land_data.triggered = false;
+        takeoff_land.delay_trigger.first = false;
+        if (state == PREPARING_TAKEOFF)
+        {
+            ROS_WARN("[px4ctrl] Cancel ground takeoff preparation before arming");
+            state = MANUAL_CTRL;
+            toggle_offboard_mode(false);
+        }
+        else if ((state == AUTO_TAKEOFF || state == AUTO_LAND) && state_data.current_state.armed &&
+            state_data.current_state.mode == "OFFBOARD" && automaticControlOk(now_time))
+        { state = AUTO_HOVER; set_hov_with_odom(); }
+        else if (state == AUTO_TAKEOFF || state == AUTO_LAND)
+        { state = MANUAL_CTRL; toggle_offboard_mode(false); }
+    }
+    // STEP1: state machine runs
 	switch (state)
 	{
 	case MANUAL_CTRL:
 	{
-		if (rc_data.enter_hover_mode) // Try to jump to AUTO_HOVER
+		if (rc_data.enter_hover_mode && (!param.takeoff_land.require_explicit_takeoff || state_data.current_state.armed)) // Try to jump to AUTO_HOVER
 		{
 			if (!odom_is_received(now_time))
 			{
@@ -75,7 +138,9 @@ void PX4CtrlFSM::process()
 		}
 		else if (param.takeoff_land.enable && takeoff_land_data.triggered && takeoff_land_data.takeoff_land_cmd == quadrotor_msgs::TakeoffLand::TAKEOFF) // Try to jump to AUTO_TAKEOFF
 		{
-			if (!odom_is_received(now_time))
+			if (param.takeoff_land.require_explicit_takeoff && !automaticTakeoffReady(now_time))
+            { ROS_ERROR("[px4ctrl] Reject automatic takeoff: ground preflight is not ready"); break; }
+            if (!odom_is_received(now_time))
 			{
 				ROS_ERROR("[px4ctrl] Reject AUTO_TAKEOFF. No odom!");
 				break;
@@ -100,39 +165,47 @@ void PX4CtrlFSM::process()
 				if (!rc_data.is_hover_mode || !rc_data.is_command_mode || !rc_data.check_centered())
 				{
 					ROS_ERROR("[px4ctrl] Reject AUTO_TAKEOFF. If you have your RC connected, keep its switches at \"auto hover\" and \"command control\" states, and all sticks at the center, then takeoff again.");
-					while (ros::ok())
-					{
-						ros::Duration(0.01).sleep();
-						ros::spinOnce();
-						if (rc_data.is_hover_mode && rc_data.is_command_mode && rc_data.check_centered())
-						{
-							ROS_INFO("\033[32m[px4ctrl] OK, you can takeoff again.\033[32m");
-							break;
-						}
-					}
+                    // Reject immediately; do not block the control loop awaiting RC.
 					break;
 				}
 			}
 
+            if (param.takeoff_land.require_explicit_takeoff)
+            {
+                controller.resetThrustMapping();
+                set_start_pose_for_takeoff_land(odom_data);
+                takeoff_mode_request_stamp = ros::Time::now();
+                takeoff_mode_request_wall = ros::WallTime::now();
+                state = PREPARING_TAKEOFF;
+                rotor_low_speed_during_land = true;
+                if (!toggle_offboard_mode(true)) { state = MANUAL_CTRL; break; }
+                ROS_INFO("[px4ctrl] Waiting for fresh OFFBOARD state before arming (maximum 2.5 s)");
+                break; // Keep processing sensors, cancellation and setpoints while feedback arrives.
+            }
 			state = AUTO_TAKEOFF;
 			controller.resetThrustMapping();
 			set_start_pose_for_takeoff_land(odom_data);
-			toggle_offboard_mode(true);				  // toggle on offboard before arm
+			if (!toggle_offboard_mode(true)) { state = MANUAL_CTRL; break; } // Never arm after rejected mode change
 			for (int i = 0; i < 10 && ros::ok(); ++i) // wait for 0.1 seconds to allow mode change by FMU // mark
 			{
 				ros::Duration(0.01).sleep();
 				ros::spinOnce();
 			}
+			if (param.takeoff_land.require_explicit_takeoff &&
+                (abort_automatic || !automaticControlOk(ros::Time::now()) ||
+                 state_data.current_state.armed || state_data.current_state.mode != "OFFBOARD" ||
+                 extended_state_data.current_extended_state.landed_state != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND))
+            { state = MANUAL_CTRL; takeoff_land_data.triggered = false; toggle_offboard_mode(false); break; }
 			if (param.takeoff_land.enable_auto_arm)
 			{
-				toggle_arm_disarm(true);
+				if (!toggle_arm_disarm(true)) { state = MANUAL_CTRL; toggle_offboard_mode(false); break; }
 			}
 			takeoff_land.toggle_takeoff_land_time = now_time;
 
 			ROS_INFO("\033[32m[px4ctrl] MANUAL_CTRL(L1) --> AUTO_TAKEOFF\033[32m");
 		}
 
-		if (rc_data.toggle_reboot) // Try to reboot. EKF2 based PX4 FCU requires reboot when its state estimator goes wrong.
+		if (rc_data.toggle_reboot && !param.takeoff_land.require_explicit_takeoff) // Try to reboot. EKF2 based PX4 FCU requires reboot when its state estimator goes wrong.
 		{
 			if (state_data.current_state.armed)
 			{
@@ -144,6 +217,41 @@ void PX4CtrlFSM::process()
 
 		break;
 	}
+
+    case PREPARING_TAKEOFF:
+    {
+        rotor_low_speed_during_land = true;
+        if (!groundTakeoffInputsOk(now_time) ||
+            (odom_data.p-takeoff_land.start_pose.head<3>()).norm() > .10)
+        {
+            ROS_ERROR("[px4ctrl] Reject takeoff before arming: ground/RC/sensor/battery/position check changed");
+            state = MANUAL_CTRL;
+            toggle_offboard_mode(false);
+            break;
+        }
+        if ((ros::WallTime::now()-takeoff_mode_request_wall).toSec() > 2.5)
+        {
+            ROS_ERROR("[px4ctrl] Reject takeoff before arming: fresh OFFBOARD feedback timeout; observed mode=%s",
+                      state_data.current_state.mode.c_str());
+            state = MANUAL_CTRL;
+            toggle_offboard_mode(false);
+            break;
+        }
+        if (state_data.rcv_stamp < takeoff_mode_request_stamp || state_data.current_state.mode != "OFFBOARD")
+            break;
+        // The mode service only acknowledges sending a request. Arm once, only after
+        // fresh FCU feedback and a new complete ground-preflight check in this cycle.
+        if (!toggle_arm_disarm(true))
+        {
+            state = MANUAL_CTRL;
+            toggle_offboard_mode(false);
+            break;
+        }
+        state = AUTO_TAKEOFF;
+        takeoff_land.toggle_takeoff_land_time = ros::Time::now();
+        ROS_INFO("[px4ctrl] Fresh OFFBOARD confirmed; arm accepted; PREPARING_TAKEOFF --> AUTO_TAKEOFF");
+        break;
+    }
 
 	case AUTO_HOVER:
 	{
@@ -225,6 +333,8 @@ void PX4CtrlFSM::process()
 		if ((now_time - takeoff_land.toggle_takeoff_land_time).toSec() < AutoTakeoffLand_t::MOTORS_SPEEDUP_TIME) // Wait for several seconds to warn prople.
 		{
 			des = get_rotor_speed_up_des(now_time);
+            ground_spool_attitude_held = param.takeoff_land.require_explicit_takeoff &&
+                param.takeoff_land.hold_attitude_during_spool;
 		}
 		else if (odom_data.p(2) >= (takeoff_land.start_pose(2) + param.takeoff_land.height)) // reach the desired height
 		{
@@ -331,12 +441,30 @@ void PX4CtrlFSM::process()
 	}
 
 	// STEP3: estimate thrust model
-	if (state == AUTO_HOVER || state == CMD_CTRL)
+	if (px4ctrl_guard::allowThrustEstimation(
+            state == AUTO_HOVER || state == CMD_CTRL,
+            state_data.current_state.connected,
+            state_data.current_state.armed,
+            state_data.current_state.mode == "OFFBOARD",
+            extended_state_data.current_extended_state.landed_state ==
+                mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR,
+            (now_time - state_data.rcv_stamp).toSec(),
+            (now_time - extended_state_data.rcv_stamp).toSec()))
 	{
 		controller.estimateThrustModel(imu_data.a, bat_data.volt, odom_data.v, param);
 	}
 
 	// STEP4: publish control commands to mavros
+    if (ground_spool_attitude_held)
+    {
+        // Candidate policy: while the existing 3 s spool timer is active, avoid
+        // requesting tilt corrections that a ground-constrained vehicle cannot
+        // follow. Preserve the existing collective-thrust calculation exactly.
+        // The debug message above still describes the computed PID proposal;
+        // AttitudeTarget is the applied output, with the hold status reported.
+        u.q = imu_data.q;
+        u.bodyrates.setZero();
+    }
 	publish_attitude_ctrl(u, now_time);
 	
 	// STEP5: Detect if the drone has landed
@@ -361,7 +489,8 @@ void PX4CtrlFSM::motors_idling(const Imu_Data_t &imu, Controller_Output_t &u)
 void PX4CtrlFSM::land_detector(const State_t state, const Desired_State_t &des, const Odom_Data_t &odom)
 {
 	static State_t last_state = State_t::MANUAL_CTRL;
-	if (last_state == State_t::MANUAL_CTRL && (state == State_t::AUTO_HOVER || state == State_t::AUTO_TAKEOFF))
+	if ((last_state == State_t::MANUAL_CTRL && (state == State_t::AUTO_HOVER || state == State_t::AUTO_TAKEOFF)) ||
+        (last_state == State_t::PREPARING_TAKEOFF && state == State_t::AUTO_TAKEOFF))
 	{
 		takeoff_land.landed = false; // Always holds
 	}

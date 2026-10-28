@@ -23,7 +23,7 @@ from gcs_map_guard import MapGuard, valid_bounds, inside
 STATUS_FIELDS = ('frame_id', 'map_session_id', 'mission_id', 'revision', 'state',
                  'current_waypoint_id', 'completed', 'total', 'reason', 'odom_fresh',
                  'flight_ready', 'world_x', 'world_y', 'world_z',
-                 'max_abs_xy', 'min_z', 'max_z')
+                 'max_abs_xy', 'min_z', 'max_z', 'automatic_supported', 'automatic', 'takeoff_ready', 'takeoff_height')
 
 
 def status_dict(message):
@@ -95,7 +95,7 @@ class RosBackend:
             mission = dict(self.status)
             now = time.monotonic()
             if now - self.status_time > 1.0:
-                mission.update(odom_fresh=False, flight_ready=False,
+                mission.update(odom_fresh=False, flight_ready=False, takeoff_ready=False,
                                reason='Mission executor status stale; execution result unknown')
             state_fresh = now - self.state_time <= 2.5
             return dict(type='telemetry', protocol=2, server='agri-onboard-ros',
@@ -145,6 +145,11 @@ class RosBackend:
         for key in ('request_id', 'operation', 'map_session_id', 'mission_id',
                     'revision', 'frame_id', 'replace_from'):
             setattr(request, key, command[key])
+        request.automatic = command.get('automatic', False)
+        if request.automatic:
+            ground = command.get('ground_origin', {})
+            for key in ('x', 'y', 'z'):
+                setattr(request.ground_origin, key, ground.get(key, 0.))
         request.waypoints = [RemoteWaypoint(**point) for point in command['waypoints']]
         try:
             rospy.wait_for_service('/mission/remote/command', timeout=1.0)
