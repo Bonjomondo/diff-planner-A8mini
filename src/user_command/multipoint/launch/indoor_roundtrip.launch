@@ -9,6 +9,7 @@
     <arg name="enable_rc" value="false" />
     <arg name="start_plan" value="0" />
     <arg name="back_plan" value="0" />
-    <arg name="next_distance" value="0.2" />
+    <!-- 到目标 P 的三维距离门槛，单位：米；(距离目标点多少会被判定到达目标点)-->
+    <arg name="next_distance" value="0.4" />
   </include>
 </launch>

@@ -34,7 +34,7 @@ roslaunch multipoint indoor_roundtrip.launch
 
 协议 upload 增加 `automatic=true` 和 `ground_origin={x,y,z}`，保存两个航点 `[P,R]`。R.xy 与起飞点一致，R.z 与控制器起飞高度一致。旧后端未声明 automatic_supported 时，界面不会执行自动任务。
 
-状态依次为 READY → TAKING_OFF → FLYING/HOVERING → LANDING → COMPLETED。明确 start 才发送一次起飞命令；相同请求去重，不自动重发。稳定空中悬停约一秒后才发布目标。到达返航点不提前完成，落地但仍解锁也不完成。
+状态依次为 READY → TAKING_OFF → FLYING/HOVERING → LANDING → COMPLETED。明确 start 才发送一次起飞命令；相同请求去重，不自动重发。空中就绪且定位速度不超过 0.10 m/s，连续稳定约一秒后才发布目标；不再要求距记录的返航参考点 R 不超过 0.15 m。到达返航点不提前完成，落地但仍解锁也不完成。
 
 控制器在 TAKING_OFF 任务阶段先进入地面的 `PREPARING_TAKEOFF`，等待请求之后收到的新鲜 OFFBOARD 状态，最多 2.5 秒；MAVROS 模式服务接受请求不等于已收到模式反馈。等待期间持续处理传感器/取消并发送怠速设定值，不阻塞控制循环；地面位置、遥控、定位、电量检查变化或超时均在解锁前退出。收到模式反馈且当前地面检查通过后才请求一次解锁，再进入 AUTO_TAKEOFF。任务为模式及解锁的正常 FCU 反馈提供最多 4 秒确认时间，期间地图、通道及输入保护保持有效。
 

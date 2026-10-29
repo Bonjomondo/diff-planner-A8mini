@@ -2,7 +2,9 @@
     <arg name="odom_topic" default="/ekf/ekf_odom" />
     <arg name="yaml_path" default="$(find multipoint)/config/points.yaml" />
     <arg name="next_distance" default="0.7" />
-    <arg name="velocity_tolerance" default="0.2" />
+    <!-- 到点及悬停期间的速度门槛，单位：米/秒-->
+    <arg name="velocity_tolerance" default="0.3" />
+    <!-- 连续满足距离和速度条件多久才判定到点，单位：秒；-->
     <arg name="arrival_stable_sec" default="0.5" />
     <arg name="gimbal_retry_sec" default="12.0" />
     <arg name="land_command_retry_sec" default="1.0" />

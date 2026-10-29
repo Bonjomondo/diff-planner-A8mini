@@ -1,5 +1,6 @@
 <launch>
   <include file="$(find multipoint)/test/automatic_roundtrip.test">
     <arg name="scenario" value="position_limit_removed" />
+    <arg name="takeoff_timeout_sec" value="10.0" />
   </include>
 </launch>

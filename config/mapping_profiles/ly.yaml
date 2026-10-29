@@ -1,0 +1,17 @@
+# Mapping profile for the original ly aircraft. Metres; rotation is row-major.
+# These are the existing calibration values, not a new calibration.
+version: 1
+lidar:
+  model: MID360
+  ip: 192.168.1.190
+  host_ip: 192.168.1.5
+  broadcast_code: 47MCP3J0031590
+  publish_freq: 10
+imu:
+  topic: /mavros/imu/data
+  fcu_url: /dev/ttyACM0:57600
+extrinsics:
+  extrinsic_T: [0.092711, 0.026376, 0.042704]
+  extrinsic_R: [0.920182, 0.013079, 0.391273,
+                0.001701, 0.999299, -0.037404,
+               -0.391488, 0.035084, 0.919514]

@@ -29,6 +29,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.status = None
         self.goals, self.takeoffs, self.lands, self.aborts = [], [], [], []
         self.clear, self.publish_odom, self.controls_ok = True, True, True
+        self.hover_ready, self.speed = True, 0.
         self.output_ready, self.publish_output_ready = True, True
         self.deadline, self.goal_time, self.seq = 0., 0., 0
         self.subscribers = [
@@ -63,6 +64,16 @@ class AutomaticRoundtripTest(unittest.TestCase):
         while not condition() and time.monotonic() < end:
             rospy.sleep(.03)
         self.assertTrue(condition(), 'stage={} status={}'.format(self.stage, self.status))
+
+    def move_pose(self, target):
+        # Separate ROS subscriptions may arrive in either order. Keep synthetic
+        # successive samples close enough for the real map alignment guard.
+        origin = list(self.position)
+        distance = sum((a-b)**2 for a,b in zip(origin,target))**.5
+        steps = max(1, int(distance/.04)+1)
+        for step in range(1,steps+1):
+            self.position = [a+(b-a)*step/steps for a,b in zip(origin,target)]
+            rospy.sleep(.04)
 
     def on_status(self, message):
         self.status = message
@@ -117,7 +128,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.publishers['extended'].publish(ExtendedState(landed_state=ExtendedState.LANDED_STATE_ON_GROUND if landed else ExtendedState.LANDED_STATE_IN_AIR))
         ctrl = 'PREPARING_TAKEOFF' if self.stage == 'preparing' else 'MANUAL_CTRL' if ground else 'AUTO_TAKEOFF' if self.stage == 'taking_off' else 'AUTO_LAND' if self.stage in ('landing', 'landed_armed') else 'AUTO_HOVER'
         self.publishers['controller'].publish(String(data=ctrl))
-        self.publishers['ready'].publish(Bool(data=self.stage == 'hover'))
+        self.publishers['ready'].publish(Bool(data=self.stage == 'hover' and self.hover_ready))
         self.publishers['preflight'].publish(Bool(data=ground and self.stage != 'preparing'))
         self.publishers['control'].publish(Bool(data=self.controls_ok))
         self.publishers['height'].publish(Float64(data=1.))
@@ -130,6 +141,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
             self.seq += 1
             odom.header.seq, odom.header.frame_id, odom.header.stamp = self.seq, 'world', rospy.Time.now()
             odom.pose.pose.orientation.w = 1.
+            odom.twist.twist.linear.x = self.speed
             odom.pose.pose.position.x, odom.pose.pose.position.y, odom.pose.pose.position.z = self.position
             self.publishers['odom'].publish(odom)
             self.publishers['map'].publish(odom)
@@ -185,13 +197,29 @@ class AutomaticRoundtripTest(unittest.TestCase):
         if self.scenario == 'position_limit_removed':
             # Force each formerly rejected position while inputs and endpoints remain valid.
             self.stage = 'hover'
+            self.hover_ready = False
             for pos in ([.65, -.2, 1.0], [.4, -.2, 1.36], [.4, -.2, .05]):
-                self.position = list(pos)
+                self.move_pose(pos)
                 rospy.sleep(.35)
                 self.assertEqual(self.status.state, 'TAKING_OFF')
                 self.assertFalse(self.aborts)
                 self.assertFalse(self.goals)
-            self.position = [.4, -.2, 1.2]
+            self.move_pose([.4, -.2, 1.2])
+            self.hover_ready = True
+            self.scenario = 'complete'
+        if self.scenario == 'hover_offset_allowed':
+            # The current hover is 0.30 m from R: old 0.15 m gate would hang here.
+            self.stage = 'hover'
+            self.speed = .2
+            self.move_pose([.7, -.2, 1.2])
+            rospy.sleep(1.3)
+            self.assertEqual(self.status.state, 'TAKING_OFF')
+            self.assertFalse(self.goals)  # Speed gate must still hold.
+            self.speed = 0.
+            rospy.sleep(.6)
+            self.assertFalse(self.goals)  # Still require one full stable second.
+            self.until(lambda: bool(self.goals), timeout=3)
+            self.assertEqual(self.goals[0].pose.position.x, 1.1)
             self.scenario = 'complete'
         if self.scenario == 'cancel_takeoff':
             self.assertTrue(self.command('cancel')['accepted'])

@@ -1,6 +1,7 @@
 <launch>
   <arg name="scenario" default="complete" />
   <arg name="preparation_delay" default="0.0" />
+  <arg name="takeoff_timeout_sec" default="5.0" />
   <group if="$(eval env('ROS_MASTER_URI').rstrip('/') == 'http://127.0.0.1:11411')">
   <node pkg="multipoint" type="multipointplan" name="multipointplan" output="screen">
     <param name="mission_source" value="remote" />
@@ -13,7 +14,7 @@
     <param name="position_tolerance" value="0.15" />
     <param name="arrival_stable_sec" value="0.15" />
     <param name="land_command_retry_sec" value="0.3" />
-    <param name="takeoff_timeout_sec" value="5.0" />
+    <param name="takeoff_timeout_sec" value="$(arg takeoff_timeout_sec)" />
     <param name="landing_timeout_sec" value="3.0" />
     <remap from="odom_topic" to="/ekf/ekf_odom" />
   </node>

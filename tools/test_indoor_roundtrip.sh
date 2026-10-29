@@ -32,7 +32,7 @@ g++ -std=c++11 -Wall -Wextra -Werror -I src/realflight_modules/px4ctrl/src \
     -o "$STATE/test_thrust_estimation_guard"
 "$STATE/test_thrust_estimation_guard"
 tests=("$@")
-if (( ${#tests[@]} == 0 )); then tests=(remote_mission.test remote_cancel.test point_roundtrip_planner.test automatic_cancel_takeoff.test automatic_takeoff_odom_loss.test automatic_takeoff_rc_loss.test automatic_takeoff_rejected.test automatic_cancel_landing.test automatic_landing_timeout.test automatic_landing_blocked.test automatic_roundtrip.test automatic_controller.test automatic_controller_delayed.test automatic_roundtrip_delayed.test automatic_takeoff_corridor_blocked.test automatic_position_limit_removed.test spool_attitude_baseline.test spool_attitude_hold.test); fi
+if (( ${#tests[@]} == 0 )); then tests=(remote_mission.test remote_cancel.test point_roundtrip_planner.test automatic_cancel_takeoff.test automatic_takeoff_odom_loss.test automatic_takeoff_rc_loss.test automatic_takeoff_rejected.test automatic_cancel_landing.test automatic_landing_timeout.test automatic_landing_blocked.test automatic_roundtrip.test automatic_controller.test automatic_controller_delayed.test automatic_roundtrip_delayed.test automatic_takeoff_corridor_blocked.test automatic_position_limit_removed.test automatic_hover_offset_allowed.test spool_attitude_baseline.test spool_attitude_hold.test); fi
 for launch in "${tests[@]}"; do
     echo "Running isolated test: $launch"
     # roslaunch leaves node parameters behind on a reused master. A preceding

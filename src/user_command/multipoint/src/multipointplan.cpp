@@ -417,9 +417,9 @@ private:
         if ((takeoff_seen_ && !preparing && controller_state_ != "AUTO_TAKEOFF" && controller_state_ != "AUTO_HOVER") ||
             (!takeoff_seen_ && age > 2.) || (age > 4. && (!fcu_state_.armed || fcu_state_.mode != "OFFBOARD")))
         { abortMission("Takeoff rejected or interrupted; pilot takeover required"); return; }
-        const auto &home = remote_mission_.points.back();
-        const Eigen::Vector3d hover(home.x, home.y, home.z);
-        if (flightReady(true) && (odom_position_-hover).norm() <= .15 && odom_velocity_.norm() <= .1)
+        // Start the route after airborne readiness and low-speed stability.
+        // Proximity to the recorded return point is not a takeoff-completion gate.
+        if (flightReady(true) && odom_velocity_.norm() <= .1)
         {
             if (auto_hover_since_.isZero()) auto_hover_since_ = ros::WallTime::now();
             if ((ros::WallTime::now()-auto_hover_since_).toSec() >= 1.)

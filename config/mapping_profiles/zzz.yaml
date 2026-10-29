@@ -1,0 +1,17 @@
+# Mapping profile for zzz. Calibration copied from its verified original project.
+# Use Mid360s SDK format on this aircraft; MID360 format receives no data here.
+version: 1
+lidar:
+  model: Mid360s
+  ip: 192.168.1.193
+  host_ip: 192.168.1.5
+  broadcast_code: ARMCNCP0036493
+  publish_freq: 10
+imu:
+  topic: /mavros/imu/data
+  fcu_url: /dev/ttyACM0:57600
+extrinsics:
+  extrinsic_T: [-0.036817, 0.002759, 0.095866]
+  extrinsic_R: [0.999825, 0.016834, -0.008137,
+               -0.017019, 0.999587, -0.023176,
+                0.007744, 0.023311, 0.999698]
