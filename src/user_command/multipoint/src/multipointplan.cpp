@@ -1190,9 +1190,11 @@ private:
             ROS_INFO("Landing complete: ground + disarmed; LAND retries stopped. Restart stack for next flight.");
         }
         if (landing_latched_ && automatic_landing_ &&
+            fresh(controller_receive_time_, .5) && controller_receive_time_ > landing_request_time_ &&
+            controller_state_ == "AUTO_HOVER" &&
             (now - last_land_publish_time_).toSec() >= land_command_retry_sec_)
         {
-            publishLandingCommand(true);
+            publishLandingCommand(!last_land_publish_time_.isZero());
         }
 
         if (state_ == FINISHED)
@@ -1526,12 +1528,9 @@ private:
         // automatic LAND retries.
         std_msgs::Empty stop;
         planning_stop_pub_.publish(stop);
+        landing_request_time_ = ros::WallTime::now();
 
-        if (automatic_landing_)
-        {
-            publishLandingCommand(false);
-        }
-        else
+        if (!automatic_landing_)
         {
             ROS_WARN("RC channel 8: manual LAND selected because channel 6 is out of "
                      "command mode; planner stopped and automatic LAND retry disabled");
@@ -1726,7 +1725,7 @@ private:
     uint8_t landed_state_ = mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED;
     mavros_msgs::State fcu_state_;
     ros::WallTime odom_receive_time_, fcu_receive_time_, extended_receive_time_;
-    ros::WallTime controller_receive_time_, ready_receive_time_, heartbeat_receive_time_;
+    ros::WallTime controller_receive_time_, ready_receive_time_, heartbeat_receive_time_, landing_request_time_;
     ros::WallTime goal_publish_time_, gimbal_wait_time_;
     ros::Time odom_stamp_;
     double odom_timeout_sec_, odom_future_tolerance_sec_, flight_state_timeout_sec_;

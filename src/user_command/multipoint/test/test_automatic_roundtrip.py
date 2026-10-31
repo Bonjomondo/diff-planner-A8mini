@@ -30,6 +30,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.goals, self.takeoffs, self.lands, self.aborts = [], [], [], []
         self.clear, self.publish_odom, self.controls_ok = True, True, True
         self.hover_ready, self.speed = True, 0.
+        self.controller_override = None
         self.output_ready, self.publish_output_ready = True, True
         self.deadline, self.goal_time, self.seq = 0., 0., 0
         self.subscribers = [
@@ -87,6 +88,8 @@ class AutomaticRoundtripTest(unittest.TestCase):
     def on_goal(self, message):
         self.goals.append(message)
         self.goal_time = time.monotonic()
+        if len(self.goals) == 2 and self.scenario == 'complete':
+            self.controller_override = 'CMD_CTRL'
 
     def on_flight_command(self, message):
         if message.takeoff_land_cmd == TakeoffLand.TAKEOFF:
@@ -127,7 +130,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.publishers['fcu'].publish(State(connected=True, armed=not ground, mode='STABILIZED' if ground else 'OFFBOARD'))
         self.publishers['extended'].publish(ExtendedState(landed_state=ExtendedState.LANDED_STATE_ON_GROUND if landed else ExtendedState.LANDED_STATE_IN_AIR))
         ctrl = 'PREPARING_TAKEOFF' if self.stage == 'preparing' else 'MANUAL_CTRL' if ground else 'AUTO_TAKEOFF' if self.stage == 'taking_off' else 'AUTO_LAND' if self.stage in ('landing', 'landed_armed') else 'AUTO_HOVER'
-        self.publishers['controller'].publish(String(data=ctrl))
+        self.publishers['controller'].publish(String(data=self.controller_override or ctrl))
         self.publishers['ready'].publish(Bool(data=self.stage == 'hover' and self.hover_ready))
         self.publishers['preflight'].publish(Bool(data=ground and self.stage != 'preparing'))
         self.publishers['control'].publish(Bool(data=self.controls_ok))
@@ -242,6 +245,11 @@ class AutomaticRoundtripTest(unittest.TestCase):
             self.assertFalse(self.lands)
             return
         self.until(lambda: self.status.state == 'LANDING')
+        if self.scenario == 'complete':
+            # LAND must wait even after the normal retry interval while CMD_CTRL is active.
+            rospy.sleep(.7)
+            self.assertFalse(self.lands, 'LAND was sent before AUTO_HOVER')
+            self.controller_override = None
         self.until(lambda: bool(self.lands))
         self.assertNotEqual(self.status.state, 'COMPLETED')
         if self.scenario == 'cancel_landing':
