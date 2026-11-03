@@ -98,7 +98,8 @@ void RC_Data_t::feed(mavros_msgs::RCInConstPtr pMsg)
     // 3
     if (!is_hover_mode && !is_command_mode)
     {
-        if (last_reboot_cmd < REBOOT_THRESHOLD_VALUE && reboot_cmd > REBOOT_THRESHOLD_VALUE)
+        if (last_reboot_cmd < REBOOT_THRESHOLD_VALUE &&
+            reboot_cmd > REBOOT_THRESHOLD_VALUE)
             toggle_reboot = true;
         else
             toggle_reboot = false;
@@ -113,19 +114,24 @@ void RC_Data_t::feed(mavros_msgs::RCInConstPtr pMsg)
 
 void RC_Data_t::check_validity()
 {
-    if (mode >= -1.1 && mode <= 1.1 && gear >= -1.1 && gear <= 1.1 && reboot_cmd >= -1.1 && reboot_cmd <= 1.1)
+    if (mode >= -1.1 && mode <= 1.1 && gear >= -1.1 && gear <= 1.1 &&
+        reboot_cmd >= -1.1 && reboot_cmd <= 1.1)
     {
         // pass
     }
     else
     {
-        ROS_ERROR("RC data validity check fail. mode=%f, gear=%f, reboot_cmd=%f", mode, gear, reboot_cmd);
+        ROS_ERROR("RC data validity check fail. mode=%f, gear=%f, reboot_cmd=%f",
+                  mode,
+                  gear,
+                  reboot_cmd);
     }
 }
 
 bool RC_Data_t::check_centered()
 {
-    bool centered = fabs(ch[0]) < 1e-5 && fabs(ch[1]) < 1e-5 && fabs(ch[2]) < 1e-5 && fabs(ch[3]) < 1e-5;
+    bool centered = fabs(ch[0]) < 1e-5 && fabs(ch[1]) < 1e-5 && fabs(ch[2]) < 1e-5 &&
+                    fabs(ch[3]) < 1e-5;
     return centered;
 }
 
@@ -147,8 +153,12 @@ void Odom_Data_t::feed(nav_msgs::OdometryConstPtr pMsg)
     uav_utils::extract_odometry(pMsg, p, v, q, w);
 
 // #define VEL_IN_BODY
-#ifdef VEL_IN_BODY /* Set to 1 if the velocity in odom topic is relative to current body frame, not to world frame.*/
-    Eigen::Quaternion<double> wRb_q(msg.pose.pose.orientation.w, msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z);
+#ifdef VEL_IN_BODY /* Set to 1 if the velocity in odom topic is relative to current body \
+                      frame, not to world frame.*/
+    Eigen::Quaternion<double> wRb_q(msg.pose.pose.orientation.w,
+                                    msg.pose.pose.orientation.x,
+                                    msg.pose.pose.orientation.y,
+                                    msg.pose.pose.orientation.z);
     Eigen::Matrix3d wRb = wRb_q.matrix();
     v = wRb * v;
 
@@ -160,16 +170,16 @@ void Odom_Data_t::feed(nav_msgs::OdometryConstPtr pMsg)
     // check the frequency
     static int one_min_count = 9999;
     static ros::Time last_clear_count_time = ros::Time(0.0);
-    if ( (now - last_clear_count_time).toSec() > 1.0 )
+    if ((now - last_clear_count_time).toSec() > 1.0)
     {
-        if ( one_min_count < 100 )
+        if (one_min_count < 100)
         {
             ROS_WARN("ODOM frequency seems lower than 100Hz, which is too low!");
         }
         one_min_count = 0;
         last_clear_count_time = now;
     }
-    one_min_count ++;
+    one_min_count++;
 }
 
 Imu_Data_t::Imu_Data_t()
@@ -200,16 +210,16 @@ void Imu_Data_t::feed(sensor_msgs::ImuConstPtr pMsg)
     // check the frequency
     static int one_min_count = 9999;
     static ros::Time last_clear_count_time = ros::Time(0.0);
-    if ( (now - last_clear_count_time).toSec() > 1.0 )
+    if ((now - last_clear_count_time).toSec() > 1.0)
     {
-        if ( one_min_count < 100 )
+        if (one_min_count < 100)
         {
             ROS_WARN("IMU frequency seems lower than 100Hz, which is too low!");
         }
         one_min_count = 0;
         last_clear_count_time = now;
     }
-    one_min_count ++;
+    one_min_count++;
 }
 
 State_Data_t::State_Data_t()
@@ -218,7 +228,6 @@ State_Data_t::State_Data_t()
 
 void State_Data_t::feed(mavros_msgs::StateConstPtr pMsg)
 {
-
     current_state = *pMsg;
 }
 
@@ -238,7 +247,6 @@ Command_Data_t::Command_Data_t()
 
 void Command_Data_t::feed(quadrotor_msgs::PositionCommandConstPtr pMsg)
 {
-
     msg = *pMsg;
     rcv_stamp = ros::Time::now();
 
@@ -271,7 +279,6 @@ Battery_Data_t::Battery_Data_t()
 
 void Battery_Data_t::feed(sensor_msgs::BatteryStateConstPtr pMsg)
 {
-
     msg = *pMsg;
     rcv_stamp = ros::Time::now();
 
@@ -298,7 +305,9 @@ void Battery_Data_t::feed(sensor_msgs::BatteryStateConstPtr pMsg)
     {
         if ((rcv_stamp - last_print_t).toSec() > 1)
         {
-            ROS_ERROR("[px4ctrl] Dangerous! voltage=%.3f, percentage=%.3f", volt, percentage);
+            ROS_ERROR("[px4ctrl] Dangerous! voltage=%.3f, percentage=%.3f",
+                      volt,
+                      percentage);
             last_print_t = rcv_stamp;
         }
     }
@@ -311,10 +320,25 @@ Takeoff_Land_Data_t::Takeoff_Land_Data_t()
 
 void Takeoff_Land_Data_t::feed(quadrotor_msgs::TakeoffLandConstPtr pMsg)
 {
-
     msg = *pMsg;
     rcv_stamp = ros::Time::now();
 
     triggered = true;
     takeoff_land_cmd = pMsg->takeoff_land_cmd;
+}
+
+ApriltagLandPose_Data_t::ApriltagLandPose_Data_t()
+{
+    p_des << 0, 0;
+    yaw_des = 0;
+    rcv_stamp = ros::Time(0);
+}
+
+void ApriltagLandPose_Data_t::feed(geometry_msgs::PointConstPtr pMsg)
+{
+    rcv_stamp = ros::Time::now();
+
+    p_des.x() = pMsg->x;
+    p_des.y() = pMsg->y;
+    yaw_des = pMsg->z;
 }

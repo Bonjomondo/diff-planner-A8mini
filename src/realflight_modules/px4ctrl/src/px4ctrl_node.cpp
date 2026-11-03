@@ -77,6 +77,16 @@ int main(int argc, char *argv[])
                                                   ros::VoidConstPtr(),
                                                   ros::TransportHints().tcpNoDelay());
 
+    ros::Subscriber apriltag_land_pose_sub =
+        nh.subscribe<geometry_msgs::Point>("/landing_camera/landing_pose",
+                                         10,
+                                         boost::bind(&ApriltagLandPose_Data_t::feed, &fsm.land_pose_data, _1));
+    ros::Subscriber apriltag_land_status_sub =
+        nh.subscribe<std_msgs::String>("/landing_camera/status",
+                                       10,
+                                       boost::bind(&PX4CtrlFSM::gimbalLandStatus_cb, &fsm, _1));
+    fsm.gimbal_set_land_pub = nh.advertise<std_msgs::Bool>("/landing_camera/set_landing", 10);
+
     fsm.ctrl_FCU_pub = nh.advertise<mavros_msgs::AttitudeTarget>("/mavros/setpoint_raw/attitude", 10);
     fsm.traj_start_trigger_pub = nh.advertise<geometry_msgs::PoseStamped>("/traj_start_trigger", 10);
 
