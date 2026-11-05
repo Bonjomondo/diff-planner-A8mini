@@ -1,0 +1,18 @@
+# Mapping profile for nv. Metres; rotation is row-major.
+# Existing extrinsics from /home/nv/swarm, not a new calibration.
+# Network and broadcast code follow nv's current interface and shell settings.
+version: 1
+lidar:
+  model: MID360
+  ip: 192.168.9.88
+  host_ip: 192.168.9.50
+  broadcast_code: 47MDM630020460
+  publish_freq: 10
+imu:
+  topic: /mavros/imu/data
+  fcu_url: /dev/ttyTHS1:921600
+extrinsics:
+  extrinsic_T: [0.094614, -0.012512, 0.043731]
+  extrinsic_R: [0.9659258, 0, 0.2588190,
+                0, 1, 0,
+               -0.2588190, 0, 0.9659258]
