@@ -10,6 +10,13 @@
 //    preset  — 从 YAML（points.yaml）读取预设航点，可选 test_back 返航航线
 //    remote  — 由地面站通过 ROS Service /mission/remote/command 下发航线
 //
+//  守卫分档（2026-11-05 起）：
+//    L0 记录  —— 只记日志/遥测，不改变飞行。用于载荷类（云台动作超时）。
+//    L1 宽限  —— 持续失效超过阈值才中止（mission_guard::sustained）。用于地图/围栏
+//                校验、航点超时（先重发一次）。降落阶段对地图校验整体豁免。
+//    L3 立即  —— 飞机已不在可控状态：飞控掉出 OFFBOARD、里程计失效、轨迹输出闩锁、
+//                起飞未确认、降落被打断、走廊被占。保持一次即中止，不设宽限。
+//
 //  贯穿全文的安全设计：
 //    1) 任何"飞机是否可飞"的判断都要求数据新鲜（fresh()），任一路超时即中止；
 //    2) 异常统一走 abortMission()：锁定 mission_fault_，必须落地重启整套系统，
@@ -56,8 +63,11 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <mutex>
+#include <thread>
 #include <deque>
 #include <fstream>
 #include <iomanip>
@@ -140,6 +150,12 @@ public:
     // 构造流程：读参数 → 严格校验 → 加载航点 / 建立通信 → 启动定时器。
     // 参数非法时直接抛异常，由 main 打印 ROS_FATAL 后退出：
     // 宁可起不来，也不带着错误配置起飞。
+    ~MultipointPlanner()
+    {
+        corridor_stop_ = true;
+        if (corridor_thread_.joinable()) corridor_thread_.join();
+    }
+
     MultipointPlanner()
         : nh_(),
           pnh_("~"),
@@ -182,6 +198,8 @@ public:
             throw std::runtime_error("Invalid automatic flight timeouts");
         pnh_.param("require_flight_ready", require_flight_ready_, true);
         pnh_.param("require_map_coordinates", require_map_coordinates_, mission_source_ == "remote");
+        // 地图/围栏校验连续失效多久才中止；0 表示一次失效即中止（旧行为）。
+        pnh_.param("map_gate_debounce_sec", map_gate_debounce_sec_, 1.5);
         // 地图就绪标志：remote 模式下必须为 true 且新鲜，才允许上传/开始任务，
         // 用来确认点云坐标系与栅栏已经建立、航点坐标和世界系对得上。
         map_ready_sub_ = nh_.subscribe<std_msgs::Bool>("/indoor_mission/map_ready", 1,
@@ -211,7 +229,8 @@ public:
             !finite(flight_state_timeout_sec_) || flight_state_timeout_sec_ <= 0.0 ||
             !finite(waypoint_timeout_sec_) || waypoint_timeout_sec_ <= 0.0 ||
             !finite(gimbal_timeout_sec_) || gimbal_timeout_sec_ <= 0.0 ||
-            !finite(remote_reset_jump_m_) || remote_reset_jump_m_ <= 0.0)
+            !finite(remote_reset_jump_m_) || remote_reset_jump_m_ <= 0.0 ||
+            !finite(map_gate_debounce_sec_) || map_gate_debounce_sec_ < 0.0)
         {
             throw std::runtime_error("Invalid mission source/frame/timeout: use clicked|preset|remote and world");
         }
@@ -235,6 +254,7 @@ public:
         takeoff_land_pub_ =
             nh_.advertise<quadrotor_msgs::TakeoffLand>("/px4ctrl/takeoff_land", 10);
         planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
+        planning_resume_pub_ = nh_.advertise<std_msgs::Empty>("/planning/resume", 1);
         startcommand_pub_ =
             nh_.advertise<geometry_msgs::PoseStamped>("/move_base_simple/goal", 10);
         backcommand_pub_ =
@@ -333,6 +353,9 @@ public:
         ROS_INFO("Mission configuration: source=%s gimbal_actions=%s flight_gate=%s",
                  mission_source_.c_str(), enable_gimbal_actions_ ? "true" : "false",
                  require_flight_ready_ ? "true" : "false");
+
+        ROS_INFO("Map gate: require_map=%s debounce=%.2f s (landing phase exempt)",
+                 require_map_coordinates_ ? "true" : "false", map_gate_debounce_sec_);
     }
 
 private:
@@ -419,9 +442,11 @@ private:
     }
 
     // 自动飞行期间所有输入是否健全（起飞与降落两个阶段共用）。
+    // 地图/围栏不在这里判：它由 mapGateAllows() 统一带 L1 宽限处理，
+    // 否则同一个条件会在两处以不同严格度出现（旧代码就是这样漏掉起飞宽限的）。
     bool automaticInputsReady() const
     {
-        return mapCoordinatesReady() && odomFresh() && fresh(heartbeat_receive_time_, .5) &&
+        return odomFresh() && fresh(heartbeat_receive_time_, .5) &&
             point_pub_.getNumSubscribers() > 0 && fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
             fresh(extended_receive_time_, flight_state_timeout_sec_) && fcu_state_.connected &&
             fresh(controller_receive_time_, .5) && fresh(auto_control_time_, .5) && auto_control_ok_;
@@ -438,8 +463,8 @@ private:
     // 起飞高度已知、速度接近静止、起降指令有订阅者等。
     bool automaticStartReady() const
     {
-        return automatic_roundtrip_ && trajectoryOutputReady() && !landing_latched_ && !mission_fault_ &&
-            automaticInputsReady() &&
+        return automatic_roundtrip_ && trajectoryOutputReady() && mapCoordinatesReady() &&
+            !landing_latched_ && !mission_fault_ && automaticInputsReady() &&
             !fcu_state_.armed && landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND &&
             controller_state_ == "MANUAL_CTRL" && fresh(takeoff_ready_time_, .5) && takeoff_ready_ &&
             fresh(takeoff_height_time_, .5) && finite(takeoff_height_) && takeoff_height_ > .1 &&
@@ -447,7 +472,70 @@ private:
     }
 
     // Endpoint-only check; this does not check the complete vertical segment.
-    bool verticalCorridorEndpointsClear(const Eigen::Vector3d& ground, const Eigen::Vector3d& hover)
+    // 走廊检查放到后台线程：只有这个线程会阻塞在服务调用上，控制回路只读结果。
+    void ensureCorridorWorker()
+    {
+        if (corridor_thread_.joinable()) return;
+        corridor_thread_ = std::thread([this]() { corridorWorker(); });
+    }
+
+    void setCorridorTargets(const Eigen::Vector3d& ground, const Eigen::Vector3d& hover)
+    {
+        std::lock_guard<std::mutex> guard(corridor_target_mutex_);
+        corridor_ground_ = ground;
+        corridor_hover_ = hover;
+        corridor_active_ = true;
+    }
+
+    void corridorWorker()
+    {
+        ros::ServiceClient check =
+            nh_.serviceClient<nav_msgs::GetPlan>("/indoor_mission/check_endpoints");
+        bool last_ok = true;
+        while (ros::ok() && !corridor_stop_)
+        {
+            if (!corridor_active_)
+            {
+                ros::WallDuration(.05).sleep();
+                continue;
+            }
+            Eigen::Vector3d ground, hover;
+            {
+                std::lock_guard<std::mutex> guard(corridor_target_mutex_);
+                ground = corridor_ground_;
+                hover = corridor_hover_;
+            }
+            const bool ok = queryCorridorClear(check, ground, hover, "periodic");
+            if (ok && !last_ok)
+                ROS_INFO("Corridor check recovered: both endpoints clear again");
+            last_ok = ok;
+            corridor_ok_ = ok;
+            corridor_result_wall_ = ros::WallTime::now().toSec();
+            ros::WallDuration(.2).sleep();
+        }
+    }
+
+    // 结果超过 1.5 s 没更新，按"监控失效"处理并中止——宁可停下，也不要
+    // 带着一个不响应的走廊监控继续下降。
+    bool corridorHealthy()
+    {
+        const double stamp = corridor_result_wall_.load();
+        if (stamp <= 0.0) return true;                 // 本阶段还没查过
+        const double age = ros::WallTime::now().toSec() - stamp;
+        if (age > 1.5)
+        {
+            ROS_WARN_THROTTLE(1.0, "Corridor check service has not answered for %.1f s", age);
+            return false;
+        }
+        return corridor_ok_.load();
+    }
+
+    // 走廊检查的统一实现：/indoor_mission/check_endpoints 只返回"起点+终点"两个点，
+    // 才说明两端都在已知、无占据、无膨胀且在本围栏内。
+    // 失败时把判定依据全部打出来（服务是否应答、返回点数、耗时、两个端点坐标），
+    // 否则线上只能看到一句 corridor is no longer clear，无法定位是哪一端出了问题。
+    bool queryCorridorClear(ros::ServiceClient& client, const Eigen::Vector3d& ground,
+                            const Eigen::Vector3d& hover, const char* where)
     {
         nav_msgs::GetPlan query;
         query.request.start.header.frame_id = query.request.goal.header.frame_id = "world";
@@ -458,8 +546,25 @@ private:
         query.request.goal.pose.position.x = hover.x();
         query.request.goal.pose.position.y = hover.y();
         query.request.goal.pose.position.z = hover.z();
+        const double started = ros::WallTime::now().toSec();
+        const bool called = client.call(query);
+        const double elapsed_ms = (ros::WallTime::now().toSec() - started) * 1000.0;
+        const auto poses = query.response.plan.poses.size();
+        const bool clear = called && poses == 2;
+        if (!clear)
+            ROS_WARN_THROTTLE(1.0,
+                              "Corridor check failed (%s): call_ok=%s poses=%zu took=%.1f ms "
+                              "ground=(%.2f,%.2f,%.2f) hover=(%.2f,%.2f,%.2f)",
+                              where, called ? "true" : "false", poses, elapsed_ms,
+                              ground.x(), ground.y(), ground.z(),
+                              hover.x(), hover.y(), hover.z());
+        return clear;
+    }
+
+    bool verticalCorridorEndpointsClear(const Eigen::Vector3d& ground, const Eigen::Vector3d& hover)
+    {
         auto check = nh_.serviceClient<nav_msgs::GetPlan>("/indoor_mission/check_endpoints");
-        return check.call(query) && query.response.plan.poses.size() == 2;
+        return queryCorridorClear(check, ground, hover, "upload");
     }
 
     // 自动起飞第一步：确认地面点未漂移、起飞高度未变、垂直走廊通畅，
@@ -480,6 +585,8 @@ private:
         remote_mission_.state = "TAKING_OFF";
         automatic_phase_time_ = ros::WallTime::now();
         last_corridor_check_ = ros::WallTime();
+        corridor_result_wall_ = ros::WallTime::now().toSec();
+        corridor_ok_ = true;
         auto_hover_since_ = ros::WallTime();
         takeoff_seen_ = false;
         quadrotor_msgs::TakeoffLand command;
@@ -547,15 +654,15 @@ private:
             return;
         }
         const auto& return_point = remote_mission_.points.back();
-        if ((ros::WallTime::now() - last_corridor_check_).toSec() >= .2)
+        // 走廊检查移到后台线程（见 corridorWorker）：这个服务由 diff_planner 提供，
+        // 在 50 ms 控制回路里同步调用会把里程计回调一起阻塞住。
+        ensureCorridorWorker();
+        setCorridorTargets(ground_origin_,
+                           Eigen::Vector3d(return_point.x, return_point.y, return_point.z));
+        if (!corridorHealthy())
         {
-            last_corridor_check_ = ros::WallTime::now();
-            if (!verticalCorridorEndpointsClear(ground_origin_,
-                                                Eigen::Vector3d(return_point.x, return_point.y, return_point.z)))
-            {
-                abortMission("Vertical takeoff/landing corridor is no longer clear");
-                return;
-            }
+            abortMission("Vertical takeoff/landing corridor is no longer clear");
+            return;
         }
         // 自动降落阶段
         if (!taking_off)
@@ -622,6 +729,33 @@ private:
             else if (remote_mission_.state == "READY") invalidateRemoteSession("Draft mission cancelled");
             return;
         }
+        if (request.operation == "clear")
+        {
+            // 地面清理：解除上一次失败/降落闩锁并把机载任务复位到 IDLE。
+            // 这是"落地重启整套系统"之外唯一的复位途径，所以条件比 cancel 更严：
+            // 必须收到新鲜的 FCU 状态、已连接、未解锁、且扩展状态明确在地面。
+            if (!fresh(fcu_receive_time_, flight_state_timeout_sec_) || !fcu_state_.connected ||
+                fcu_state_.armed ||
+                landed_state_ != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
+                throw std::runtime_error(
+                    "Clear requires a connected, disarmed aircraft confirmed on the ground");
+            if (state_ != FINISHED || remote_mission_.active())
+                throw std::runtime_error("Clear requires the mission to be stopped");
+            const bool had_fault = mission_fault_;
+            remote_mission_.clear();
+            mission_fault_ = false;
+            landing_latched_ = false;
+            automatic_landing_ = false;
+            uploaded_automatic_ = false;
+            state_ = FINISHED;
+            // 同时解除 traj_server 的 stop 闩锁；它自己还会再查一次
+            // 未解锁 + 在地面，空中收到会拒绝。
+            planning_resume_pub_.publish(std_msgs::Empty());
+            publishRemoteStatus();
+            ROS_WARN("Remote mission cleared on the ground (previous fault=%s); trajectory output reset requested",
+                     had_fault ? "true" : "false");
+            return;
+        }
         if (landing_latched_ || mission_fault_)
             throw std::runtime_error("Landing/failure is latched; land and restart the stack");
         if (!odomFresh()) throw std::runtime_error("Fresh world odometry is required");
@@ -652,10 +786,12 @@ private:
                 if (!ground.allFinite() || (ground - odom_position_).norm() > .1 ||
                     (hover.head<2>() - ground.head<2>()).norm() > .03 ||
                     std::abs(home.z - ground.z() - takeoff_height_) > .03 ||
-                    std::hypot(route.front().x - home.x, route.front().y - home.y) < .3 ||
-                    !verticalCorridorEndpointsClear(ground, hover))
+                    std::hypot(route.front().x - home.x, route.front().y - home.y) < .3)
                     throw std::runtime_error(
-                        "Invalid ground origin, return height or blocked/unknown vertical corridor");
+                        "Invalid ground origin, return height or target too close");
+                // 上传阶段不再校验走廊：规划器地图只覆盖已观测空间，未观测点会被判
+                // unknown 而阻塞保存。起飞前（beginAutomaticTakeoff）和下降中仍然检查。
+                ROS_INFO("Route uploaded without corridor pre-check; takeoff and descent will verify");
                 remote_mission_.upload(request.map_session_id, request.mission_id, request.revision, route);
                 ground_origin_ = ground;
                 uploaded_automatic_ = true;
@@ -738,6 +874,9 @@ private:
     void invalidateRemoteSession(const std::string& reason)
     {
         if (mission_source_ != "remote") return;
+        // 注意：这里的中止不是重复代码——remote_mission_.invalidate() 会把状态
+        // 置为 FAILED，之后就再也不会进入自动阶段的分支，别的守卫也就没机会
+        // 触发。真正通知控制器停止的只有这一句。
         if (state_ != FINISHED || remote_mission_.active()) abortMission(reason.c_str());
         remote_had_fresh_odom_ = false;
         remote_mission_.invalidate(newMapSession(), reason);
@@ -1375,7 +1514,7 @@ private:
 
     // 把 active_waypoints_[current_index_] 发布到 /goal，并把状态置为 FLYING。
     // 这里也是"重新规划"的切换点：Diff-Planner 会从飞机当前状态规划到新目标。
-    void publishCurrentGoal()
+    void publishCurrentGoal(bool retry = false)
     {
         const Waypoint& waypoint = active_waypoints_.at(current_index_);
         geometry_msgs::PoseStamped goal;
@@ -1391,6 +1530,7 @@ private:
         state_ = FLYING;
         if (mission_source_ == "remote") remote_mission_.state = "FLYING";
         arrival_candidate_time_ = ros::Time(0);
+        if (!retry) waypoint_retry_count_ = 0;
         ROS_INFO("Published waypoint %u goal: [x %.2f, y %.2f, z %.2f]",
                  waypoint.id, waypoint.x, waypoint.y, waypoint.z);
     }
@@ -1401,6 +1541,29 @@ private:
     //   3) 处理降落闩锁下的指令重发与"已落地"判定
     //   4) 逐项安全检查（地图、里程计、轨迹输出、飞行状态、规划器心跳），任一失败即中止
     //   5) 按状态机推进：FLYING → HOVERING →（WAITING_GIMBAL）→ 下一个航点
+    // L1 地图门：降落阶段豁免；其余阶段连续失效超过 map_gate_debounce_sec_
+    // 才中止。返回 false 表示已经中止任务。
+    bool mapGateAllows()
+    {
+        const bool landing_phase = landing_latched_ || remote_mission_.state == "LANDING";
+        if (landing_phase || mapCoordinatesReady())
+        {
+            map_gate_failed_since_ = 0.0;
+            return true;
+        }
+        const double gate_now = ros::WallTime::now().toSec();
+        if (mission_guard::sustained(gate_now, true, map_gate_failed_since_,
+                                     map_gate_debounce_sec_))
+        {
+            abortMission("point-cloud coordinates or fence verification lost");
+            return false;
+        }
+        ROS_WARN_THROTTLE(1.0, "Map/fence verification lost for %.2f s; "
+                          "abort after %.2f s if it persists",
+                          gate_now - map_gate_failed_since_, map_gate_debounce_sec_);
+        return true;
+    }
+
     void timerCallback(const ros::TimerEvent&)
     {
         const ros::Time now = ros::Time::now();
@@ -1414,6 +1577,12 @@ private:
                 publishRemoteStatus();
         }
         tickAutomaticFlight();
+
+        // 地图/围栏门（L1）：连续失效超过 map_gate_debounce_sec_ 才中止。
+        // 必须在下面的 TAKING_OFF 提前 return 之前，否则起飞阶段会绕过宽限
+        // （旧实现里 automaticInputsReady(true) 一帧失效就中止）。
+        if (state_ != FINISHED && !mapGateAllows()) return;
+
         if (remote_mission_.state == "TAKING_OFF") return;
         if (landing_latched_ && automatic_landing_ &&
             fresh(fcu_receive_time_, flight_state_timeout_sec_) &&
@@ -1422,6 +1591,7 @@ private:
             landed_state_ == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
         {
             automatic_landing_ = false;
+            corridor_active_ = false;
             ROS_INFO("Landing complete: ground + disarmed; LAND retries stopped. Restart stack for next flight.");
         }
         if (landing_latched_ && automatic_landing_ &&
@@ -1434,11 +1604,6 @@ private:
 
         if (state_ == FINISHED)
         {
-            return;
-        }
-        if (!mapCoordinatesReady())
-        {
-            abortMission("point-cloud coordinates or fence verification lost");
             return;
         }
         if (!odomFresh())
@@ -1487,6 +1652,15 @@ private:
         {
             if ((ros::WallTime::now() - goal_publish_time_).toSec() > waypoint_timeout_sec_)
             {
+                // L1：先重发一次目标并重新计时，仍不到才中止。
+                if (waypoint_retry_count_ < 1)
+                {
+                    ++waypoint_retry_count_;
+                    ROS_WARN("Waypoint %u not reached within %.0f s; republishing the goal once",
+                             waypoint.id, waypoint_timeout_sec_);
+                    publishCurrentGoal(true);
+                    return;
+                }
                 abortMission("waypoint timeout (goal may have been rejected, changed or unreachable)");
                 return;
             }
@@ -1552,7 +1726,10 @@ private:
         if (state_ == WAITING_GIMBAL &&
             (ros::WallTime::now() - gimbal_wait_time_).toSec() > gimbal_timeout_sec_)
         {
-            abortMission("gimbal completion timeout");
+            // L0：云台是载荷，不参与飞行安全。超时只放弃这一动作，任务继续。
+            ROS_WARN("Gimbal task for waypoint %u not confirmed within %.0f s; skipping it",
+                     waypoint.id, gimbal_timeout_sec_);
+            advanceWaypoint();
             return;
         }
         if (state_ == WAITING_GIMBAL &&
@@ -1605,12 +1782,9 @@ private:
             return;
         }
 
+        // 不在这里重复检查 odom/flightReady：50 ms 主循环已经在做，而且会给出
+        // 具体原因（旧代码在这里只有一句笼统的中止）。
         const Waypoint& waypoint = active_waypoints_.at(current_index_);
-        if (!odomFresh() || !flightReady(false))
-        {
-            abortMission("invalid flight state at gimbal completion");
-            return;
-        }
         if (msg->data != waypoint.id)
         {
             ROS_WARN("Ignoring gimbal_done %u; currently waiting for waypoint %u",
@@ -1774,6 +1948,8 @@ private:
         closeMissionCsv();
         landing_latched_ = true;
         automatic_landing_ = automatic;
+        corridor_result_wall_ = ros::WallTime::now().toSec();
+        corridor_ok_ = true;
         if (mission_source_ == "remote")
         {
             remote_mission_.state = "LANDING";
@@ -1920,7 +2096,7 @@ private:
     ros::Publisher point_pub_;
     ros::Publisher gimbal_task_pub_;
     ros::Publisher takeoff_land_pub_;
-    ros::Publisher planning_stop_pub_;
+    ros::Publisher planning_stop_pub_, planning_resume_pub_;
     ros::Publisher startcommand_pub_;
     ros::Publisher backcommand_pub_;
     ros::Publisher clicked_markers_pub_;
@@ -2012,9 +2188,18 @@ private:
     bool automatic_roundtrip_ = false, uploaded_automatic_ = false;
     bool takeoff_ready_ = false, auto_control_ok_ = false, takeoff_seen_ = false;
     double takeoff_height_ = 0., takeoff_timeout_sec_, landing_timeout_sec_;
+    double map_gate_debounce_sec_ = 1.5, map_gate_failed_since_ = 0.0;
+    int waypoint_retry_count_ = 0;
     Eigen::Vector3d ground_origin_ = Eigen::Vector3d::Zero();
     ros::WallTime takeoff_ready_time_, auto_control_time_, takeoff_height_time_, automatic_phase_time_,
               auto_hover_since_, last_corridor_check_, landing_contact_time_;
+    std::thread corridor_thread_;
+    std::atomic<bool> corridor_stop_{false};
+    std::atomic<bool> corridor_active_{false};
+    std::atomic<bool> corridor_ok_{true};
+    std::atomic<double> corridor_result_wall_{0.0};
+    std::mutex corridor_target_mutex_;
+    Eigen::Vector3d corridor_ground_{0., 0., 0.}, corridor_hover_{0., 0., 0.};
     ros::Subscriber takeoff_ready_sub_, auto_control_sub_, takeoff_height_sub_;
     ros::Publisher abort_automatic_pub_;
     std::ofstream mission_csv_;

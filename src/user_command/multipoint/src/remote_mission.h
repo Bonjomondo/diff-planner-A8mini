@@ -105,6 +105,20 @@ public:
         reason.clear();
     }
 
+    // 操作员在地面确认后清理既有任务（含 FAILED）。安全判断由调用方负责：
+    // 这里只做状态复位，不检查飞机是否在地面。
+    void clear()
+    {
+        if (active()) throw std::runtime_error("Cannot clear an active mission");
+        state = "IDLE";
+        id.clear();
+        revision = 0;
+        completed = 0;
+        points.clear();
+        reason.clear();
+        mission_ids_.clear();
+    }
+
     void invalidate(const std::string &new_session, const std::string &why)
     {
         session = new_session;

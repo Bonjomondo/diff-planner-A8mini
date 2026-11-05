@@ -2,6 +2,10 @@
   <!-- Automatic task adapter only; sensors/planner/controller are started separately. -->
   <param name="/multipointplan/automatic_roundtrip" value="true" />
   <param name="/multipointplan/require_map_coordinates" value="true" />
+  <!-- 地图/围栏校验连续失效多久才中止。实测单帧毛刺后重建 10 对需 1.0 s，
+       加网关 5 Hz 发布延迟共约 1.1~1.2 s，故取 1.5 s 以吸收单帧毛刺；
+       降落阶段本身不中止（见 multipointplan.cpp）。 -->
+  <param name="/multipointplan/map_gate_debounce_sec" value="1.5" />
   <include file="$(find multipoint)/launch/multipointplan_exp_lio.launch">
     <arg name="mission_source" value="remote" />
     <arg name="start_gimbal_node" value="false" />

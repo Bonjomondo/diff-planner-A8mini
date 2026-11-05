@@ -19,6 +19,21 @@ inline bool stampedFresh(double age, double timeout, double future_tolerance)
            age >= -future_tolerance && age <= timeout;
 }
 
+// 连续失败计时：failing_now 为假时清零；为真时从首次进入开始累计，
+// 累计时长达到 debounce 才返回 true。since 由调用方持有（0 表示未在失败中），
+// now 需单调递增（用 ros::WallTime::toSec()）。
+inline bool sustained(double now, bool failing_now, double& since, double debounce)
+{
+    if (!failing_now)
+    {
+        since = 0.0;
+        return false;
+    }
+    if (since <= 0.0) since = now;
+    return std::isfinite(now) && std::isfinite(debounce) && debounce >= 0.0 &&
+           now - since >= debounce;
+}
+
 struct FlightStatus
 {
     bool fresh_state = false;

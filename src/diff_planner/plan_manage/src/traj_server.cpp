@@ -5,10 +5,14 @@
 #include <quadrotor_msgs/TakeoffLand.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
+#include <mavros_msgs/State.h>
+#include <mavros_msgs/ExtendedState.h>
 #include <visualization_msgs/Marker.h>
 #include <ros/ros.h>
 #include <algorithm>
 #include <cmath>
+
+#include "traj_guard.h"
 
 using namespace Eigen;
 
@@ -26,6 +30,9 @@ quadrotor_msgs::PositionCommand cmd;
 
 bool receive_traj_ = false;
 bool landing_requested_ = false;
+// 复位闩锁的安全门槛用：默认按"已解锁"处理，收到状态前一律拒绝复位。
+bool fcu_armed_ = true;
+int fcu_landed_state_ = 0;
 boost::shared_ptr<poly_traj::Trajectory> traj_;
 double traj_duration_;
 ros::Time start_time_;
@@ -71,6 +78,33 @@ void publishOutputReady()
 void planningStopCallback(const std_msgs::EmptyConstPtr &)
 {
   stopCommandOutput("planning stop");
+}
+
+void stateCallback(const mavros_msgs::StateConstPtr &msg)
+{
+  fcu_armed_ = msg->armed;
+}
+
+void extendedStateCallback(const mavros_msgs::ExtendedStateConstPtr &msg)
+{
+  fcu_landed_state_ = static_cast<int>(msg->landed_state);
+}
+
+// 地面受控复位：只有在地面、未解锁、且没有在跟踪轨迹时才允许解除 stop 闩锁。
+// 空中收到该指令一律拒绝并告警。
+void planningResumeCallback(const std_msgs::EmptyConstPtr &)
+{
+  if (!landing_requested_)
+    return;
+  if (!traj_guard::resumeAllowed(fcu_armed_, fcu_landed_state_, receive_traj_))
+  {
+    ROS_WARN("[traj_server] planning resume refused: armed=%d landed_state=%d tracking=%d",
+             fcu_armed_ ? 1 : 0, fcu_landed_state_, receive_traj_ ? 1 : 0);
+    return;
+  }
+  landing_requested_ = false;
+  ROS_WARN("[traj_server] planning output resumed on the ground (disarmed, landed)");
+  publishOutputReady();
 }
 
 void takeoffLandCallback(const quadrotor_msgs::TakeoffLandConstPtr &msg)
@@ -426,6 +460,11 @@ int main(int argc, char **argv)
       nh.subscribe("/planning/stop", 10, planningStopCallback);
   ros::Subscriber takeoff_land_sub =
       nh.subscribe("/px4ctrl/takeoff_land", 10, takeoffLandCallback);
+  ros::Subscriber fcu_state_sub = nh.subscribe("/mavros/state", 10, stateCallback);
+  ros::Subscriber fcu_ext_sub =
+      nh.subscribe("/mavros/extended_state", 10, extendedStateCallback);
+  ros::Subscriber planning_resume_sub =
+      nh.subscribe("/planning/resume", 10, planningResumeCallback);
   
   pos_cmd_pub = nh.advertise<quadrotor_msgs::PositionCommand>("/position_cmd", 50);
 

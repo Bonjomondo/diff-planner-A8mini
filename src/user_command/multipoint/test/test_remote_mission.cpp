@@ -74,5 +74,22 @@ int main()
     for (uint32_t i = 1; i <= 200; ++i) maximum.push_back({i, 0, 0, 1, 60});
     history.upload("map", "maximum", 1, maximum);
     assert(history.points.size() == 200);
+    // 地面清理：FAILED 之后必须能复位到 IDLE 并重新上传；活动任务不允许清理。
+    Mission cleared;
+    cleared.session = "map";
+    cleared.upload("map", "first", 1, route);
+    cleared.state = "FAILED";
+    cleared.reason = "odometry lost";
+    rejects([&] { cleared.upload("map", "second", 1, route); });   // FAILED 时上传会被拒
+    cleared.clear();
+    assert(cleared.state == "IDLE" && cleared.id.empty() && cleared.points.empty());
+    assert(cleared.revision == 0 && cleared.completed == 0);
+    cleared.upload("map", "second", 1, route);
+    assert(cleared.state == "READY" && cleared.id == "second");
+    cleared.state = "FLYING";
+    rejects([&] { cleared.clear(); });                             // 活动任务拒绝清理
+    cleared.state = "LANDING";
+    rejects([&] { cleared.clear(); });
+
     std::cout << "Remote mission checks passed: atomic routes, bounds, versions, frozen prefix and sessions\n";
 }
