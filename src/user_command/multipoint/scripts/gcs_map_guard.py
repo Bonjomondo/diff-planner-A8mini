@@ -5,12 +5,30 @@ It rejects mismatched frames instead of estimating a transform from one pose.
 """
 from collections import deque
 import math
+import numbers
 import time
+
+# 两条流允许的最大配对时间差（秒）；沿用既有门限。
+PAIR_TOLERANCE = .05
+# 位置 / 姿态门限与连续合格对数，同样沿用既有值。
+DISTANCE_TOLERANCE = .15
+ANGLE_TOLERANCE = math.radians(5)
+# 判定阈值：连续合格对数低于它即判无效。
+MIN_GOOD_PAIRS = 10
+# 失败时的衰减方式：从"清零"改为"减半"（漏桶）。孤立的一帧毛刺只会让计数
+# 掉一半（长途飞行时计数接近上限，仍远高于阈值）；持续失真则每帧减半，
+# 约 log2(计数/阈值) 帧内跌到阈值以下（10 Hz 下通常 < 1 s）。
+FRESH_SECONDS = .5
+# 计数上限：只用于避免整数无限增长，不影响判定（阈值是 MIN_GOOD_PAIRS）。
+MAX_GOOD_PAIRS = 1000
+
+_REAL = numbers.Real
 
 
 def valid_bounds(bounds):
     return (isinstance(bounds, (list, tuple)) and len(bounds) == 6
-            and all(type(v) in (int, float) and math.isfinite(v) for v in bounds)
+            and all(isinstance(v, _REAL) and not isinstance(v, bool) and math.isfinite(v)
+                    for v in bounds)
             and all(bounds[i] < bounds[i + 3] for i in range(3)))
 
 
@@ -23,56 +41,108 @@ class MapGuard:
         self.clock = clock
         self.map = None
         self.planner = deque(maxlen=100)
-        self.last_pair = None
+        self.pending = deque(maxlen=16)
         self.good = 0
         self.last_good = 0
+        self.last_reject = "none"
         self.sequences = {}
 
     def observe(self, source, stamp, frame, position, orientation, sequence=None):
         if sequence is not None:
             if source in self.sequences and sequence < self.sequences[source]:
                 self.good = 0
-                self.last_pair = None
+                self.pending.clear()
                 self.planner.clear()
                 self.map = None
+                self.last_reject = "restart"
             self.sequences[source] = sequence
         values = [stamp] + list(position) + list(orientation)
-        if (len(position) != 3 or len(orientation) != 4 or not all(math.isfinite(v) for v in values)
-                or stamp <= 0 or frame != 'world'):
+        if (len(position) != 3 or len(orientation) != 4
+                or not all(math.isfinite(v) for v in values) or stamp <= 0):
             self.good = 0
+            self.last_reject = "nonfinite"
+            return
+        if frame != 'world':
+            self.good = 0
+            self.last_reject = "frame"
             return
         norm = math.sqrt(sum(v * v for v in orientation))
         if norm < 1e-8:
             self.good = 0
+            self.last_reject = "quaternion"
             return
         sample = (stamp, tuple(position), tuple(v / norm for v in orientation), self.clock())
         if source == 'map':
-            if self.map and stamp <= self.map[0]:
+            if self.map is not None and stamp < self.map[0]:
                 self.good = 0
-                self.last_pair = None
+                self.pending.clear()
+                self.last_reject = "restart"
+            elif self.map is not None and stamp == self.map[0]:
+                # 同一帧重复发布：既不是新场次也不是倒退，忽略即可，
+                # 不能像旧实现那样把连续计数清零。
+                return
             self.map = sample
+            self.pending.append(sample)
         else:
             if self.planner and stamp < self.planner[-1][0]:
                 self.good = 0
                 self.planner.clear()
+                self.pending.clear()
+                self.last_reject = "restart"
             self.planner.append(sample)
-        if not self.map or not self.planner:
-            return
-        candidate = min(self.planner, key=lambda p: abs(p[0] - self.map[0]))
-        if abs(candidate[0] - self.map[0]) > .05 or self.map[0] == self.last_pair:
-            return
-        self.last_pair = self.map[0]
-        distance = sum((a - b) ** 2 for a, b in zip(candidate[1], self.map[1])) ** .5
-        cosine = min(1., abs(sum(a * b for a, b in zip(candidate[2], self.map[2]))))
-        if distance > .15 or 2 * math.acos(cosine) > math.radians(5):
-            self.good = 0
+        self._flush()
+
+    def _flush(self):
+        """判定时机：等 EKF 流越过该 LIO 时间戳后再配对一次。
+
+        时间最近的那个 EKF 样本，只可能在该时间戳之前或之后；一旦看到
+        不早于它的 EKF 样本，前后两个候选就都在缓存里了，"最近的一对"
+        此时才唯一确定。旧实现收到 LIO 就立刻拿当时缓存里最新的 EKF 配对，
+        并把这帧 LIO 记为已配对；更贴近时间戳的 EKF 稍后到达也不会重新
+        校验，高速转向时姿态差被放大（2026-11-05 实际飞行把计数从 296
+        清零，map_ready 掉线 1.2 s，任务因此中止）。
+        """
+        while self.pending and self.planner and self.planner[-1][0] >= self.pending[0][0]:
+            self._evaluate(self.pending.popleft())
+
+    def _evaluate(self, map_sample):
+        candidate = min(self.planner, key=lambda p: abs(p[0] - map_sample[0]))
+        if abs(candidate[0] - map_sample[0]) > PAIR_TOLERANCE:
+            self.last_reject = "no_counterpart"
+            return                      # 没有可配对样本：不改变计数，也不判失败
+        distance = sum((a - b) ** 2 for a, b in zip(candidate[1], map_sample[1])) ** .5
+        cosine = min(1., abs(sum(a * b for a, b in zip(candidate[2], map_sample[2]))))
+        if distance > DISTANCE_TOLERANCE:
+            self.good //= 2
+            self.last_reject = "distance"
+        elif 2 * math.acos(cosine) > ANGLE_TOLERANCE:
+            self.good //= 2
+            self.last_reject = "angle"
         else:
-            self.good += 1
+            self.good = min(self.good + 1, MAX_GOOD_PAIRS)
             self.last_good = self.clock()
+            self.last_reject = "none"
+
+    def _invalid_reason(self, ros_now, stamp):
+        if self.map is None:
+            return "no_map"
+        if self.clock() - self.map[3] >= FRESH_SECONDS:
+            return "map_not_arriving"
+        age = ros_now - stamp
+        if not math.isfinite(age):
+            return "map_stamp_invalid"
+        if age < -PAIR_TOLERANCE:
+            return "map_stamp_ahead"
+        if age >= FRESH_SECONDS:
+            return "map_stamp_late"
+        if self.good < MIN_GOOD_PAIRS:
+            return "pairs_below_threshold"
+        if self.clock() - self.last_good >= FRESH_SECONDS:
+            return "pairs_stale"
+        return ""
 
     def snapshot(self, ros_now):
         stamp = self.map[0] if self.map else 0.
-        valid = (self.good >= 10 and self.clock() - self.last_good < .5
-                 and self.map is not None and self.clock() - self.map[3] < .5
-                 and -.05 <= ros_now - stamp < .5)
-        return dict(map_coordinates_valid=bool(valid), map_odom_stamp=stamp)
+        reason = self._invalid_reason(ros_now, stamp)
+        return dict(map_coordinates_valid=not reason, map_odom_stamp=stamp,
+                    map_reason=reason, map_last_reject=self.last_reject)
