@@ -38,6 +38,7 @@ class RosBackend:
         self.state = State()
         self.battery = -1.0
         self.map_guard = MapGuard()
+        self.map_gate_reason = ''
         self.fence = []
         self.map_route = None
         self.map_route_points = []
@@ -62,10 +63,33 @@ class RosBackend:
         with self.lock:
             self.fence = list(msg.data) if valid_bounds(msg.data) else []
 
+    def map_gate(self):
+        """地图校验 + 围栏的综合结论；调用方负责持锁。
+
+        规划器侧按 L1 处置：map_gate_reason 非空只表示"宽限计时开始"，
+        连续超过 map_gate_debounce_sec_ 才会中止任务；降落阶段由规划器豁免。
+        """
+        snap = self.map_guard.snapshot(rospy.Time.now().to_sec())
+        if not snap['map_coordinates_valid']:
+            snap['map_gate_reason'] = snap['map_reason'] or 'unknown'
+        elif not self.fence:
+            snap['map_gate_reason'] = 'no_fence'
+        else:
+            snap['map_gate_reason'] = ''
+        snap['fence_valid'] = bool(self.fence)
+        return snap
+
     def publish_map_ready(self, _):
         with self.lock:
-            ready = self.map_guard.snapshot(rospy.Time.now().to_sec())['map_coordinates_valid'] and bool(self.fence)
-        self.map_ready_pub.publish(Bool(data=ready))
+            gate = self.map_gate()
+            reason = gate['map_gate_reason']
+            if reason and reason != self.map_gate_reason:
+                rospy.logwarn('map gate closed: %s (last reject: %s, fence_valid: %s)',
+                              reason, gate['map_last_reject'], gate['fence_valid'])
+            elif not reason and self.map_gate_reason:
+                rospy.loginfo('map gate reopened: coordinates and fence verified again')
+            self.map_gate_reason = reason
+        self.map_ready_pub.publish(Bool(data=not reason))
 
     def on_status(self, message):
         with self.lock:
@@ -106,13 +130,13 @@ class RosBackend:
                         mission_ready=mission['flight_ready'], odom_fresh=mission['odom_fresh'],
                         world_x=mission['world_x'], world_y=mission['world_y'],
                         world_z=mission['world_z'], mission=mission, flight_bounds=list(self.fence),
-                        **self.map_guard.snapshot(rospy.Time.now().to_sec()))
+                        **self.map_gate())
 
     def command(self, command):
         with self.lock:
             stale = time.monotonic() - self.status_time > 1.0
             guarded = command.get('require_map_alignment', False)
-            verified = self.map_guard.snapshot(rospy.Time.now().to_sec())['map_coordinates_valid'] and bool(self.fence)
+            verified = not self.map_gate()['map_gate_reason']
             bounds = tuple(self.fence)
             identity = (command['map_session_id'], command['mission_id'], command['revision'], bounds)
             route_matches = self.map_route == identity
@@ -136,9 +160,14 @@ class RosBackend:
                             setattr(query.start.pose.position, key, point[key])
                             setattr(query.goal.pose.position, key, point[key])
                         if not check(query).plan.poses:
-                            return False, 'Goal/return point is occupied, unknown or outside local planner map', self.telemetry()['mission']
+                            # 上传阶段只记录：真正的安全关口是起飞前和下降中的走廊检查。
+                            # 规划器地图只覆盖已观测空间，未观测区域常被判 unknown，
+                            # 在“上传”这一步拒绝会让操作员无法保存任务。
+                            rospy.logwarn('endpoint (%.2f, %.2f, %.2f) is occupied/unknown on the '
+                                          'planner map; upload allowed, takeoff/descent will re-check',
+                                          point['x'], point['y'], point['z'])
                 except (rospy.ROSException, rospy.ServiceException):
-                    return False, 'Planner endpoint check unavailable', self.telemetry()['mission']
+                    rospy.logwarn('planner endpoint check unavailable; upload allowed, takeoff/descent will re-check')
         if stale:
             return False, 'Mission executor status stale; query after recovery', self.telemetry()['mission']
         request = MissionCommandRequest()

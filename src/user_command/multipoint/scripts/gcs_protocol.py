@@ -63,12 +63,15 @@ def validate_command(obj):
     if obj.get('type') != 'command' or type(obj.get('protocol')) is not int or obj['protocol'] != 2:
         raise ProtocolError('Expected type=command, protocol=2')
     operation = obj.get('operation')
-    if operation not in ('upload', 'start', 'get_status', 'update', 'cancel'):
+    if operation not in ('upload', 'start', 'get_status', 'update', 'cancel', 'clear'):
         raise ProtocolError('Unsupported operation')
+    # clear 只需要会话号：机载可能持有一个地面站并不知道的失败任务，
+    # 因此 mission_id 允许为空、revision 允许为 0。
+    optional = operation in ('get_status', 'clear')
     result = dict(request_id=_text(obj, 'request_id'), operation=operation,
                   map_session_id=_text(obj, 'map_session_id', operation == 'get_status'),
-                  mission_id=_text(obj, 'mission_id', operation == 'get_status'),
-                  revision=_uint(obj, 'revision', 0 if operation == 'get_status' else 1),
+                  mission_id=_text(obj, 'mission_id', optional),
+                  revision=_uint(obj, 'revision', 0 if optional else 1),
                   frame_id='', waypoints=[], replace_from=0)
     if 'require_map_alignment' in obj:
         if type(obj['require_map_alignment']) is not bool:
