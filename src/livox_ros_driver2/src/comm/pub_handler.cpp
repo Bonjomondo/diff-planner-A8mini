@@ -31,6 +31,21 @@
 
 namespace livox_ros {
 
+namespace {
+// MID360s is absent from older SDK2 headers. Only recognize it when the
+// installed SDK declares the device type; ordinary MID360 stays unchanged.
+template <typename DeviceType>
+auto IsMid360s(uint8_t dev_type, int)
+    -> decltype(DeviceType::kLivoxLidarTypeMid360s, bool()) {
+  return dev_type == static_cast<uint8_t>(DeviceType::kLivoxLidarTypeMid360s);
+}
+
+template <typename DeviceType>
+bool IsMid360s(uint8_t, ...) {
+  return false;
+}
+}  // namespace
+
 std::atomic<bool> PubHandler::is_timestamp_sync_;
 
 PubHandler &pub_handler() {
@@ -132,7 +147,8 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
   packet.extrinsic_enable = false; 
   if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeIndustrialHAP) {
     packet.line_num = kLineNumberHAP;
-  } else if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeMid360||dev_type==LivoxLidarDeviceType::kLivoxLidarTypeMid360s) {
+  } else if (dev_type == LivoxLidarDeviceType::kLivoxLidarTypeMid360 ||
+             IsMid360s<LivoxLidarDeviceType>(dev_type, 0)) {
     packet.line_num = kLineNumberMid360;
   } else {
     packet.line_num = kLineNumberDefault;
