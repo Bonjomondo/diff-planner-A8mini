@@ -191,15 +191,27 @@ void PX4CtrlFSM::process()
                          takeoff_land_data.takeoff_land_cmd ==
                              quadrotor_msgs::TakeoffLand::LAND)
                 {
-                    if (gimbal_land_status == "IDLE")
+                    if (param.takeoff_land.enable_apriltag)
                     {
-                        /* trigger gimbal land command */
-                        std_msgs::Bool set_land_msg;
-                        set_land_msg.data = true;
-                        gimbal_set_land_pub.publish(set_land_msg);
+                        if (gimbal_land_status == "IDLE")
+                        {
+                            /* trigger gimbal land command */
+                            std_msgs::Bool set_land_msg;
+                            set_land_msg.data = true;
+                            gimbal_set_land_pub.publish(set_land_msg);
+                        }
+                    }
+                    else
+                    {
+                        /* go to land state directly when apriltag is not enabled */
+                        state = AUTO_LAND;
+                        set_start_pose_for_takeoff_land(odom_data);
+                        ROS_INFO(
+                            "\033[32m[px4ctrl] AUTO_HOVER(L2) --> AUTO_LAND\033[32m");
                     }
                 }
-                else if (land_pose_is_received(now_time))
+                else if (param.takeoff_land.enable_apriltag &&
+                         land_pose_is_received(now_time))
                 {
                     /* go to april tag oriented center */
                     des = get_hover_des();

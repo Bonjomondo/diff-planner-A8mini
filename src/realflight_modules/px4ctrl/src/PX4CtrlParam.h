@@ -54,6 +54,7 @@ public:
 		bool enable;
 		bool enable_auto_arm;
 		bool no_RC;
+		bool enable_apriltag;
 		double height;
 		double speed;
 	};
