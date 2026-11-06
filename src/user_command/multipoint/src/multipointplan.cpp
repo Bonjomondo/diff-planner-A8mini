@@ -537,12 +537,22 @@ private:
     bool queryCorridorClear(ros::ServiceClient& client, const Eigen::Vector3d& ground,
                             const Eigen::Vector3d& hover, const char* where)
     {
+        // 地面端点本身落在楼板上：楼板是真实占据体素，膨胀 0.3 m 后还会盖住
+        // 起降点上方 0.3 m，直接检查这一点必然失败。实测下降前
+        // ground z=-0.01 恒为 occupied，导致"返航走廊不通"中止任务。
+        // 这里把起点抬到膨胀区之上，只检查真正会被穿越的空气柱。
+        const double height = hover.z() - ground.z();
+        double lift = std::max(0.35, 0.7 * height);
+        if (lift > height - 0.05) lift = std::max(0.0, height - 0.05);
+        Eigen::Vector3d from = ground;
+        from.z() += lift;
+
         nav_msgs::GetPlan query;
         query.request.start.header.frame_id = query.request.goal.header.frame_id = "world";
         query.request.start.pose.orientation.w = query.request.goal.pose.orientation.w = 1.;
-        query.request.start.pose.position.x = ground.x();
-        query.request.start.pose.position.y = ground.y();
-        query.request.start.pose.position.z = ground.z();
+        query.request.start.pose.position.x = from.x();
+        query.request.start.pose.position.y = from.y();
+        query.request.start.pose.position.z = from.z();
         query.request.goal.pose.position.x = hover.x();
         query.request.goal.pose.position.y = hover.y();
         query.request.goal.pose.position.z = hover.z();
@@ -554,9 +564,10 @@ private:
         if (!clear)
             ROS_WARN_THROTTLE(1.0,
                               "Corridor check failed (%s): call_ok=%s poses=%zu took=%.1f ms "
-                              "ground=(%.2f,%.2f,%.2f) hover=(%.2f,%.2f,%.2f)",
+                              "ground=(%.2f,%.2f,%.2f) from=(%.2f,%.2f,%.2f) hover=(%.2f,%.2f,%.2f)",
                               where, called ? "true" : "false", poses, elapsed_ms,
                               ground.x(), ground.y(), ground.z(),
+                              from.x(), from.y(), from.z(),
                               hover.x(), hover.y(), hover.z());
         return clear;
     }
