@@ -750,8 +750,11 @@ private:
                 landed_state_ != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND)
                 throw std::runtime_error(
                     "Clear requires a connected, disarmed aircraft confirmed on the ground");
-            if (state_ != FINISHED || remote_mission_.active())
-                throw std::runtime_error("Clear requires the mission to be stopped");
+            // 初始化是"恢复可开始下一次任务"的动作：只要没有正在执行的任务
+            // 就允许，不再要求一定处于 FINISHED（新会话初始为 IDLE）。
+            // active() 已覆盖 TAKING_OFF/FLYING/HOVERING/LANDING 四种飞行状态。
+            if (remote_mission_.active())
+                throw std::runtime_error("Initialization requires the mission to be stopped");
             const bool had_fault = mission_fault_;
             remote_mission_.clear();
             mission_fault_ = false;
@@ -763,7 +766,7 @@ private:
             // 未解锁 + 在地面，空中收到会拒绝。
             planning_resume_pub_.publish(std_msgs::Empty());
             publishRemoteStatus();
-            ROS_WARN("Remote mission cleared on the ground (previous fault=%s); trajectory output reset requested",
+            ROS_WARN("Remote mission initialized on the ground (previous fault=%s); trajectory output reset requested",
                      had_fault ? "true" : "false");
             return;
         }
