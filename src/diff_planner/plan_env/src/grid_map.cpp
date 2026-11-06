@@ -839,10 +839,16 @@ void GridMap::clearBuffer(char casein, int bound)
         md_.count_hit_and_miss_[id_buf] = 0;
         md_.flag_traverse_[id_buf] = md_.raycast_num_;
         md_.flag_rayend_[id_buf] = md_.raycast_num_;
+        // 先记住这一格原本是否占据，再清除。原来是在清成空闲之后拿膨胀计数
+        // (> GRID_MAP_OBS_FLAG) 当替身判断，孤立的占据格计数恰好等于
+        // GRID_MAP_OBS_FLAG，严格大于不成立 → 只加不减，属于计数配对错误。
+        // 注意：仅修此处并未消除端点检查里观察到的残留，最终的修法是
+        // checkMissionEndpoints 改为直接扫描底层占据缓冲。
+        const bool was_occupied = md_.occupancy_buffer_[id_buf] >= mp_.min_occupancy_log_;
         md_.occupancy_buffer_[id_buf] = mp_.clamp_min_log_;
         mission_observed_[id_buf] = 0;
 
-        if (md_.occupancy_buffer_inflate_[id_buf_inf] > GRID_MAP_OBS_FLAG)
+        if (was_occupied)
         {
           changeInfBuf(false, id_buf_inf, id_global);
         }

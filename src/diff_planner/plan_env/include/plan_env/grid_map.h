@@ -171,8 +171,37 @@ private:
     if (!mission_box_.enabled) return true;
     for (const auto &pose : {req.start, req.goal}) {
       Eigen::Vector3d p(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
-      if (!p.allFinite() || !isInBuf(p) || !isInInfBuf(p) || getInflateOccupancy(p) != 0
-          || !mission_observed_[globalIdx2BufIdx(pos2GlobalIdx(p))]) return true;
+      // 只要求"在栅格内且未被占据"，不再要求"必须已被观测"：雷达正上方是
+      // 机体遮挡的盲区，永远扫不到，会导致返航点必然被拒。
+      //
+      // 占据判定不走 occupancy_buffer_inflate_：它是"邻居占据数"的引用计数，
+      // 实测会出现"半径 0.5 m 内没有任何占据体素，计数却是 1"的残留
+      // （2026-11-06 现场复现），使起降点正上方的返航点恒被判为障碍。
+      // 这里直接扫描底层占据缓冲，只认真正存在的占据体素。
+      bool occupied = false;
+      if (p.allFinite() && isInBuf(p))
+      {
+        const Eigen::Vector3i c = pos2GlobalIdx(p);
+        const int r = mp_.inf_grid_;
+        for (int dx = -r; dx <= r && !occupied; ++dx)
+          for (int dy = -r; dy <= r && !occupied; ++dy)
+            for (int dz = -r; dz <= r && !occupied; ++dz)
+            {
+              const Eigen::Vector3i id = c + Eigen::Vector3i(dx, dy, dz);
+              if (!isInBuf(id))
+                continue;
+              if (md_.occupancy_buffer_[globalIdx2BufIdx(id)] >= mp_.min_occupancy_log_)
+                occupied = true;
+            }
+      }
+      if (!p.allFinite() || !isInBuf(p) || !isInInfBuf(p) || occupied)
+      {
+        // 保留一条简明告警，便于现场判断是出界还是真的被占。
+        ROS_WARN_THROTTLE(1.0, "endpoint rejected (%.2f,%.2f,%.2f): inBuf=%d inInfBuf=%d occupied=%d",
+                          p.x(), p.y(), p.z(), isInBuf(p) ? 1 : 0, isInInfBuf(p) ? 1 : 0,
+                          occupied ? 1 : 0);
+        return true;
+      }
     }
     res.plan.header.frame_id = "world";
     res.plan.poses = {req.start, req.goal}; // Endpoint checks only, not a planned path.
