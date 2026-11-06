@@ -10,10 +10,30 @@
 
 namespace remote_mission
 {
+struct GimbalAction
+{
+    bool enabled = false, photo = false;
+    std::string mode = "angle";
+    double yaw = 0., pitch = 0., yaw_min = -45., yaw_max = 45., settle = 1.;
+    unsigned speed = 30;
+    void validate() const
+    {
+        if (!enabled) return;
+        if ((mode != "angle" && mode != "sweep") || !std::isfinite(yaw) ||
+            !std::isfinite(pitch) || !std::isfinite(yaw_min) || !std::isfinite(yaw_max) ||
+            !std::isfinite(settle) || yaw < -135 || yaw > 135 || yaw_min < -135 ||
+            yaw_max > 135 || yaw_min >= yaw_max || pitch < -90 || pitch > 25 ||
+            speed < 1 || speed > 100 || settle < 0 || settle > 10)
+            throw std::runtime_error("Invalid remote waypoint gimbal action");
+    }
+};
 struct Point
 {
     uint32_t id;
     double x, y, z, hover_sec;
+    GimbalAction gimbal;
+    Point(uint32_t ident = 0, double px = 0, double py = 0, double pz = 0, double hover = 0)
+        : id(ident), x(px), y(py), z(pz), hover_sec(hover) {}
 };
 
 // Independent of ROS so route transactions can be tested without a flight stack.
@@ -43,6 +63,7 @@ public:
         std::set<uint32_t> ids;
         for (const auto &p : route)
         {
+            p.gimbal.validate();
             if (!p.id || !ids.insert(p.id).second)
                 throw std::runtime_error("Waypoint IDs must be unique positive UInt32 values");
             if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z) ||

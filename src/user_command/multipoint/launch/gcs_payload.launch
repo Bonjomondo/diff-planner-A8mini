@@ -3,9 +3,14 @@
   <arg name="module" />
   <arg name="auto_record" default="false" />
   <arg name="save_video" default="false" />
+  <!-- Share the relay upstream socket with GCS; retain its rotation deadman. -->
+  <arg name="camera_host" default="127.0.0.1" />
+  <arg name="camera_port" default="37260" />
   <group if="$(eval arg('module') == 'gimbal')">
     <node pkg="multipoint" name="a8mini_gimbal" type="a8mini_gimbal_node.py" output="screen" required="true">
       <rosparam command="load" file="$(find multipoint)/config/points.yaml" />
+      <param name="camera_ip" value="$(arg camera_host)" />
+      <param name="camera_port" value="$(arg camera_port)" />
       <param name="enable_auto_recording" value="$(arg auto_record)" type="bool" />
       <param name="dry_run" value="false" type="bool" />
     </node>

@@ -3,3 +3,12 @@ float64 x
 float64 y
 float64 z
 float64 hover_sec
+bool run_gimbal
+string gimbal_mode
+float64 gimbal_yaw_deg
+float64 gimbal_pitch_deg
+float64 gimbal_yaw_min_deg
+float64 gimbal_yaw_max_deg
+uint8 gimbal_speed
+float64 gimbal_settle_sec
+bool gimbal_photo

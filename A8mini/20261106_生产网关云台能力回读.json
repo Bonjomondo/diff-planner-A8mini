@@ -1,0 +1,99 @@
+{
+  "test": "production-read-only-handshake",
+  "sampled_utc": "2026-11-06T09:51:27Z",
+  "endpoint": "127.0.0.1:8765",
+  "telemetry": {
+    "type": "telemetry",
+    "protocol": 2,
+    "server": "agri-onboard-ros",
+    "fcu_connected": true,
+    "armed": false,
+    "mode": "ALTCTL",
+    "battery_percent": 100.0,
+    "mission_ready": false,
+    "odom_fresh": true,
+    "world_x": 0.0039885409944292695,
+    "world_y": 0.005615460344031777,
+    "world_z": -0.0021849664306202417,
+    "mission": {
+      "frame_id": "world",
+      "map_session_id": "18e56be5d1424ed9-6acc775b",
+      "mission_id": "",
+      "revision": 0,
+      "state": "IDLE",
+      "current_waypoint_id": 0,
+      "completed": 0,
+      "total": 0,
+      "reason": "",
+      "odom_fresh": true,
+      "flight_ready": false,
+      "world_x": 0.0039885409944292695,
+      "world_y": 0.005615460344031777,
+      "world_z": -0.0021849664306202417,
+      "max_abs_xy": 30.0,
+      "min_z": 0.3,
+      "max_z": 2.5,
+      "gimbal_ready": true,
+      "gimbal_dry_run": false,
+      "action_phase": "idle",
+      "action_reason": "",
+      "gimbal_required": false,
+      "gimbal_capabilities": {
+        "version": 1,
+        "modes": [
+          "angle",
+          "sweep"
+        ],
+        "speed_min": 1,
+        "speed_max": 100,
+        "photo": true,
+        "yaw_convention": "right_positive",
+        "photo_feedback": true
+      }
+    }
+  },
+  "get_status_ack": {
+    "type": "ack",
+    "protocol": 2,
+    "request_id": "c415b311f9fc4de19841052bc8e8cd13",
+    "accepted": true,
+    "reason": "Accepted by mission executor",
+    "mission": {
+      "frame_id": "world",
+      "map_session_id": "18e56be5d1424ed9-6acc775b",
+      "mission_id": "",
+      "revision": 0,
+      "state": "IDLE",
+      "current_waypoint_id": 0,
+      "completed": 0,
+      "total": 0,
+      "reason": "",
+      "odom_fresh": true,
+      "flight_ready": false,
+      "world_x": 0.004588634443843053,
+      "world_y": 0.004224573518457176,
+      "world_z": -0.0019978777630388174,
+      "max_abs_xy": 30.0,
+      "min_z": 0.3,
+      "max_z": 2.5,
+      "gimbal_ready": true,
+      "gimbal_dry_run": false,
+      "action_phase": "idle",
+      "action_reason": "",
+      "gimbal_required": false,
+      "gimbal_capabilities": {
+        "version": 1,
+        "modes": [
+          "angle",
+          "sweep"
+        ],
+        "speed_min": 1,
+        "speed_max": 100,
+        "photo": true,
+        "yaw_convention": "right_positive",
+        "photo_feedback": true
+      }
+    }
+  },
+  "no_flight_commands": true
+}

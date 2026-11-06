@@ -8,14 +8,23 @@ import socket
 import struct
 import threading
 import time
+import uuid
+from pathlib import Path
+import sys
 
 import rospy
 from mavros_msgs.msg import ExtendedState
-from std_msgs.msg import Bool, Float64MultiArray, UInt32
+from std_msgs.msg import Bool, Float64MultiArray, UInt32, String
+from multipoint.msg import GimbalTask, GimbalResult
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from remote_gimbal import RemoteGimbalExecutor, FIELDS
+
 
 
 SIYI_HEADER = b"\x55\x66"
+CMD_ROTATE_RATE = 0x07
 CMD_REQUEST_SYSTEM_INFO = 0x0A
+CMD_CAMERA_FEEDBACK = 0x0B
 CMD_CAMERA_FUNCTION = 0x0C
 CMD_GIMBAL_MODE = CMD_CAMERA_FUNCTION
 CMD_REQUEST_ATTITUDE = 0x0D
@@ -80,6 +89,24 @@ def decode_packet(packet):
     }
 
 
+def decode_packets(datagram):
+    """Firmware may concatenate ACK/attitude/feedback frames in one UDP packet."""
+    offset = 0
+    while offset + 10 <= len(datagram):
+        header = datagram.find(SIYI_HEADER, offset)
+        if header < 0 or header + 10 > len(datagram):
+            return
+        length = 10 + struct.unpack_from('<H', datagram, header + 3)[0]
+        if header + length > len(datagram):
+            offset = header + 1
+            continue
+        try:
+            yield decode_packet(datagram[header:header + length])
+            offset = header + length
+        except SiyiProtocolError:
+            offset = header + 1
+
+
 def recording_desired_for_landed_state(landed_state):
     """Map MAVROS flight phases to a desired camera recording state."""
     if landed_state == ExtendedState.LANDED_STATE_ON_GROUND:
@@ -115,7 +142,8 @@ class SiyiUdpClient:
         self.lock = threading.RLock()
 
     def close(self):
-        self.socket.close()
+        with self.lock:
+            self.socket.close()
 
     def _next_sequence(self):
         sequence = self.sequence
@@ -154,17 +182,12 @@ class SiyiUdpClient:
 
                     if source[0] != self.camera_address[0]:
                         continue
-                    try:
-                        decoded = decode_packet(response)
-                    except SiyiProtocolError as error:
-                        rospy.logwarn("Discarding malformed SIYI response: %s", error)
-                        continue
-
-                    if decoded["command_id"] != command_id:
-                        continue
-                    # Some firmware revisions do not echo sequence consistently, so the
-                    # command ID and CRC are treated as the authoritative ACK match.
-                    return decoded["payload"]
+                    for decoded in decode_packets(response):
+                        if decoded["command_id"] != command_id:
+                            continue
+                        # Firmware can concatenate replies and does not consistently
+                        # echo sequences; match a CRC-valid frame and command ID.
+                        return decoded["payload"]
 
                 rospy.logwarn(
                     "SIYI command 0x%02X timed out (attempt %d/%d)",
@@ -192,6 +215,37 @@ class SiyiUdpClient:
             raise SiyiProtocolError("set-attitude ACK payload is too short")
         current_yaw, current_pitch = struct.unpack_from("<hh", response, 0)
         return current_yaw / 10.0, current_pitch / 10.0
+
+    def set_rotate_rate(self, yaw, pitch):
+        if any(type(value) is not int or not -100 <= value <= 100 for value in (yaw, pitch)):
+            raise ValueError("rotate rates must be integers -100..100")
+        # SDK sign: right/up positive. This is a speed level, not angular velocity.
+        self.send_command(CMD_ROTATE_RATE, struct.pack("bb", yaw, pitch), expect_ack=False)
+
+    def take_photo_feedback(self, cancelled=lambda: False, timeout_sec=3.):
+        """One shutter command only; a missing reply is an unknown result, never retried."""
+        with self.lock:
+            self._drain_receive_buffer()
+            packet = encode_packet(self._next_sequence(), CMD_CAMERA_FUNCTION, b"\x00")
+            self.socket.sendto(packet, self.camera_address)
+            deadline = time.monotonic() + timeout_sec
+            while time.monotonic() < deadline:
+                if cancelled():
+                    raise SiyiProtocolError("photo action cancelled; shutter result unknown")
+                try:
+                    response, source = self.socket.recvfrom(2048)
+                except socket.timeout:
+                    continue
+                if source != self.camera_address:
+                    continue
+                for feedback in decode_packets(response):
+                    if feedback['command_id'] != CMD_CAMERA_FEEDBACK or not feedback['payload']:
+                        continue
+                    if feedback['payload'][0] == 0:
+                        return
+                    if feedback['payload'][0] == 1:
+                        raise SiyiProtocolError("camera photo feedback failed; check TF card")
+            raise SiyiProtocolError("photo feedback timeout; result unknown, shutter not retried")
 
     def request_attitude(self):
         response = self.send_command(CMD_REQUEST_ATTITUDE, expect_ack=True)
@@ -330,6 +384,18 @@ class A8MiniGimbalNode:
             self.gimbal_task_callback,
             queue_size=10,
         )
+        self.remote_instance_id = uuid.uuid4().hex
+        self.remote_result_pub = rospy.Publisher('/mission/gimbal_result_v1', GimbalResult, queue_size=10)
+        self.remote_executor = RemoteGimbalExecutor(
+            self.client, lambda result: self.remote_result_pub.publish(GimbalResult(**result)),
+            shutdown=rospy.is_shutdown, dry_run=self.dry_run)
+        self.remote_task_sub = rospy.Subscriber('/mission/gimbal_task_v1', GimbalTask,
+                                              self.remote_task_callback, queue_size=10)
+        self.remote_cancel_sub = rospy.Subscriber('/mission/gimbal_cancel_v1', String,
+            lambda message: self.remote_executor.cancel(message.data), queue_size=10)
+        self.remote_ready_pub = rospy.Publisher('/mission/gimbal_ready_v1', String, queue_size=1)
+        self.remote_ready_timer = rospy.Timer(rospy.Duration(.5),
+            lambda event: self.remote_ready_pub.publish(String(data=('dry_run' if self.dry_run else 'hardware') + ':' + self.remote_instance_id)))
         self.worker = threading.Thread(target=self._worker_loop, name="a8mini-gimbal-worker")
         self.worker.daemon = True
         self.worker.start()
@@ -365,6 +431,22 @@ class A8MiniGimbalNode:
             )
         else:
             rospy.logwarn("A8 mini automatic recording is disabled")
+
+    def remote_task_callback(self, message):
+        try:
+            task = {key: getattr(message, key) for key in FIELDS + ('lease_sec',)}
+            if task['executor_id'] != self.remote_instance_id:
+                self.remote_result_pub.publish(GimbalResult(**self.remote_executor.result(
+                    task, 'failed', 'gimbal executor restarted; old action not replayed', True)))
+                return
+            with self.task_lock:
+                if self.pending_tasks:
+                    self.remote_result_pub.publish(GimbalResult(**self.remote_executor.result(
+                        task, 'failed', 'legacy gimbal action is busy', True)))
+                    return
+                self.remote_executor.submit(task)
+        except (ValueError, OverflowError) as error:
+            rospy.logerr("Rejected remote gimbal action: %s", error)
 
     @staticmethod
     def _parse_task(msg):
@@ -427,6 +509,9 @@ class A8MiniGimbalNode:
             return
 
         with self.task_lock:
+            if self.remote_executor.busy():
+                rospy.logwarn("Legacy gimbal task rejected while remote action owns the camera")
+                return
             if waypoint_id in self.completed_tasks:
                 self.publish_done(waypoint_id)
                 return
@@ -610,6 +695,11 @@ class A8MiniGimbalNode:
         self.done_pub.publish(UInt32(data=waypoint_id))
 
     def shutdown(self):
+        self.remote_ready_timer.shutdown()
+        try:
+            self.remote_executor.close()
+        except (OSError, SiyiProtocolError) as error:
+            rospy.logerr("Failed to stop remote gimbal executor: %s", error)
         with self.recording_condition:
             self.recording_condition.notify_all()
         if self.client is not None:

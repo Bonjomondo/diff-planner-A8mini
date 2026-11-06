@@ -14,17 +14,23 @@ from multipoint.srv import MissionCommand, MissionCommandRequest
 
 # Catkin's devel relay changes __file__ but not sys.path; import the source helper.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from gcs_protocol import GatewayServer
+from gcs_protocol import GatewayServer, gimbal_ros_fields
 
 
 STATUS_FIELDS = ('frame_id', 'map_session_id', 'mission_id', 'revision', 'state',
                  'current_waypoint_id', 'completed', 'total', 'reason', 'odom_fresh',
                  'flight_ready', 'world_x', 'world_y', 'world_z',
-                 'max_abs_xy', 'min_z', 'max_z')
+                 'max_abs_xy', 'min_z', 'max_z', 'gimbal_protocol_version', 'gimbal_ready',
+                 'gimbal_dry_run', 'action_phase', 'action_reason', 'gimbal_required')
 
 
 def status_dict(message):
-    return {key: getattr(message, key) for key in STATUS_FIELDS}
+    result = {key: getattr(message, key) for key in STATUS_FIELDS}
+    if result.pop('gimbal_protocol_version', 0) == 1:
+        result['gimbal_capabilities'] = dict(version=1, modes=['angle', 'sweep'],
+            speed_min=1, speed_max=100, photo=True, yaw_convention='right_positive',
+            photo_feedback=True)
+    return result
 
 
 class RosBackend:
@@ -68,7 +74,7 @@ class RosBackend:
             mission = dict(self.status)
             now = time.monotonic()
             if now - self.status_time > 1.0:
-                mission.update(odom_fresh=False, flight_ready=False,
+                mission.update(odom_fresh=False, flight_ready=False, gimbal_ready=False,
                                reason='Mission executor status stale; execution result unknown')
             state_fresh = now - self.state_time <= 2.5
             return dict(type='telemetry', protocol=2, server='agri-onboard-ros',
@@ -89,7 +95,11 @@ class RosBackend:
         for key in ('request_id', 'operation', 'map_session_id', 'mission_id',
                     'revision', 'frame_id', 'replace_from'):
             setattr(request, key, command[key])
-        request.waypoints = [RemoteWaypoint(**point) for point in command['waypoints']]
+        request.waypoints = []
+        for point in command['waypoints']:
+            fields = {key: value for key, value in point.items() if key != 'gimbal'}
+            fields.update(gimbal_ros_fields(point.get('gimbal')))
+            request.waypoints.append(RemoteWaypoint(**fields))
         try:
             rospy.wait_for_service('/mission/remote/command', timeout=1.0)
             response = self.proxy(request)

@@ -1,0 +1,3253 @@
+[
+  {
+    "at": "2026-11-06T09:50:18Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:20Z",
+    "request": {
+      "action": "stop",
+      "module": "flight"
+    },
+    "response": {
+      "ok": true,
+      "message": "Stop requested; wait for process cleanup before starting again",
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "stopping",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:21Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "stopping",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:22Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "stopping",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:23Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "stopping",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:24Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 130,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "exited",
+            "ready": false,
+            "exit_code": 0,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:24Z",
+    "request": {
+      "action": "start",
+      "options": {
+        "flight": true,
+        "gimbal": true,
+        "yolo": false,
+        "auto_record": true,
+        "save_video": false,
+        "rviz": false
+      }
+    },
+    "response": {
+      "ok": true,
+      "results": [
+        {
+          "module": "flight",
+          "ok": true,
+          "message": "Launch requested; check status and logs"
+        },
+        {
+          "module": "gimbal",
+          "ok": true,
+          "message": "Launch requested; check status and logs"
+        }
+      ],
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/a8mini_gimbal"
+            ],
+            "recording": "waiting_flight_state"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:24Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/a8mini_gimbal"
+            ],
+            "recording": "waiting_flight_state"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:26Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/a8mini_gimbal"
+            ],
+            "recording": "waiting_flight_state"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:27Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/mavros",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "waiting_flight_state"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:28Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:29Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:30Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:31Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:33Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:34Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:35Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:36Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:37Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:38Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:39Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/laserMapping",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:41Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:42Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:43Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:44Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:45Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:46Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:48Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:49Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/ekf",
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:50Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:51Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:52Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:53Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:54Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:56Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:57Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan",
+              "/px4ctrl"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:58Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:50:59Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:51:00Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway",
+              "/multipointplan"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:51:01Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "starting",
+            "ready": false,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [
+              "/gcs_gateway"
+            ],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  },
+  {
+    "at": "2026-11-06T09:51:03Z",
+    "request": {
+      "action": "status"
+    },
+    "response": {
+      "ok": true,
+      "status": {
+        "modules": [
+          {
+            "name": "flight",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "gimbal",
+            "state": "running",
+            "ready": true,
+            "exit_code": null,
+            "options": {
+              "flight": true,
+              "gimbal": true,
+              "yolo": false,
+              "auto_record": true,
+              "save_video": false,
+              "rviz": false
+            },
+            "missing": [],
+            "recording": "watching_flight_events"
+          },
+          {
+            "name": "yolo",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          },
+          {
+            "name": "rviz",
+            "state": "stopped",
+            "ready": false,
+            "exit_code": null,
+            "options": {},
+            "missing": [],
+            "recording": "disabled"
+          }
+        ],
+        "options": {
+          "flight": true,
+          "gimbal": true,
+          "yolo": false,
+          "auto_record": true,
+          "save_video": false,
+          "rviz": false
+        },
+        "flight_external": false,
+        "note": "Running means nodes registered; flight/position readiness comes from live telemetry"
+      },
+      "manager_pid": 10535
+    }
+  }
+]

@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from gcs_protocol import (GatewayServer, LineBuffer, MAX_FRAME_BYTES, ProtocolError,
-                          decode_line, validate_command)
+                          decode_line, validate_command, gimbal_ros_fields)
 
 
 def upload():
@@ -49,6 +49,26 @@ class ProtocolTest(unittest.TestCase):
         obj = upload()
         obj.update(operation='update', revision=2, replace_from=1, waypoints=[])
         self.assertEqual(validate_command(obj)['replace_from'], 1)
+
+    def test_optional_gimbal_is_validated_and_mapped_without_enabling_legacy_points(self):
+        self.assertFalse(gimbal_ros_fields()['run_gimbal'])
+        obj = upload()
+        obj['waypoints'][0]['gimbal'] = dict(mode='sweep', yaw_min_deg=-45, yaw_max_deg=45,
+            pitch_deg=-30, speed=25, settle_sec=1, photo=True)
+        normalized = validate_command(obj)['waypoints'][0]['gimbal']
+        fields = gimbal_ros_fields(normalized)
+        self.assertTrue(fields['run_gimbal'])
+        self.assertEqual(fields['gimbal_mode'], 'sweep')
+        self.assertEqual(fields['gimbal_speed'], 25)
+        self.assertTrue(fields['gimbal_photo'])
+        for changes in (dict(speed=True), dict(speed=1.5), dict(speed=0), dict(speed=101),
+                        dict(photo=1), dict(mode='range'), dict(yaw_min_deg=60),
+                        dict(pitch_deg=-91), dict(yaw_deg=136), dict(settle_sec=11),
+                        dict(yaw_deg=float('nan')), dict(unrecognized=1)):
+            invalid = copy.deepcopy(obj)
+            invalid['waypoints'][0]['gimbal'].update(changes)
+            with self.subTest(changes=changes), self.assertRaises(ProtocolError):
+                validate_command(invalid)
 
     def test_strict_numbers_frames_and_envelopes(self):
         for field, value in [('protocol', True), ('protocol', 1), ('request_id', ''),

@@ -59,6 +59,53 @@ def _uint(obj, key, minimum=0):
     return int(value)
 
 
+def normalize_gimbal(obj):
+    """Canonical angles: yaw right-positive, pitch up-positive; speed is SDK level."""
+    if not isinstance(obj, dict):
+        raise ProtocolError('gimbal must be an object (omit it for flight-only waypoints)')
+    allowed = {'mode', 'yaw_deg', 'pitch_deg', 'yaw_min_deg', 'yaw_max_deg',
+               'speed', 'settle_sec', 'photo'}
+    if set(obj) - allowed:
+        raise ProtocolError('Unknown gimbal field')
+    if obj.get('mode') not in ('angle', 'sweep'):
+        raise ProtocolError('gimbal.mode must be angle or sweep')
+    result = {'mode': obj['mode']}
+    defaults = dict(yaw_deg=0., pitch_deg=0., yaw_min_deg=-45., yaw_max_deg=45., settle_sec=1.)
+    for name, default in defaults.items():
+        value = obj.get(name, default)
+        try:
+            valid = type(value) in (int, float) and math.isfinite(value)
+        except OverflowError:
+            valid = False
+        if not valid:
+            raise ProtocolError('gimbal.' + name + ' must be a finite number')
+        result[name] = float(value)
+    speed, photo = obj.get('speed', 30), obj.get('photo', False)
+    if type(speed) is not int or not 1 <= speed <= 100:
+        raise ProtocolError('gimbal.speed must be integer 1..100 (SDK level, not degrees/s)')
+    if type(photo) is not bool:
+        raise ProtocolError('gimbal.photo must be boolean')
+    result.update(speed=speed, photo=photo)
+    if any(not -135 <= result[name] <= 135 for name in ('yaw_deg', 'yaw_min_deg', 'yaw_max_deg')):
+        raise ProtocolError('gimbal yaw outside [-135,135]')
+    if not -90 <= result['pitch_deg'] <= 25 or not 0 <= result['settle_sec'] <= 10:
+        raise ProtocolError('gimbal pitch outside [-90,25] or settle_sec outside [0,10]')
+    if result['yaw_min_deg'] >= result['yaw_max_deg']:
+        raise ProtocolError('gimbal.yaw_min_deg must be less than yaw_max_deg')
+    return result
+
+
+def gimbal_ros_fields(action=None):
+    enabled = action is not None
+    action = normalize_gimbal(action) if enabled else dict(
+        mode='angle', yaw_deg=0., pitch_deg=0., yaw_min_deg=-45., yaw_max_deg=45.,
+        speed=30, settle_sec=1., photo=False)
+    return dict(run_gimbal=enabled, gimbal_mode=action['mode'],
+                gimbal_yaw_deg=action['yaw_deg'], gimbal_pitch_deg=action['pitch_deg'],
+                gimbal_yaw_min_deg=action['yaw_min_deg'], gimbal_yaw_max_deg=action['yaw_max_deg'],
+                gimbal_speed=action['speed'], gimbal_settle_sec=action['settle_sec'],
+                gimbal_photo=action['photo'])
+
 def validate_command(obj):
     if obj.get('type') != 'command' or type(obj.get('protocol')) is not int or obj['protocol'] != 2:
         raise ProtocolError('Expected type=command, protocol=2')
@@ -90,6 +137,8 @@ def validate_command(obj):
                 if not valid:
                     raise ProtocolError(key + ' must be a finite number')
                 normalized[key] = float(value)
+            if 'gimbal' in point:
+                normalized['gimbal'] = normalize_gimbal(point['gimbal'])
             result['waypoints'].append(normalized)
         if operation == 'update':
             result['replace_from'] = _uint(obj, 'replace_from')
