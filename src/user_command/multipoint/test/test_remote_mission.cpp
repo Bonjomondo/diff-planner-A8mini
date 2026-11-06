@@ -63,6 +63,18 @@ int main()
     rejects([&] { ready.update("map-2", "new-route", 2, 0, route); });
     ready.max_z = ready.min_z;
     rejects([&] { ready.validateLimits(); });
+    Point action_point(1, 1, 0, 1, 0);
+    action_point.gimbal.enabled = true;
+    action_point.gimbal.mode = "sweep";
+    mission.validate({action_point});
+    for (unsigned speed : {0u, 101u}) {
+        action_point.gimbal.speed = speed;
+        rejects([&] { mission.validate({action_point}); });
+    }
+    action_point.gimbal.speed = 30;
+    action_point.gimbal.yaw_min = 50;
+    action_point.gimbal.yaw_max = 40;
+    rejects([&] { mission.validate({action_point}); });
     Mission history;
     history.session = "map";
     history.upload("map", "one", 1, route);

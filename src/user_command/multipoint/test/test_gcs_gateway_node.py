@@ -102,6 +102,28 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(status['mission_id'], 'route')
         self.assertEqual(reason, 'Accepted')
 
+    def test_capabilities_and_action_fields_reach_json_and_ros(self):
+        self.message.gimbal_protocol_version = 1
+        self.message.gimbal_ready = True
+        self.message.gimbal_required = True
+        self.message.action_phase = 'moving'
+        self.backend.on_status(self.message)
+        mission = self.backend.telemetry()['mission']
+        self.assertEqual(mission['gimbal_capabilities']['version'], 1)
+        self.assertEqual(mission['gimbal_capabilities']['modes'], ['angle', 'sweep'])
+        self.assertTrue(mission['gimbal_required'])
+        self.assertEqual(mission['action_phase'], 'moving')
+        command = self.command()
+        command['waypoints'][0]['gimbal'] = dict(mode='angle', yaw_deg=30,
+            pitch_deg=-20, speed=25, settle_sec=1, photo=True)
+        self.backend.proxy = Mock(return_value=Message(accepted=True, reason='', mission=self.message))
+        self.backend.command(command)
+        point = self.backend.proxy.call_args[0][0].waypoints[0]
+        self.assertTrue(point.run_gimbal)
+        self.assertEqual(point.gimbal_speed, 25)
+        self.assertEqual(point.gimbal_yaw_deg, 30)
+        self.assertTrue(point.gimbal_photo)
+
     def test_stale_and_unknown_service_results(self):
         self.backend.proxy = Mock(side_effect=RosError('lost reply'))
         accepted, reason, _ = self.backend.command(self.command())

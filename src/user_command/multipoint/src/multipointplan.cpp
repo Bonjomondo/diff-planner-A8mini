@@ -9,6 +9,8 @@
 #include <mavros_msgs/ExtendedState.h>
 #include <multipoint/MissionCommand.h>
 #include <multipoint/MissionStatus.h>
+#include <multipoint/GimbalTask.h>
+#include <multipoint/GimbalResult.h>
 #include <nav_msgs/Odometry.h>
 #include <ros/serialization.h>
 #include <quadrotor_msgs/TakeoffLand.h>
@@ -74,6 +76,8 @@ struct Waypoint
     double gimbal_settle_sec;
     GimbalMode gimbal_mode;
     bool run_gimbal;
+    unsigned gimbal_speed;
+    bool gimbal_photo;
 };
 
 class MultipointPlanner
@@ -121,6 +125,7 @@ public:
         pnh_.param("flight_state_timeout_sec", flight_state_timeout_sec_, 2.5);
         pnh_.param("waypoint_timeout_sec", waypoint_timeout_sec_, 120.0);
         pnh_.param("gimbal_timeout_sec", gimbal_timeout_sec_, 90.0);
+        pnh_.param("allow_gimbal_dry_run", allow_gimbal_dry_run_, false);
         pnh_.param("remote_max_abs_xy", remote_mission_.max_abs_xy, 30.0);
         pnh_.param("remote_min_z", remote_mission_.min_z, 0.3);
         pnh_.param("remote_max_z", remote_mission_.max_z, 2.5);
@@ -157,6 +162,8 @@ public:
         point_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("/goal", 10);
         gimbal_task_pub_ =
             nh_.advertise<std_msgs::Float64MultiArray>("/mission/gimbal_task", 10);
+        remote_gimbal_task_pub_ = nh_.advertise<multipoint::GimbalTask>("/mission/gimbal_task_v1", 10);
+        remote_gimbal_cancel_pub_ = nh_.advertise<std_msgs::String>("/mission/gimbal_cancel_v1", 10);
         takeoff_land_pub_ =
             nh_.advertise<quadrotor_msgs::TakeoffLand>("/px4ctrl/takeoff_land", 10);
         planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
@@ -186,6 +193,10 @@ public:
                                  &MultipointPlanner::landCallback, this);
         gimbal_done_sub_ = nh_.subscribe("/mission/gimbal_done", 10,
                                          &MultipointPlanner::gimbalDoneCallback, this);
+        remote_gimbal_result_sub_ = nh_.subscribe("/mission/gimbal_result_v1", 10,
+            &MultipointPlanner::remoteGimbalResultCallback, this);
+        remote_gimbal_ready_sub_ = nh_.subscribe("/mission/gimbal_ready_v1", 1,
+            &MultipointPlanner::remoteGimbalReadyCallback, this);
         if (enable_start_trigger_)
         {
             startcommand_sub_ = nh_.subscribe("/move_base_simple/goal", 10,
@@ -221,6 +232,8 @@ public:
         }
 
         timer_ = nh_.createTimer(ros::Duration(0.05), &MultipointPlanner::timerCallback, this);
+        remote_gimbal_lease_timer_ = nh_.createWallTimer(ros::WallDuration(.5),
+            &MultipointPlanner::remoteGimbalLeaseCallback, this);
 
         ROS_INFO("Mission ready: %zu YAML waypoint(s), position tolerance %.2f m, "
                  "velocity tolerance %.2f m/s, RViz click route %s",
@@ -269,6 +282,13 @@ private:
         status.max_abs_xy = remote_mission_.max_abs_xy;
         status.min_z = remote_mission_.min_z;
         status.max_z = remote_mission_.max_z;
+        status.gimbal_required = std::any_of(remote_mission_.points.begin() + std::min(remote_mission_.completed, remote_mission_.points.size()),
+            remote_mission_.points.end(), [](const remote_mission::Point &point) { return point.gimbal.enabled; });
+        status.gimbal_protocol_version = 1;
+        status.gimbal_ready = remoteGimbalReady();
+        status.gimbal_dry_run = remote_gimbal_dry_run_;
+        status.action_phase = remote_action_phase_;
+        status.action_reason = remote_action_reason_;
         return status;
     }
 
@@ -291,7 +311,15 @@ private:
             waypoint.z = point.z;
             waypoint.hover_sec = point.hover_sec;
             waypoint.gimbal_mode = GIMBAL_ANGLE;
-            waypoint.run_gimbal = false;
+            waypoint.run_gimbal = point.gimbal.enabled;
+            waypoint.gimbal_mode = point.gimbal.mode == "sweep" ? GIMBAL_RANGE : GIMBAL_ANGLE;
+            waypoint.gimbal_yaw_deg = point.gimbal.yaw;
+            waypoint.gimbal_pitch_deg = point.gimbal.pitch;
+            waypoint.gimbal_yaw_min_deg = point.gimbal.yaw_min;
+            waypoint.gimbal_yaw_max_deg = point.gimbal.yaw_max;
+            waypoint.gimbal_settle_sec = point.gimbal.settle;
+            waypoint.gimbal_speed = point.gimbal.speed;
+            waypoint.gimbal_photo = point.gimbal.photo;
             route.push_back(waypoint);
         }
         return route;
@@ -301,7 +329,12 @@ private:
     {
         remote_mission_.checkStart(remote_mission_.session, remote_mission_.id,
                                   remote_mission_.revision);
-        if (!startMission(remoteWaypoints(), false, false, remote_mission_.completed))
+        const auto route = remoteWaypoints();
+        const bool use_gimbal = std::any_of(route.begin() + remote_mission_.completed, route.end(),
+            [](const Waypoint &p) { return p.run_gimbal; });
+        if (use_gimbal && !remoteGimbalReady())
+            throw std::runtime_error("Gimbal node is unavailable; start cloud/gimbal module before this route");
+        if (!startMission(route, use_gimbal, false, remote_mission_.completed))
             throw std::runtime_error("Start rejected: confirm airborne hover, fresh world odometry, controller and planner");
     }
 
@@ -331,11 +364,25 @@ private:
             throw std::runtime_error("Route must use frame_id=world");
         std::vector<remote_mission::Point> route;
         for (const auto &p : request.waypoints)
-            route.push_back({p.id, p.x, p.y, p.z, p.hover_sec});
+        {
+            remote_mission::Point point(p.id, p.x, p.y, p.z, p.hover_sec);
+            point.gimbal.enabled = p.run_gimbal;
+            point.gimbal.mode = p.gimbal_mode;
+            point.gimbal.yaw = p.gimbal_yaw_deg;
+            point.gimbal.pitch = p.gimbal_pitch_deg;
+            point.gimbal.yaw_min = p.gimbal_yaw_min_deg;
+            point.gimbal.yaw_max = p.gimbal_yaw_max_deg;
+            point.gimbal.speed = p.gimbal_speed;
+            point.gimbal.settle = p.gimbal_settle_sec;
+            point.gimbal.photo = p.gimbal_photo;
+            route.push_back(point);
+        }
         if (request.operation == "upload")
         {
             remote_mission_.upload(request.map_session_id, request.mission_id, request.revision, route);
             remote_returning_ = false;
+            remote_action_phase_ = "idle";
+            remote_action_reason_.clear();
             return;
         }
         if (remote_returning_)
@@ -353,6 +400,8 @@ private:
         if (active)
         {
             active_waypoints_ = remoteWaypoints();
+            mission_uses_gimbal_ = std::any_of(active_waypoints_.begin() + current_index_, active_waypoints_.end(),
+                [](const Waypoint &p) { return p.run_gimbal; });
             if (retarget) publishCurrentGoal();  // Diff-Planner replans from its current state.
         }
     }
@@ -734,6 +783,7 @@ private:
             planning_stop_pub_.publish(std_msgs::Empty());
             return true;
         }
+        cancelRemoteGimbal("mission reset");
         closeMissionCsv();
         active_waypoints_.clear();
         remote_home_valid_ = remote_returning_ = false;
@@ -773,6 +823,7 @@ private:
 
     void abortMission(const char *reason)
     {
+        cancelRemoteGimbal(reason);
         ROS_ERROR("Mission stopped: %s. Land, disarm, set RC8 DOWN and call /mission/reset before a new mission.", reason);
         state_ = FINISHED;
         mission_fault_ = true;
@@ -1071,7 +1122,7 @@ private:
     {
         // The legacy gimbal protocol deduplicates by waypoint ID only. Until
         // session IDs are available, do not silently skip actions on a rerun.
-        if (use_gimbal && gimbal_mission_consumed_)
+        if (use_gimbal && mission_source_ != "remote" && gimbal_mission_consumed_)
         {
             ROS_WARN("Gimbal route already used in this run; land and restart the complete stack before repeating it");
             return false;
@@ -1079,17 +1130,18 @@ private:
         if (landing_latched_ || mission_fault_ || start_index >= waypoints.size() || !odomFresh() ||
             !flightReady(!returning) ||
             !fresh(heartbeat_receive_time_, 0.5) || point_pub_.getNumSubscribers() == 0 ||
-            (use_gimbal && gimbal_task_pub_.getNumSubscribers() == 0))
+            (use_gimbal && (mission_source_ == "remote" ? !remoteGimbalReady() : gimbal_task_pub_.getNumSubscribers() == 0)))
         {
             ROS_WARN("Mission start rejected: need fresh world odometry, planner heartbeat/goal subscriber, "
                      "OFFBOARD + armed + IN_AIR + controller mission_ready; payload missions also need gimbal. "
                      "Route is preserved; confirm hover and trigger again.");
             return false;
         }
+        cancelRemoteGimbal("route replaced");
         active_waypoints_ = waypoints;
         current_index_ = start_index;
         mission_uses_gimbal_ = use_gimbal;
-        if (use_gimbal)
+        if (use_gimbal && mission_source_ != "remote")
             gimbal_mission_consumed_ = true;
         arrival_candidate_time_ = ros::Time(0);
         arrived_time_ = ros::Time(0);
@@ -1110,6 +1162,8 @@ private:
 
     void publishCurrentGoal()
     {
+        remote_action_phase_ = "idle";
+        remote_action_reason_.clear();
         const Waypoint &waypoint = active_waypoints_.at(current_index_);
         geometry_msgs::PoseStamped goal;
         goal.header.stamp = ros::Time::now();
@@ -1249,8 +1303,13 @@ private:
 
             if (mission_uses_gimbal_ && waypoint.run_gimbal)
             {
-                publishGimbalTask(false);
+                if (mission_source_ == "remote" && !remoteGimbalReady())
+                {
+                    abortMission("gimbal node unavailable at waypoint");
+                    return;
+                }
                 state_ = WAITING_GIMBAL;
+                publishGimbalTask(false);
                 gimbal_wait_time_ = ros::WallTime::now();
             }
             else
@@ -1260,21 +1319,53 @@ private:
             return;
         }
 
+        if (state_ == WAITING_GIMBAL && mission_source_ == "remote")
+        {
+            const Eigen::Vector3d target(waypoint.x, waypoint.y, waypoint.z);
+            if (!remoteGimbalReady() || (target - odom_position_).norm() > position_tolerance_ ||
+                odom_velocity_.norm() > velocity_tolerance_)
+            {
+                abortMission("gimbal action interrupted: node unavailable or aircraft left hover tolerance");
+                return;
+            }
+        }
         if (state_ == WAITING_GIMBAL &&
             (ros::WallTime::now() - gimbal_wait_time_).toSec() > gimbal_timeout_sec_)
         {
             abortMission("gimbal completion timeout");
             return;
         }
-        if (state_ == WAITING_GIMBAL &&
+        // Correlated remote actions have an independent 0.5 s wall timer.
+        if (state_ == WAITING_GIMBAL && mission_source_ != "remote" &&
             (now - last_gimbal_publish_time_).toSec() >= gimbal_retry_sec_)
-        {
             publishGimbalTask(true);
+    }
+
+    void remoteGimbalLeaseCallback(const ros::WallTimerEvent &)
+    {
+        if (mission_source_ != "remote" || state_ != WAITING_GIMBAL) return;
+        const Waypoint &waypoint = active_waypoints_.at(current_index_);
+        const Eigen::Vector3d target(waypoint.x, waypoint.y, waypoint.z);
+        if (!odomFresh() || !flightReady(false) || !fresh(heartbeat_receive_time_, .5) ||
+            !remoteGimbalReady() || (target - odom_position_).norm() > position_tolerance_ ||
+            odom_velocity_.norm() > velocity_tolerance_ ||
+            (ros::WallTime::now() - gimbal_wait_time_).toSec() > gimbal_timeout_sec_)
+        {
+            abortMission("remote gimbal lease stopped: flight/hover/node guard or action timeout");
+            return;
         }
+        // Legacy launch retry_sec may be 12 s, longer than this action's 5 s lease.
+        // Both the callback and lease scheduling use wall time independently.
+        publishRemoteGimbalTask(true);
     }
 
     void publishGimbalTask(bool retry)
     {
+        if (mission_source_ == "remote")
+        {
+            publishRemoteGimbalTask(retry);
+            return;
+        }
         const Waypoint &waypoint = active_waypoints_.at(current_index_);
         std_msgs::Float64MultiArray task;
         task.data.reserve(7);
@@ -1303,8 +1394,100 @@ private:
         }
     }
 
+    bool remoteGimbalReady() const
+    {
+        return fresh(remote_gimbal_receive_time_, 1.5) &&
+            (!remote_gimbal_dry_run_ || allow_gimbal_dry_run_) &&
+            remote_gimbal_task_pub_.getNumSubscribers() > 0;
+    }
+
+    void remoteGimbalReadyCallback(const std_msgs::StringConstPtr &message)
+    {
+        const std::size_t separator = message->data.find(':');
+        if (separator == std::string::npos) return;
+        const std::string mode = message->data.substr(0, separator);
+        const std::string generation = message->data.substr(separator + 1);
+        if ((mode != "hardware" && mode != "dry_run") || generation.empty() || generation.size() > 80) return;
+        if (state_ == WAITING_GIMBAL && !remote_action_id_.empty() &&
+            !remote_gimbal_generation_.empty() && remote_gimbal_generation_ != generation)
+            abortMission("gimbal executor restarted during action; result unknown, action not replayed");
+        remote_gimbal_generation_ = generation;
+        remote_gimbal_receive_time_ = ros::WallTime::now();
+        remote_gimbal_dry_run_ = mode == "dry_run";
+    }
+
+    void cancelRemoteGimbal(const std::string &why)
+    {
+        if (remote_action_id_.empty()) return;
+        std_msgs::String message;
+        message.data = remote_action_id_;
+        remote_gimbal_cancel_pub_.publish(message);
+        remote_action_id_.clear();
+        remote_action_phase_ = "failed";
+        remote_action_reason_ = why;
+    }
+
+    void publishRemoteGimbalTask(bool retry)
+    {
+        const Waypoint &waypoint = active_waypoints_.at(current_index_);
+        if (!retry)
+        {
+            remote_action_id_ = newMapSession();
+            remote_action_phase_ = "moving";
+            remote_action_reason_.clear();
+        }
+        multipoint::GimbalTask task;
+        task.map_session_id = remote_mission_.session;
+        task.mission_id = remote_mission_.id;
+        task.action_id = remote_action_id_;
+        task.executor_id = remote_gimbal_generation_;
+        task.waypoint_id = waypoint.id;
+        task.mode = waypoint.gimbal_mode == GIMBAL_RANGE ? "sweep" : "angle";
+        task.yaw_deg = waypoint.gimbal_yaw_deg;
+        task.pitch_deg = waypoint.gimbal_pitch_deg;
+        task.yaw_min_deg = waypoint.gimbal_yaw_min_deg;
+        task.yaw_max_deg = waypoint.gimbal_yaw_max_deg;
+        task.speed = waypoint.gimbal_speed;
+        task.settle_sec = waypoint.gimbal_settle_sec;
+        task.photo = waypoint.gimbal_photo;
+        task.lease_sec = 5.;
+        remote_gimbal_task_pub_.publish(task);
+        remote_gimbal_last_publish_ = ros::WallTime::now();
+        last_gimbal_publish_time_ = ros::Time::now();
+        publishRemoteStatus();
+    }
+
+    void remoteGimbalResultCallback(const multipoint::GimbalResultConstPtr &message)
+    {
+        if (mission_source_ != "remote" || state_ != WAITING_GIMBAL ||
+            remote_action_id_.empty() || message->action_id != remote_action_id_ ||
+            message->mission_id != remote_mission_.id || message->map_session_id != remote_mission_.session ||
+            message->waypoint_id != active_waypoints_.at(current_index_).id) return;
+        remote_action_phase_ = message->phase;
+        remote_action_reason_ = message->reason;
+        if (!message->terminal) { publishRemoteStatus(); return; }
+        if (!message->success)
+        {
+            abortMission(("gimbal action failed: " + message->reason).c_str());
+            return;
+        }
+        const Waypoint &waypoint = active_waypoints_.at(current_index_);
+        const Eigen::Vector3d target(waypoint.x, waypoint.y, waypoint.z);
+        if (!odomFresh() || !flightReady(false) || !remoteGimbalReady() ||
+            (target - odom_position_).norm() > position_tolerance_ || odom_velocity_.norm() > velocity_tolerance_)
+        {
+            abortMission("invalid aircraft hover or gimbal state at action completion");
+            return;
+        }
+        remote_action_id_.clear();
+        writeMissionCsv(waypoint, arrived_time_, ros::Time::now());
+        advanceWaypoint();
+    }
+
     void gimbalDoneCallback(const std_msgs::UInt32ConstPtr &msg)
     {
+        // An old UInt32 ACK can never complete a new correlated remote action.
+        if (mission_source_ == "remote") return;
         if (state_ != WAITING_GIMBAL)
         {
             ROS_WARN("Ignoring gimbal_done %u because no gimbal task is pending", msg->data);
@@ -1452,6 +1635,7 @@ private:
 
     void requestLanding(bool automatic)
     {
+        cancelRemoteGimbal("landing requested");
         state_ = FINISHED;
         closeMissionCsv();
         landing_latched_ = true;
@@ -1617,6 +1801,11 @@ private:
     ros::NodeHandle pnh_;
     ros::Publisher point_pub_;
     ros::Publisher gimbal_task_pub_;
+    ros::Publisher remote_gimbal_task_pub_, remote_gimbal_cancel_pub_;
+    ros::Subscriber remote_gimbal_result_sub_, remote_gimbal_ready_sub_;
+    ros::WallTime remote_gimbal_receive_time_, remote_gimbal_last_publish_;
+    bool remote_gimbal_dry_run_ = false, allow_gimbal_dry_run_ = false;
+    std::string remote_gimbal_generation_, remote_action_id_, remote_action_phase_ = "idle", remote_action_reason_;
     ros::Publisher takeoff_land_pub_;
     ros::Publisher planning_stop_pub_;
     ros::Publisher startcommand_pub_;
@@ -1651,6 +1840,7 @@ private:
     ros::Subscriber clear_clicked_route_sub_;
     ros::Subscriber fcu_sub_, extended_sub_, controller_sub_, ready_sub_, heartbeat_sub_, land_sub_;
     ros::Timer timer_;
+    ros::WallTimer remote_gimbal_lease_timer_;
     tf::TransformListener tf_listener_;
 
     std::vector<Waypoint> mission_waypoints_;

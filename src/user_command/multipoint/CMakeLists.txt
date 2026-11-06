@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
 )
 
-add_message_files(FILES RemoteWaypoint.msg MissionStatus.msg)
+add_message_files(FILES RemoteWaypoint.msg MissionStatus.msg GimbalTask.msg GimbalResult.msg)
 add_service_files(FILES MissionCommand.srv)
 generate_messages()
 
@@ -50,6 +50,7 @@ if(CATKIN_ENABLE_TESTING)
   add_executable(test_remote_mission test/test_remote_mission.cpp)
   target_compile_options(test_remote_mission PRIVATE -UNDEBUG)
   add_test(NAME remote_mission COMMAND test_remote_mission)
+  catkin_add_nosetests(test/test_remote_gimbal.py)
   catkin_add_nosetests(test/test_gcs_protocol.py)
   catkin_add_nosetests(test/test_gcs_gateway_node.py)
   catkin_add_nosetests(test/test_a8mini_gimbal_node.py)
@@ -61,7 +62,7 @@ catkin_install_python(
   PROGRAMS scripts/a8mini_gimbal_node.py scripts/a8mini_detection_node.py
            scripts/a8mini_detection.py scripts/a8mini_video.py scripts/a8mini_capture.py
            scripts/a8mini_diagnostics.py scripts/a8mini_labels.py
-           scripts/gcs_gateway_node.py scripts/gcs_protocol.py
+           scripts/gcs_gateway_node.py scripts/gcs_protocol.py scripts/remote_gimbal.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

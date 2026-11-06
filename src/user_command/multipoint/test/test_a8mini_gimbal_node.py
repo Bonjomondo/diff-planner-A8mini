@@ -10,8 +10,9 @@ from unittest.mock import Mock, patch
 
 
 class _Message:
-    def __init__(self, data=None):
+    def __init__(self, data=None, **fields):
         self.data = data
+        self.__dict__.update(fields)
 
 
 class _ExtendedState:
@@ -37,12 +38,20 @@ def _install_ros_stubs():
 
     std_msgs = types.ModuleType("std_msgs")
     std_msgs_msg = types.ModuleType("std_msgs.msg")
+    std_msgs_msg.String = _Message
     std_msgs_msg.Bool = _Message
     std_msgs_msg.Float64MultiArray = _Message
     std_msgs_msg.UInt32 = _Message
     std_msgs.msg = std_msgs_msg
     sys.modules.setdefault("std_msgs", std_msgs)
     sys.modules.setdefault("std_msgs.msg", std_msgs_msg)
+
+    multipoint = types.ModuleType('multipoint')
+    messages = types.ModuleType('multipoint.msg')
+    messages.GimbalTask = messages.GimbalResult = _Message
+    multipoint.msg = messages
+    sys.modules.setdefault('multipoint', multipoint)
+    sys.modules.setdefault('multipoint.msg', messages)
 
 
 _install_ros_stubs()
@@ -70,6 +79,67 @@ class FakeSiyiClient(MODULE.SiyiUdpClient):
 
 
 class SiyiRecordingTest(unittest.TestCase):
+    def test_concatenated_udp_ack_attitude_and_feedback_frames(self):
+        import struct
+        ack = MODULE.encode_packet(1, MODULE.CMD_ROTATE_RATE, bytes((1,)))
+        attitude = MODULE.encode_packet(2, MODULE.CMD_REQUEST_ATTITUDE,
+            struct.pack('<hhhhhh', 1163, 0, 0, 0, 0, 0))
+        photo = MODULE.encode_packet(3, MODULE.CMD_CAMERA_FEEDBACK, bytes((0,)))
+        frame = ack + ack + attitude
+        self.assertEqual(len(frame), 44)  # Observed from the actual A8 mini.
+        self.assertEqual([p['command_id'] for p in MODULE.decode_packets(frame)], [7, 7, 13])
+        damaged = bytearray(ack); damaged[-1] ^= 1
+        recovered = list(MODULE.decode_packets(bytes(damaged) + attitude + photo))
+        self.assertEqual([p['command_id'] for p in recovered], [13, 11])
+        client = MODULE.SiyiUdpClient.__new__(MODULE.SiyiUdpClient)
+        client.sequence, client.retries, client.timeout_sec = 0, 1, .1
+        client.camera_address = ('127.0.0.1', 37260)
+        client.lock, client.socket = threading.RLock(), Mock()
+        client._drain_receive_buffer = Mock()
+        client.socket.recvfrom.return_value = (frame, client.camera_address)
+        self.assertEqual(client.request_attitude(), (116.3, 0., 0.))
+        client.socket.recvfrom.return_value = (ack + photo + attitude, client.camera_address)
+        client.take_photo_feedback()
+
+    def test_generation_mismatch_rejects_delayed_task_without_motion(self):
+        node = MODULE.A8MiniGimbalNode.__new__(MODULE.A8MiniGimbalNode)
+        node.remote_instance_id = 'new-generation'
+        node.remote_executor = Mock()
+        node.remote_executor.result.return_value = dict(phase='failed', success=False)
+        node.remote_result_pub = Mock()
+        fields = {key: 0 for key in MODULE.FIELDS + ('lease_sec',)}
+        fields['executor_id'] = 'old-generation'
+        node.remote_task_callback(_Message(**fields))
+        node.remote_executor.submit.assert_not_called()
+        self.assertTrue(node.remote_result_pub.publish.called)
+
+    def test_photo_feedback_success_and_failure_each_send_shutter_once(self):
+        import socket
+        for info in (0, 1):
+            client = MODULE.SiyiUdpClient.__new__(MODULE.SiyiUdpClient)
+            client.sequence = 0
+            client.camera_address = ('192.168.144.25', 37260)
+            client.lock = threading.RLock()
+            client.socket = Mock()
+            client.socket.recvfrom.return_value = (
+                MODULE.encode_packet(42, MODULE.CMD_CAMERA_FEEDBACK, bytes((info,))),
+                client.camera_address)
+            client._drain_receive_buffer = Mock()
+            if info == 0:
+                client.take_photo_feedback()
+            else:
+                with self.assertRaisesRegex(MODULE.SiyiProtocolError, 'failed'):
+                    client.take_photo_feedback()
+            self.assertEqual(client.socket.sendto.call_count, 1)
+            sent = MODULE.decode_packet(client.socket.sendto.call_args[0][0])
+            self.assertEqual(sent['command_id'], MODULE.CMD_CAMERA_FUNCTION)
+            self.assertEqual(sent['payload'], bytes((0,)))
+        client.socket.reset_mock()
+        client.socket.recvfrom.side_effect = socket.timeout()
+        with self.assertRaisesRegex(MODULE.SiyiProtocolError, 'unknown'):
+            client.take_photo_feedback(timeout_sec=.001)
+        self.assertEqual(client.socket.sendto.call_count, 1)
+
     def test_disabled_auto_recording_does_not_subscribe_or_control_recording(self):
         for enabled in (False, True):
             ros = Mock()

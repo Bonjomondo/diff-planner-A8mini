@@ -1,0 +1,57 @@
+{
+  "test": "bounded-gimbal-ground-smoke",
+  "ros_master": [
+    1,
+    "",
+    "http://127.0.0.1:11311/"
+  ],
+  "endpoint": "127.0.0.1:37260 relay",
+  "speed_sdk_level": 10,
+  "photo": false,
+  "commanded_yaw_delta_deg": 5.0,
+  "phases": [
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "bounded-plus-five",
+      "waypoint_id": 1,
+      "phase": "moving",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "restore-original",
+      "waypoint_id": 2,
+      "phase": "moving",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    }
+  ],
+  "no_flight_commands": true,
+  "started_utc": "2026-11-06T09:45:50Z",
+  "before": {
+    "yaw": -116.3,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "target": {
+    "yaw": -111.3,
+    "pitch": 0.0
+  },
+  "success": false,
+  "error": "mission executor lease expired",
+  "restore_success": false,
+  "restore_error": "no response from 127.0.0.1:37260 for command 0x0D",
+  "final_fcu_guard": true,
+  "fcu": {
+    "connected": true,
+    "armed": false,
+    "mode": "ALTCTL",
+    "landed_state": 1
+  },
+  "finished_utc": "2026-11-06T09:46:16Z"
+}

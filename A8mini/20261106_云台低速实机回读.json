@@ -1,0 +1,282 @@
+{
+  "test": "bounded-gimbal-ground-smoke",
+  "ros_master": [
+    1,
+    "",
+    "http://127.0.0.1:11311/"
+  ],
+  "endpoint": "127.0.0.1:37260 relay",
+  "speed_sdk_level": 10,
+  "photo": false,
+  "commanded_yaw_delta_deg": 5.0,
+  "phases": [
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "restore-prior-probe",
+      "waypoint_id": 3,
+      "phase": "moving",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "restore-prior-probe",
+      "waypoint_id": 3,
+      "phase": "settling",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "bounded-plus-five",
+      "waypoint_id": 1,
+      "phase": "moving",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "bounded-plus-five",
+      "waypoint_id": 1,
+      "phase": "settling",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "restore-original",
+      "waypoint_id": 2,
+      "phase": "moving",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    },
+    {
+      "map_session_id": "gimbal-only-ground-check",
+      "mission_id": "no-flight",
+      "action_id": "restore-original",
+      "waypoint_id": 2,
+      "phase": "settling",
+      "reason": "",
+      "terminal": false,
+      "success": false
+    }
+  ],
+  "no_flight_commands": true,
+  "started_utc": "2026-11-06T09:49:34Z",
+  "attitude_trace": [
+    {
+      "t": 3886.351,
+      "yaw": -114.6,
+      "pitch": 0.0
+    },
+    {
+      "t": 3886.421,
+      "yaw": -114.6,
+      "pitch": 0.0
+    },
+    {
+      "t": 3886.522,
+      "yaw": -115.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3886.624,
+      "yaw": -115.4,
+      "pitch": 0.0
+    },
+    {
+      "t": 3886.723,
+      "yaw": -116.0,
+      "pitch": 0.0
+    },
+    {
+      "t": 3886.823,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.335,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.354,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.424,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.526,
+      "yaw": -115.8,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.627,
+      "yaw": -115.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.726,
+      "yaw": -114.7,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.827,
+      "yaw": -114.0,
+      "pitch": 0.0
+    },
+    {
+      "t": 3887.931,
+      "yaw": -113.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.028,
+      "yaw": -112.8,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.133,
+      "yaw": -111.9,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.229,
+      "yaw": -111.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.33,
+      "yaw": -111.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.841,
+      "yaw": -111.2,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.863,
+      "yaw": -111.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3888.933,
+      "yaw": -111.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.033,
+      "yaw": -111.5,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.136,
+      "yaw": -112.0,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.234,
+      "yaw": -112.6,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.334,
+      "yaw": -113.3,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.434,
+      "yaw": -113.9,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.535,
+      "yaw": -114.7,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.637,
+      "yaw": -115.4,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.74,
+      "yaw": -115.9,
+      "pitch": 0.0
+    },
+    {
+      "t": 3889.837,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3890.35,
+      "yaw": -116.1,
+      "pitch": 0.0
+    },
+    {
+      "t": 3890.372,
+      "yaw": -116.1,
+      "pitch": 0.0
+    }
+  ],
+  "before_restore_of_prior_probe": {
+    "yaw": -114.6,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "before": {
+    "yaw": -116.1,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "target": {
+    "yaw": -111.1,
+    "pitch": 0.0
+  },
+  "outcome": {
+    "map_session_id": "gimbal-only-ground-check",
+    "mission_id": "no-flight",
+    "action_id": "bounded-plus-five",
+    "waypoint_id": 1,
+    "phase": "complete",
+    "reason": "gimbal target confirmed",
+    "terminal": true,
+    "success": true
+  },
+  "after": {
+    "yaw": -111.1,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "success": true,
+  "restored": {
+    "yaw": -116.1,
+    "pitch": 0.0,
+    "roll": 0.0
+  },
+  "restore_success": true,
+  "final_fcu_guard": true,
+  "fcu": {
+    "connected": true,
+    "armed": false,
+    "mode": "ALTCTL",
+    "landed_state": 1
+  },
+  "finished_utc": "2026-11-06T09:49:38Z"
+}

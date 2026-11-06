@@ -1,0 +1,13 @@
+<launch>
+  <node pkg="diff_planner" type="traj_server" name="yaw_regression" output="screen">
+    <remap from="~odometry" to="/test/yaw/odom"/>
+    <remap from="~planning/trajectory" to="/test/yaw/trajectory"/>
+    <remap from="~heartbeat" to="/test/yaw/heartbeat"/>
+    <remap from="/position_cmd" to="/test/yaw/command"/>
+    <remap from="/planning/yaw" to="/test/yaw/override"/>
+    <remap from="/planning/stop" to="/test/yaw/stop"/>
+    <remap from="/px4ctrl/takeoff_land" to="/test/yaw/takeoff_land"/>
+  </node>
+  <test pkg="diff_planner" type="test_traj_server_yaw.py" test-name="traj_server_yaw"
+        time-limit="25"/>
+</launch>

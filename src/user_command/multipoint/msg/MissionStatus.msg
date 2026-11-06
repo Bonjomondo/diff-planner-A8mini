@@ -15,3 +15,9 @@ float64 world_z
 float64 max_abs_xy
 float64 min_z
 float64 max_z
+uint8 gimbal_protocol_version
+bool gimbal_ready
+bool gimbal_dry_run
+string action_phase
+string action_reason
+bool gimbal_required

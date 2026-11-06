@@ -46,6 +46,7 @@
   </node>
   <node pkg="diff_planner" type="traj_server" name="drone_0_traj_server" output="screen">
     <remap from="~planning/trajectory" to="/test/trajectory" />
+    <remap from="~odometry" to="/drone_0_test_odom" />
     <param name="traj_server/time_forward" value="1.0" />
   </node>
   <test pkg="multipoint" type="test_flight_reset.py" test-name="flight_reset_$(arg mission_source)"
