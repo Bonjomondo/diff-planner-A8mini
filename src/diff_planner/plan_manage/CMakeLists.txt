@@ -57,3 +57,7 @@ target_link_libraries(traj_server ${catkin_LIBRARIES})
 # add_executable(monitor_node src/monitor_node.cpp)
 # target_link_libraries(monitor_node ${catkin_LIBRARIES})
 
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  add_rostest(test/traj_server_yaw.test)
+endif()
