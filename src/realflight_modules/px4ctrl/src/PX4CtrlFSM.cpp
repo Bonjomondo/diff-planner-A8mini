@@ -211,7 +211,8 @@ void PX4CtrlFSM::process()
                     }
                 }
                 else if (param.takeoff_land.enable_apriltag &&
-                         land_pose_is_received(now_time))
+                         land_pose_is_received(now_time) &&
+			 rc_data.is_command_mode)
                 {
                     /* go to april tag oriented center */
                     des = get_hover_des();
