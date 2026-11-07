@@ -1,0 +1,20 @@
+<launch>
+  <arg name="bounds" />
+  <arg name="floor" />
+  <arg name="ceiling" />
+  <param name="/indoor_mission/enabled" value="true" />
+  <param name="/indoor_mission/skip_validation" value="false" />
+  <rosparam param="/indoor_mission/bounds" subst_value="true">$(arg bounds)</rosparam>
+  <include file="$(find diff_planner)/launch/exp/run_exp_single_lio.launch" />
+  <param name="/drone_0_diff_planner_node/grid_map/virtual_ground" value="$(arg floor)" type="double" />
+  <param name="/drone_0_diff_planner_node/grid_map/virtual_ceil" value="$(arg ceiling)" type="double" />
+  <param name="/drone_0_diff_planner_node/grid_map/resolution" value="0.1" />
+  <param name="/drone_0_diff_planner_node/grid_map/obstacles_inflation" value="0.3" />
+  <param name="/drone_0_diff_planner_node/manager/max_vel" value="0.3" />
+  <param name="/drone_0_diff_planner_node/optimization/max_vel" value="0.3" />
+  <param name="/drone_0_diff_planner_node/manager/max_acc" value="0.8" />
+  <param name="/drone_0_diff_planner_node/optimization/max_acc" value="0.8" />
+  <param name="/drone_0_diff_planner_node/manager/max_jer" value="5.0" />
+  <param name="/drone_0_diff_planner_node/fsm/mondify_final_goal" value="false" />
+  <param name="/drone_0_diff_planner_node/fsm/waypoint_num" value="0" />
+</launch>
