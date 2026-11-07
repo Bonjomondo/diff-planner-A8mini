@@ -63,11 +63,12 @@ def validate_command(obj):
     if obj.get('type') != 'command' or type(obj.get('protocol')) is not int or obj['protocol'] != 2:
         raise ProtocolError('Expected type=command, protocol=2')
     operation = obj.get('operation')
-    if operation not in ('upload', 'start', 'get_status', 'update', 'cancel', 'clear'):
+    if operation not in ('upload', 'start', 'get_status', 'update', 'cancel', 'clear',
+                         'initialize'):
         raise ProtocolError('Unsupported operation')
-    # clear 只需要会话号：机载可能持有一个地面站并不知道的失败任务，
+    # clear / initialize 只需要会话号：机载可能持有一个地面站并不知道的失败任务，
     # 因此 mission_id 允许为空、revision 允许为 0。
-    optional = operation in ('get_status', 'clear')
+    optional = operation in ('get_status', 'clear', 'initialize')
     result = dict(request_id=_text(obj, 'request_id'), operation=operation,
                   map_session_id=_text(obj, 'map_session_id', operation == 'get_status'),
                   mission_id=_text(obj, 'mission_id', optional),
@@ -89,6 +90,30 @@ def validate_command(obj):
             if type(value) not in (int, float) or abs(value) > 1e6 or not math.isfinite(value):
                 raise ProtocolError('ground_origin must contain bounded finite numbers')
         result['ground_origin'] = dict(ground)
+    if operation == 'initialize':
+        # 围栏 6 个数值：xmin ymin zmin xmax ymax zmax，每轴必须 min < max。
+        bounds = obj.get('bounds')
+        if not isinstance(bounds, list) or len(bounds) != 6:
+            raise ProtocolError('initialize requires 6 fence bounds')
+        values = []
+        for value in bounds:
+            if type(value) not in (int, float) or not math.isfinite(value) or abs(value) > 1e4:
+                raise ProtocolError('fence bounds must be bounded finite numbers')
+            values.append(float(value))
+        if not (values[0] < values[3] and values[1] < values[4] and values[2] < values[5]):
+            raise ProtocolError('fence bounds require min < max on every axis')
+        result['bounds'] = values
+        # 项目目录由机载执行，限制字符集并禁止 ..，配合网关侧的 os.path.isfile 校验，
+        # 且用参数列表启动（不经过 shell），避免命令注入。
+        project = obj.get('project_dir', '')
+        if not isinstance(project, str) or not project or len(project) > 200:
+            raise ProtocolError('project_dir must be a non-empty string')
+        if not project.startswith('/') or '..' in project:
+            raise ProtocolError('project_dir must be an absolute path without ..')
+        allowed = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_.-')
+        if any(ch not in allowed for ch in project):
+            raise ProtocolError('project_dir contains unsupported characters')
+        result['project_dir'] = project
     if operation in ('upload', 'update'):
         if obj.get('frame_id') != 'world':
             raise ProtocolError('frame_id must be world')

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """ROS1 adapter for the ground station's TCP JSON-lines protocol 2."""
 import math
+import os
+import signal
+import subprocess
 import threading
 import time
 import sys
@@ -18,6 +21,7 @@ from multipoint.srv import MissionCommand, MissionCommandRequest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gcs_protocol import GatewayServer
 from gcs_map_guard import MapGuard, valid_bounds, inside
+from gcs_init_sequence import Initializer
 
 
 STATUS_FIELDS = ('frame_id', 'map_session_id', 'mission_id', 'revision', 'state',
@@ -33,12 +37,19 @@ def status_dict(message):
 class RosBackend:
     def __init__(self):
         self.lock = threading.Lock()
+        # 任务初始化：按依赖顺序把飞行前置链拉到就绪（后台线程）。
+        self.initializer = Initializer()
         self.status = None
         self.status_time = self.state_time = self.battery_time = 0.0
         self.state = State()
         self.battery = -1.0
         self.map_guard = MapGuard()
         self.map_gate_reason = ''
+        # 上报给界面的地图就绪值做迟滞：闸门抖动时界面在黄/绿之间反复跳。
+        # 规划器用的 /indoor_mission/map_ready 仍是原始值（它自己有 1.5 s 去抖）。
+        self.reported_map_ready = True
+        self.reported_map_since = time.monotonic()
+        self.reported_map_hold = 1.5
         self.fence = []
         self.map_route = None
         self.map_route_points = []
@@ -79,13 +90,33 @@ class RosBackend:
         snap['fence_valid'] = bool(self.fence)
         return snap
 
+    def reported_map_gate(self):
+        """给界面用的地图结论：状态需持续 reported_map_hold 秒才翻转。调用方负责持锁。"""
+        snap = self.map_gate()
+        raw = not snap['map_gate_reason']
+        now = time.monotonic()
+        if raw == self.reported_map_ready:
+            self.reported_map_since = now
+        elif now - self.reported_map_since >= self.reported_map_hold:
+            self.reported_map_ready = raw
+            self.reported_map_since = now
+        snap['map_coordinates_valid'] = self.reported_map_ready
+        if self.reported_map_ready:
+            snap['map_gate_reason'] = ''
+        return snap
+
     def publish_map_ready(self, _):
         with self.lock:
             gate = self.map_gate()
             reason = gate['map_gate_reason']
             if reason and reason != self.map_gate_reason:
-                rospy.logwarn('map gate closed: %s (last reject: %s, fence_valid: %s)',
-                              reason, gate['map_last_reject'], gate['fence_valid'])
+                detail = gate.get('map_last_reject_detail') or ''
+                reset = gate.get('map_last_reset') or 'none'
+                rospy.logwarn('map gate closed: %s (reject=%s %s reset=%s good=%s pending=%s '
+                              'planner=%s good_age=%ss fence_valid=%s)',
+                              reason, gate['map_last_reject'], detail, reset,
+                              gate.get('map_good'), gate.get('map_pending'), gate.get('map_planner'),
+                              gate.get('map_good_age'), gate['fence_valid'])
             elif not reason and self.map_gate_reason:
                 rospy.loginfo('map gate reopened: coordinates and fence verified again')
             self.map_gate_reason = reason
@@ -130,9 +161,17 @@ class RosBackend:
                         mission_ready=mission['flight_ready'], odom_fresh=mission['odom_fresh'],
                         world_x=mission['world_x'], world_y=mission['world_y'],
                         world_z=mission['world_z'], mission=mission, flight_bounds=list(self.fence),
-                        **self.map_gate())
+                        init_phase=self.initializer.phase,
+                        init_detail=self.initializer.detail,
+                        init_ok=self.initializer.ok,
+                        **self.reported_map_gate())
 
     def command(self, command):
+        # initialize = 先做与 clear 相同的地面复位，再按新围栏重启规划器。
+        pending_init = None
+        if command['operation'] == 'initialize':
+            pending_init = (command.get('bounds'), command.get('project_dir', ''))
+            command = dict(command, operation='clear', mission_id='', revision=0)
         with self.lock:
             stale = time.monotonic() - self.status_time > 1.0
             guarded = command.get('require_map_alignment', False)
@@ -183,6 +222,9 @@ class RosBackend:
         try:
             rospy.wait_for_service('/mission/remote/command', timeout=1.0)
             response = self.proxy(request)
+            if response.accepted and pending_init is not None:
+                ok, message = self.initializer.start(*pending_init)
+                return ok, message, status_dict(response.mission)
             if response.accepted and guarded and command['operation'] in ('upload', 'update'):
                 with self.lock:
                     self.map_route = identity
