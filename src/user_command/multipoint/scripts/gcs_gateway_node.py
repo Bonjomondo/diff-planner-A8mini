@@ -14,7 +14,7 @@ from mavros_msgs.msg import State
 from sensor_msgs.msg import BatteryState
 from nav_msgs.msg import Odometry
 from nav_msgs.srv import GetPlan, GetPlanRequest
-from std_msgs.msg import Float64MultiArray, Bool
+from std_msgs.msg import Float64MultiArray, Bool, String
 from multipoint.msg import MissionStatus, RemoteWaypoint
 from multipoint.srv import MissionCommand, MissionCommandRequest
 
@@ -51,6 +51,8 @@ class RosBackend:
         self.reported_map_since = time.monotonic()
         self.reported_map_hold = 1.5
         self.fence = []
+        self.preflight_reasons = {'controller': None, 'mission': None}
+        self.preflight_times = {'controller': 0., 'mission': 0.}
         self.map_route = None
         self.map_route_points = []
         self.map_ready_pub = rospy.Publisher('/indoor_mission/map_ready', Bool, queue_size=1)
@@ -62,7 +64,9 @@ class RosBackend:
             rospy.Subscriber('/mavros/battery', BatteryState, self.on_battery, queue_size=1),
             rospy.Subscriber('/laserMapping/odometry', Odometry, lambda msg: self.on_odom('map', msg), queue_size=10),
             rospy.Subscriber('/ekf/ekf_odom', Odometry, lambda msg: self.on_odom('planner', msg), queue_size=50),
-            rospy.Subscriber('/indoor_mission/fence', Float64MultiArray, self.on_fence, queue_size=1)]
+            rospy.Subscriber('/indoor_mission/fence', Float64MultiArray, self.on_fence, queue_size=1),
+            rospy.Subscriber('/px4ctrl/preflight_failures', String, lambda msg: self.on_preflight('controller', msg), queue_size=1),
+            rospy.Subscriber('/mission/remote/preflight_failures', String, lambda msg: self.on_preflight('mission', msg), queue_size=1)]
 
     def on_odom(self, source, msg):
         p, q = msg.pose.pose.position, msg.pose.pose.orientation
@@ -73,6 +77,11 @@ class RosBackend:
     def on_fence(self, msg):
         with self.lock:
             self.fence = list(msg.data) if valid_bounds(msg.data) else []
+
+    def on_preflight(self, source, msg):
+        with self.lock:
+            self.preflight_reasons[source] = [item for item in msg.data.split(',') if item][:40]
+            self.preflight_times[source] = time.monotonic()
 
     def map_gate(self):
         """地图校验 + 围栏的综合结论；调用方负责持锁。
@@ -162,6 +171,8 @@ class RosBackend:
                         world_x=mission['world_x'], world_y=mission['world_y'],
                         world_z=mission['world_z'], mission=mission, flight_bounds=list(self.fence),
                         init_height_supported=True,
+                        preflight_controller_reasons=self.preflight_reasons['controller'] if self.preflight_reasons['controller'] is not None and now - self.preflight_times['controller'] <= 1.0 else None,
+                        preflight_mission_reasons=self.preflight_reasons['mission'] if self.preflight_reasons['mission'] is not None and now - self.preflight_times['mission'] <= 1.0 else None,
                         init_phase=self.initializer.phase,
                         init_detail=self.initializer.detail,
                         init_ok=self.initializer.ok,

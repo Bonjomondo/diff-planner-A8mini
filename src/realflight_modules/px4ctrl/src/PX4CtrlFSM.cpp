@@ -78,6 +78,47 @@ bool PX4CtrlFSM::automaticTakeoffReady(const ros::Time &now)
     return param.takeoff_land.require_explicit_takeoff && state == MANUAL_CTRL && groundTakeoffInputsOk(now);
 }
 
+// 诊断与控制门使用相同输入和门限，只报告原因，不参与控制决策。
+std::string PX4CtrlFSM::automaticTakeoffFailures(const ros::Time &now)
+{
+    std::string failures;
+    auto add = [&](bool failed, const char *code) {
+        if (failed) { if (!failures.empty()) failures += ","; failures += code; }
+    };
+    auto fresh = [&](const ros::Time &stamp, double limit) {
+        const double age = (now-stamp).toSec(); return !stamp.isZero() && age >= 0. && age <= limit;
+    };
+    const double odom_age = (now-odom_data.msg.header.stamp).toSec();
+    const double imu_age = (now-imu_data.msg.header.stamp).toSec();
+    const double bat_age = (now-bat_data.rcv_stamp).toSec();
+    add(!param.takeoff_land.require_explicit_takeoff || !param.takeoff_land.enable ||
+        !param.takeoff_land.enable_auto_arm || param.takeoff_land.no_RC, "auto_config");
+    add(!state_data.current_state.connected || !fresh(state_data.rcv_stamp,2.5), "fcu_link");
+    add(!fresh(extended_state_data.rcv_stamp,2.5), "landed_status_stale");
+    add(!odom_is_received(now) || !fresh(odom_data.rcv_stamp,param.msg_timeout.odom), "odom_stale");
+    add(odom_data.msg.header.frame_id != "world", "odom_frame");
+    add(odom_age < -.02 || odom_age > param.msg_timeout.odom, "odom_stamp");
+    add(!odom_data.p.allFinite() || !odom_data.v.allFinite() || !odom_data.q.coeffs().allFinite() ||
+        std::abs(odom_data.q.squaredNorm()-1.) >= .05, "odom_invalid");
+    add(!imu_is_received(now) || !fresh(imu_data.rcv_stamp,param.msg_timeout.imu), "imu_stale");
+    add(imu_age < -.02 || imu_age > param.msg_timeout.imu, "imu_stamp");
+    add(!imu_data.a.allFinite() || !imu_data.q.coeffs().allFinite(), "imu_invalid");
+    add(!rc_is_received(now) || !fresh(rc_data.rcv_stamp,param.msg_timeout.rc), "rc_stale");
+    add(!rc_data.is_hover_mode, "rc_hover");
+    add(!rc_data.is_command_mode, "rc_command");
+    add(!rc_data.check_centered(), "rc_sticks");
+    add(state != MANUAL_CTRL, "controller_state");
+    add(state_data.current_state.armed, "armed");
+    add(cmd_is_received(now), "command_active");
+    add(!get_landed(), "land_detector");
+    add(extended_state_data.current_extended_state.landed_state != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND, "not_on_ground");
+    add(!(odom_data.v.norm() <= .1), "moving");
+    add(!bat_is_received(now) || bat_age < 0. || !std::isfinite(bat_data.volt), "battery_stale");
+    add(bat_is_received(now) && bat_age >= 0. && std::isfinite(bat_data.volt) && bat_data.volt <= param.low_voltage, "battery_low");
+    add(!std::isfinite(param.takeoff_land.height) || param.takeoff_land.height <= .1, "height_invalid");
+    return failures;
+}
+
 void PX4CtrlFSM::process()
 {
 

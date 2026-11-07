@@ -27,6 +27,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.stage = 'ground'
         self.position = [.4, -.2, .2]
         self.status = None
+        self.preflight_failures = None
         self.goals, self.takeoffs, self.lands, self.aborts = [], [], [], []
         self.clear, self.publish_odom, self.controls_ok = True, True, True
         self.hover_ready, self.speed = True, 0.
@@ -35,6 +36,7 @@ class AutomaticRoundtripTest(unittest.TestCase):
         self.deadline, self.goal_time, self.seq = 0., 0., 0
         self.subscribers = [
             rospy.Subscriber('/mission/remote/status', MissionStatus, self.on_status),
+            rospy.Subscriber('/mission/remote/preflight_failures', String, lambda msg: setattr(self, 'preflight_failures', msg.data.split(',') if msg.data else [])),
             rospy.Subscriber('/goal', PoseStamped, self.on_goal),
             rospy.Subscriber('/px4ctrl/takeoff_land', TakeoffLand, self.on_flight_command),
             rospy.Subscriber('/px4ctrl/abort_automatic', Empty, self.aborts.append)]
@@ -165,11 +167,11 @@ class AutomaticRoundtripTest(unittest.TestCase):
                  dict(id=2, x=.4, y=-.2, z=1.2, hover_sec=0.)]
         upload = dict(frame_id='world', automatic=True, ground_origin=dict(x=.4, y=-.2, z=.2), waypoints=route)
         self.assertFalse(self.command('upload', **dict(upload, automatic=False))['accepted'])
+        # 上传允许未知走廊；起飞和下降阶段仍会验证障碍物。
         self.clear = False
-        self.assertFalse(self.command('upload', **upload)['accepted'])
-        self.clear = True
         reply = self.command('upload', **upload)
         self.assertTrue(reply['accepted'], reply['reason'])
+        self.clear = True
         self.assertEqual(reply['mission']['state'], 'READY')
         rospy.sleep(.2)
         self.assertFalse(self.takeoffs)
@@ -177,11 +179,11 @@ class AutomaticRoundtripTest(unittest.TestCase):
         # Planner heartbeat alone must never allow takeoff from a stop-latched
         # or dead trajectory server. Refused starts must emit no TAKEOFF.
         self.output_ready = False
-        rospy.sleep(.15)
+        self.until(lambda: self.preflight_failures is not None and 'trajectory_not_ready' in self.preflight_failures)
         self.assertFalse(self.command('start')['accepted'])
         self.assertFalse(self.takeoffs)
         self.output_ready = True
-        rospy.sleep(.15)
+        self.until(lambda: self.preflight_failures is not None and 'trajectory_not_ready' not in self.preflight_failures)
         self.publish_output_ready = False
         rospy.sleep(.4)
         self.assertFalse(self.command('start')['accepted'])

@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
     ros::Publisher fsm_state_pub = nh.advertise<std_msgs::String>("state", 1);
     ros::Publisher mission_ready_pub = nh.advertise<std_msgs::Bool>("mission_ready", 1);
     ros::Publisher takeoff_ready_pub = nh.advertise<std_msgs::Bool>("takeoff_ready", 1);
+    ros::Publisher preflight_failure_pub = nh.advertise<std_msgs::String>("preflight_failures", 1);
     ros::Publisher auto_control_pub = nh.advertise<std_msgs::Bool>("automatic_control_ok", 1);
     ros::Publisher takeoff_height_pub = nh.advertise<std_msgs::Float64>("takeoff_height", 1);
     ros::Publisher spool_hold_pub = nh.advertise<std_msgs::Bool>("ground_spool_attitude_held", 1);
@@ -157,6 +158,9 @@ int main(int argc, char *argv[])
             preflight.data = fsm.automaticTakeoffReady(now);
             automatic_control.data = param.takeoff_land.require_explicit_takeoff && fsm.automaticControlOk(now);
             takeoff_ready_pub.publish(preflight);
+            std_msgs::String failures;
+            failures.data = fsm.automaticTakeoffFailures(now);
+            preflight_failure_pub.publish(failures);
             auto_control_pub.publish(automatic_control);
             std_msgs::Float64 height;
             height.data = param.takeoff_land.height;

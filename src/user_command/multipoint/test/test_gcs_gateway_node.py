@@ -34,7 +34,7 @@ def load_adapter():
     ros.ROSException = ros.ServiceException = RosError
     replacements = {'rospy': ros}
     for package, names in [('mavros_msgs', ['State', 'ExtendedState']), ('sensor_msgs', ['BatteryState']),
-                           ('nav_msgs', ['Odometry']), ('std_msgs', ['Float64MultiArray', 'Bool', 'Float64']),
+                           ('nav_msgs', ['Odometry']), ('std_msgs', ['Float64MultiArray', 'Bool', 'Float64', 'String']),
                            ('multipoint', ['MissionStatus', 'RemoteWaypoint'])]:
         replacements[package] = types.ModuleType(package)
         messages = types.ModuleType(package + '.msg')
@@ -87,6 +87,16 @@ class AdapterTest(unittest.TestCase):
         self.now.return_value = 106.
         self.assertFalse(self.backend.telemetry()['fcu_connected'])
         self.assertEqual(self.backend.telemetry()['battery_percent'], -1.)
+
+    def test_preflight_details_expire_instead_of_reporting_stale_causes(self):
+        self.backend.on_preflight('controller', Message(data='rc_stale,battery_low'))
+        self.backend.on_preflight('mission', Message(data='trajectory_not_ready'))
+        telemetry = self.backend.telemetry()
+        self.assertEqual(telemetry['preflight_controller_reasons'], ['rc_stale', 'battery_low'])
+        self.assertEqual(telemetry['preflight_mission_reasons'], ['trajectory_not_ready'])
+        self.now.return_value = 102.
+        self.assertIsNone(self.backend.telemetry()['preflight_controller_reasons'])
+        self.assertIsNone(self.backend.telemetry()['preflight_mission_reasons'])
 
     def test_invalid_battery_is_unknown(self):
         for percentage in (float('nan'), float('inf'), -1., 2.):

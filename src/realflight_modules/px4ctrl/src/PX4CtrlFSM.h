@@ -69,6 +69,7 @@ public:
     bool ground_spool_attitude_held = false;
     bool automaticControlOk(const ros::Time &now);
     bool automaticTakeoffReady(const ros::Time &now);
+    std::string automaticTakeoffFailures(const ros::Time &now);
 	bool rc_is_received(const ros::Time &now_time);
 	bool cmd_is_received(const ros::Time &now_time);
 	bool odom_is_received(const ros::Time &now_time);

@@ -318,6 +318,7 @@ public:
         {
             remote_status_pub_ = nh_.advertise<multipoint::MissionStatus>(
                 "/mission/remote/status", 1, true);
+            preflight_failure_pub_ = nh_.advertise<std_msgs::String>("/mission/remote/preflight_failures", 1);
             remote_command_srv_ = nh_.advertiseService("/mission/remote/command",
                                                        &MultipointPlanner::remoteCommandCallback, this);
             publishRemoteStatus();
@@ -418,6 +419,9 @@ private:
     {
         if (mission_source_ != "remote") return;
         remote_status_pub_.publish(remoteStatus());
+        std_msgs::String failures;
+        failures.data = automaticStartFailures();
+        preflight_failure_pub_.publish(failures);
         remote_status_time_ = ros::WallTime::now();
     }
 
@@ -469,6 +473,37 @@ private:
             controller_state_ == "MANUAL_CTRL" && fresh(takeoff_ready_time_, .5) && takeoff_ready_ &&
             fresh(takeoff_height_time_, .5) && finite(takeoff_height_) && takeoff_height_ > .1 &&
             odom_velocity_.norm() <= .1 && takeoff_land_pub_.getNumSubscribers() > 0;
+    }
+
+    // 与 automaticStartReady 使用同一组输入，只作诊断，不改变飞行门控。
+    std::string automaticStartFailures() const
+    {
+        std::string failures;
+        auto add = [&](bool failed, const char* code) {
+            if (failed) { if (!failures.empty()) failures += ","; failures += code; }
+        };
+        add(!automatic_roundtrip_, "auto_config");
+        add(!trajectoryOutputReady(), "trajectory_not_ready");
+        add(!mapCoordinatesReady(), "map_not_ready");
+        add(landing_latched_, "landing_latched");
+        add(mission_fault_, "mission_fault");
+        add(!odomFresh(), "odom_stale");
+        add(!fresh(heartbeat_receive_time_, .5), "planner_heartbeat");
+        add(point_pub_.getNumSubscribers() == 0, "planner_goal");
+        add(!fresh(fcu_receive_time_, flight_state_timeout_sec_) || !fcu_state_.connected, "fcu_link");
+        add(!fresh(extended_receive_time_, flight_state_timeout_sec_), "landed_status_stale");
+        add(!fresh(controller_receive_time_, .5), "controller_stale");
+        add(!fresh(auto_control_time_, .5), "controller_auto_stale");
+        add(fresh(auto_control_time_, .5) && !auto_control_ok_, "controller_auto_check");
+        add(fcu_state_.armed, "armed");
+        add(landed_state_ != mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND, "not_on_ground");
+        add(controller_state_ != "MANUAL_CTRL", "controller_state");
+        add(!fresh(takeoff_ready_time_, .5), "controller_preflight_stale");
+        add(fresh(takeoff_ready_time_, .5) && !takeoff_ready_, "controller_preflight_check");
+        add(!fresh(takeoff_height_time_, .5) || !finite(takeoff_height_) || takeoff_height_ <= .1, "height_invalid");
+        add(!(odom_velocity_.norm() <= .1), "moving");
+        add(takeoff_land_pub_.getNumSubscribers() == 0, "controller_no_commands");
+        return failures;
     }
 
     // Endpoint-only check; this does not check the complete vertical segment.
@@ -2118,7 +2153,7 @@ private:
     ros::Publisher startcommand_pub_;
     ros::Publisher backcommand_pub_;
     ros::Publisher clicked_markers_pub_;
-    ros::Publisher remote_status_pub_;
+    ros::Publisher remote_status_pub_, preflight_failure_pub_;
     ros::ServiceServer remote_command_srv_;
     remote_mission::Mission remote_mission_;
 

@@ -17,6 +17,7 @@ class ControllerTest(unittest.TestCase):
     def setUp(self):
         self.mode, self.armed, self.z, self.switches = 'STABILIZED', False, .2, False
         self.state, self.ready, self.arm_calls, self.mode_calls = '', False, [], []
+        self.failures = None
         self.reject_mode = False
         self.abort_during_mode = False
         self.feedback_delay = float(rospy.get_param('~state_feedback_delay', 0.))
@@ -30,6 +31,7 @@ class ControllerTest(unittest.TestCase):
                          rospy.Service('/mavros/cmd/arming', CommandBool, self.set_arm)]
         self.subs = [rospy.Subscriber('/px4ctrl/state', String, self.on_state),
                      rospy.Subscriber('/px4ctrl/takeoff_ready', Bool, self.on_ready),
+                     rospy.Subscriber('/px4ctrl/preflight_failures', String, lambda msg: setattr(self, 'failures', msg.data.split(',') if msg.data else [])),
                      rospy.Subscriber('/mavros/setpoint_raw/attitude', AttitudeTarget,
                                       lambda msg: self.outputs.append((time.monotonic(), msg.thrust)))]
         self.pubs = {name: rospy.Publisher(topic, cls, queue_size=1) for name, topic, cls in [
@@ -96,8 +98,9 @@ class ControllerTest(unittest.TestCase):
         self.assertFalse(self.arm_calls)
         self.assertFalse(self.mode_calls)
         self.assertFalse(self.ready)
+        self.until(lambda: self.failures is not None and 'rc_hover' in self.failures)
         self.switches = True
-        self.until(lambda: self.ready)
+        self.until(lambda: self.ready and self.failures == [])
         rospy.sleep(.25)
         self.assertEqual(self.state, 'MANUAL_CTRL')
         self.assertFalse(self.arm_calls)  # Switch movement alone cannot arm or enter OFFBOARD.
