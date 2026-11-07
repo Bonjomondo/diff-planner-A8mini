@@ -161,6 +161,7 @@ class RosBackend:
                         mission_ready=mission['flight_ready'], odom_fresh=mission['odom_fresh'],
                         world_x=mission['world_x'], world_y=mission['world_y'],
                         world_z=mission['world_z'], mission=mission, flight_bounds=list(self.fence),
+                        init_height_supported=True,
                         init_phase=self.initializer.phase,
                         init_detail=self.initializer.detail,
                         init_ok=self.initializer.ok,
@@ -170,7 +171,8 @@ class RosBackend:
         # initialize = 先做与 clear 相同的地面复位，再按新围栏重启规划器。
         pending_init = None
         if command['operation'] == 'initialize':
-            pending_init = (command.get('bounds'), command.get('project_dir', ''))
+            pending_init = (command.get('bounds'), command.get('project_dir', ''),
+                            command.get('takeoff_height'))
             command = dict(command, operation='clear', mission_id='', revision=0)
         with self.lock:
             stale = time.monotonic() - self.status_time > 1.0

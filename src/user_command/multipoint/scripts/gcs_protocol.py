@@ -103,6 +103,13 @@ def validate_command(obj):
         if not (values[0] < values[3] and values[1] < values[4] and values[2] < values[5]):
             raise ProtocolError('fence bounds require min < max on every axis')
         result['bounds'] = values
+        # 旧版地面站不带此字段时保持现有控制器高度。
+        if 'takeoff_height' in obj:
+            height = obj['takeoff_height']
+            if (type(height) not in (int, float) or height <= 0.1
+                    or height >= values[5] - values[2] or not math.isfinite(height)):
+                raise ProtocolError('takeoff_height must be > 0.1 and less than fence height')
+            result['takeoff_height'] = float(height)
         # 项目目录由机载执行，限制字符集并禁止 ..，配合网关侧的 os.path.isfile 校验，
         # 且用参数列表启动（不经过 shell），避免命令注入。
         project = obj.get('project_dir', '')

@@ -61,6 +61,16 @@ class ProtocolTest(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             validate_command(dict(obj, automatic='true'))
 
+    def test_initialization_height_validation_and_legacy_compatibility(self):
+        obj = dict(type='command', protocol=2, operation='initialize', request_id='r',
+                   map_session_id='m', mission_id='', revision=0,
+                   bounds=[-1., -1., -.05, 1., 1., 1.5], project_dir='/home/nv/project')
+        self.assertNotIn('takeoff_height', validate_command(obj))
+        self.assertEqual(validate_command(dict(obj, takeoff_height=.8))['takeoff_height'], .8)
+        for value in (True, None, '0.5', .1, 1.55, -1., float('nan'), float('inf'), 10**400):
+            with self.subTest(value=str(value)[:30]), self.assertRaises(ProtocolError):
+                validate_command(dict(obj, takeoff_height=value))
+
     def test_strict_numbers_frames_and_envelopes(self):
         for field, value in [('protocol', True), ('protocol', 1), ('request_id', ''),
                              ('map_session_id', ''), ('mission_id', 'm' * 81),

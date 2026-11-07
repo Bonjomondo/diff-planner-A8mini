@@ -12,6 +12,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 
 class Message:
+    LANDED_STATE_ON_GROUND = 1
+
     def __init__(self, **fields):
         self.connected = self.armed = False
         self.mode = ''
@@ -31,8 +33,8 @@ def load_adapter():
     ros.Time.now.return_value.to_sec.return_value = 100.
     ros.ROSException = ros.ServiceException = RosError
     replacements = {'rospy': ros}
-    for package, names in [('mavros_msgs', ['State']), ('sensor_msgs', ['BatteryState']),
-                           ('nav_msgs', ['Odometry']), ('std_msgs', ['Float64MultiArray', 'Bool']),
+    for package, names in [('mavros_msgs', ['State', 'ExtendedState']), ('sensor_msgs', ['BatteryState']),
+                           ('nav_msgs', ['Odometry']), ('std_msgs', ['Float64MultiArray', 'Bool', 'Float64']),
                            ('multipoint', ['MissionStatus', 'RemoteWaypoint'])]:
         replacements[package] = types.ModuleType(package)
         messages = types.ModuleType(package + '.msg')
@@ -121,6 +123,22 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(request.ground_origin.z, .1)
         self.assertEqual(request.operation, 'upload')
 
+    def test_initialize_passes_height_only_after_clear_accepted(self):
+        response = Message(accepted=True, reason='Accepted', mission=self.message)
+        self.backend.proxy = Mock(return_value=response)
+        self.backend.initializer.start = Mock(return_value=(True, 'started'))
+        command = self.command()
+        command.update(operation='initialize', bounds=[-1., -1., -.1, 1., 1., 2.],
+                       project_dir='/home/nv/project', takeoff_height=.8)
+        self.assertTrue(self.backend.command(command)[0])
+        self.assertEqual(self.backend.proxy.call_args[0][0].operation, 'clear')
+        self.backend.initializer.start.assert_called_once_with(command['bounds'], '/home/nv/project', .8)
+        self.assertTrue(self.backend.telemetry()['init_height_supported'])
+        self.backend.initializer.start.reset_mock()
+        response.accepted = False
+        self.assertFalse(self.backend.command(command)[0])
+        self.backend.initializer.start.assert_not_called()
+
     def test_stale_and_unknown_service_results(self):
         self.backend.proxy = Mock(side_effect=RosError('lost reply'))
         accepted, reason, _ = self.backend.command(self.command())
@@ -130,6 +148,54 @@ class AdapterTest(unittest.TestCase):
         self.backend.proxy.reset_mock()
         self.assertFalse(self.backend.command(self.command())[0])
         self.backend.proxy.assert_not_called()
+
+
+class ControllerHeightTest(unittest.TestCase):
+    def setUp(self):
+        self.globals = MODULE.Initializer._ensure_controller.__globals__
+        self.init = MODULE.Initializer()
+        self.init._wait_message = Mock(return_value=True)
+        self.init._set = Mock()
+        self.active, self.height, self.armed = True, .5, False
+        def running(pattern):
+            return [12345] if self.active and ('px4ctrl_node' in pattern or 'run_ctrl_indoor_automatic.launch' in pattern) else []
+        def wait(topic, cls, timeout):
+            if topic == '/px4ctrl/takeoff_height': return Message(data=self.height)
+            if topic == '/mavros/state': return Message(connected=True, armed=self.armed)
+            if topic == '/mavros/extended_state': return Message(landed_state=1)
+            raise AssertionError(topic)
+        def stop(pid, sig):
+            self.assertEqual(pid, 12345)
+            self.active = False
+        def spawn(args, log):
+            self.height = float(args[-1].split(':=')[1])
+            self.active = True
+        self.stop = Mock(side_effect=stop)
+        self.spawn = Mock(side_effect=spawn)
+        replacements = patch.dict(self.globals, {'running': Mock(side_effect=running),
+                                                'spawn': self.spawn, 'os': types.SimpleNamespace(kill=self.stop)})
+        waiting = patch.object(self.globals['rospy'], 'wait_for_message', side_effect=wait, create=True)
+        for item in (replacements, waiting):
+            item.start(); self.addCleanup(item.stop)
+
+    def test_existing_matching_height_does_not_restart(self):
+        self.assertTrue(self.init._ensure_controller(.5))
+        self.assertTrue(self.active)
+        self.spawn.assert_not_called()
+        self.stop.assert_not_called()
+
+    def test_changed_height_restarts_and_verifies_on_ground(self):
+        self.assertTrue(self.init._ensure_controller(.8))
+        self.assertEqual(self.height, .8)
+        self.stop.assert_called_once()
+        self.spawn.assert_called_once()
+
+    def test_armed_aircraft_never_restarts_controller(self):
+        self.armed = True
+        self.assertFalse(self.init._ensure_controller(.8))
+        self.stop.assert_not_called()
+        self.spawn.assert_not_called()
+
 
 
 if __name__ == '__main__':

@@ -8,15 +8,16 @@
 4. 失败即停——某一步超时就中止，不启动依赖它的后续步骤。
 """
 import os
+import math
 import signal
 import subprocess
 import threading
 import time
 
 import rospy
-from mavros_msgs.msg import State
+from mavros_msgs.msg import State, ExtendedState
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float64
 
 # 录制话题：与现场手工命令保持一致
 BAG_TOPICS = [
@@ -67,14 +68,14 @@ class Initializer:
         with self.lock:
             return self.phase not in ('idle', 'ready', 'failed')
 
-    def start(self, bounds, project_dir):
+    def start(self, bounds, project_dir, takeoff_height=None):
         with self.lock:
             if self.phase not in ('idle', 'ready', 'failed'):
                 return False, '初始化正在进行中'
             self.phase = 'starting'
             self.detail = '准备中'
             self.ok = False
-        self.thread = threading.Thread(target=self._run, args=(bounds, project_dir),
+        self.thread = threading.Thread(target=self._run, args=(bounds, project_dir, takeoff_height),
                                        daemon=True)
         self.thread.start()
         return True, '已开始初始化'
@@ -103,13 +104,13 @@ class Initializer:
                 return True
         return False
 
-    def _run(self, bounds, project_dir):
+    def _run(self, bounds, project_dir, takeoff_height):
         try:
-            self._sequence(bounds, project_dir)
+            self._sequence(bounds, project_dir, takeoff_height)
         except Exception as error:      # noqa: BLE001 - 任何异常都要落到 failed
             self._set('failed', '初始化异常：%s' % str(error)[:160])
 
-    def _sequence(self, bounds, project_dir):
+    def _sequence(self, bounds, project_dir, takeoff_height=None):
         # 1) 飞控链路必须在
         self._set('mavros', '检查飞控链路')
         if not self._wait_message('/mavros/state', State, 5.):
@@ -132,15 +133,9 @@ class Initializer:
             self._set('failed', 'EKF 未在 25 s 内输出 /ekf/ekf_odom')
             return
 
-        # 4) px4ctrl：没跑才启动；等地面起飞检查就绪
-        self._set('px4ctrl', '检查飞行控制器')
-        if not running('px4ctrl_node'):
-            # 起飞高度用参数配置，默认与现场命令一致（0.5 m）。
-            height = float(rospy.get_param('~init_takeoff_height', 0.5))
-            spawn(['roslaunch', 'px4ctrl', 'run_ctrl_indoor_automatic.launch',
-                   'takeoff_height:=%.2f' % height], '/tmp/px4ctrl.launch.log')
-        if not self._wait_message('/px4ctrl/takeoff_ready', Bool, 25.):
-            self._set('failed', 'px4ctrl 未在 25 s 内发布 /px4ctrl/takeoff_ready')
+        # 4) 高度在控制器启动时读取；已运行且高度相同则不重启。
+        self._set('px4ctrl', '检查飞行控制器和起飞高度')
+        if not self._ensure_controller(takeoff_height):
             return
 
         # 5) 规划器：总是重启（围栏要换）；等轨迹输出与地图校验同时就绪
@@ -172,6 +167,61 @@ class Initializer:
         self._set('ready', '初始化完成：规划器已按新围栏重启，请重新标定起降点', ok=True)
 
     # ── 子步骤 ──────────────────────────────────────────────────
+    def _ensure_controller(self, requested):
+        active = bool(running('px4ctrl_node'))
+        if active and requested is not None:
+            try:
+                actual = rospy.wait_for_message('/px4ctrl/takeoff_height', Float64, timeout=5.).data
+            except rospy.ROSException:
+                self._set('failed', '无法读取已运行控制器的起飞高度，未更改控制器')
+                return False
+            if not math.isfinite(actual) or abs(actual - requested) > 0.001:
+                # 仅接管本初始化流程使用的启动方式，避免覆盖自定义控制器配置。
+                launchers = running('roslaunch.*run_ctrl_indoor_automatic.launch')
+                if len(launchers) != 1:
+                    self._set('failed', '控制器高度不一致且启动方式无法确认，请在地面检查控制器')
+                    return False
+                try:
+                    state = rospy.wait_for_message('/mavros/state', State, timeout=3.)
+                    landed = rospy.wait_for_message('/mavros/extended_state', ExtendedState, timeout=3.)
+                except rospy.ROSException:
+                    self._set('failed', '无法确认飞控已落地并锁定，未更改控制器')
+                    return False
+                if not state.connected or state.armed or landed.landed_state != ExtendedState.LANDED_STATE_ON_GROUND:
+                    self._set('failed', '飞控未确认落地并锁定，未更改控制器')
+                    return False
+                self._set('px4ctrl', '起飞高度已更改，正在重启控制器')
+                try:
+                    os.kill(launchers[0], signal.SIGINT)
+                except OSError as error:
+                    self._set('failed', '无法停止旧控制器：%s' % error)
+                    return False
+                deadline = time.monotonic() + 10.
+                while time.monotonic() < deadline and (running('px4ctrl_node') or
+                                                       running('roslaunch.*run_ctrl_indoor_automatic.launch')):
+                    time.sleep(.2)
+                if running('px4ctrl_node') or running('roslaunch.*run_ctrl_indoor_automatic.launch'):
+                    self._set('failed', '旧控制器未退出，请检查控制器进程')
+                    return False
+                active = False
+        if not active:
+            height = requested if requested is not None else float(rospy.get_param('~init_takeoff_height', 0.5))
+            spawn(['roslaunch', 'px4ctrl', 'run_ctrl_indoor_automatic.launch',
+                   'takeoff_height:=%.6f' % height], '/tmp/px4ctrl.launch.log')
+        if not self._wait_message('/px4ctrl/takeoff_ready', Bool, 25.):
+            self._set('failed', 'px4ctrl 未在 25 s 内发布 /px4ctrl/takeoff_ready')
+            return False
+        if requested is not None:
+            try:
+                actual = rospy.wait_for_message('/px4ctrl/takeoff_height', Float64, timeout=5.).data
+            except rospy.ROSException:
+                self._set('failed', '无法确认控制器的实际起飞高度')
+                return False
+            if not math.isfinite(actual) or abs(actual - requested) > 0.001:
+                self._set('failed', '控制器起飞高度未生效（期望 %.2f m，实际 %.2f m）' % (requested, actual))
+                return False
+        return True
+
     def _restart_planner(self, bounds, project_dir):
         if not isinstance(bounds, list) or len(bounds) != 6:
             self._set('failed', '围栏参数无效')
