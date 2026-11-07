@@ -44,6 +44,10 @@ class MapGuard:
         self.pending = deque(maxlen=16)
         self.good = 0
         self.last_good = 0
+        # 最近一次拒绝的实测量值，便于现场判断差多少（类别仍是 last_reject）。
+        self.last_reject_detail = ''
+        # 最近一次把连续计数清零的原因（成功配对不覆盖），用于定位周期性掉闸。
+        self.last_reset = ''
         self.last_reject = "none"
         self.sequences = {}
 
@@ -55,21 +59,25 @@ class MapGuard:
                 self.planner.clear()
                 self.map = None
                 self.last_reject = "restart"
+                self.last_reset = "restart:sequence"
             self.sequences[source] = sequence
         values = [stamp] + list(position) + list(orientation)
         if (len(position) != 3 or len(orientation) != 4
                 or not all(math.isfinite(v) for v in values) or stamp <= 0):
             self.good = 0
             self.last_reject = "nonfinite"
+            self.last_reset = "nonfinite"
             return
         if frame != 'world':
             self.good = 0
             self.last_reject = "frame"
+            self.last_reset = "frame"
             return
         norm = math.sqrt(sum(v * v for v in orientation))
         if norm < 1e-8:
             self.good = 0
             self.last_reject = "quaternion"
+            self.last_reset = "quaternion"
             return
         sample = (stamp, tuple(position), tuple(v / norm for v in orientation), self.clock())
         if source == 'map':
@@ -77,6 +85,7 @@ class MapGuard:
                 self.good = 0
                 self.pending.clear()
                 self.last_reject = "restart"
+                self.last_reset = "restart:map_stamp"
             elif self.map is not None and stamp == self.map[0]:
                 # 同一帧重复发布：既不是新场次也不是倒退，忽略即可，
                 # 不能像旧实现那样把连续计数清零。
@@ -89,6 +98,7 @@ class MapGuard:
                 self.planner.clear()
                 self.pending.clear()
                 self.last_reject = "restart"
+                self.last_reset = "restart:planner_stamp"
             self.planner.append(sample)
         self._flush()
 
@@ -112,16 +122,21 @@ class MapGuard:
             return                      # 没有可配对样本：不改变计数，也不判失败
         distance = sum((a - b) ** 2 for a, b in zip(candidate[1], map_sample[1])) ** .5
         cosine = min(1., abs(sum(a * b for a, b in zip(candidate[2], map_sample[2]))))
+        angle = 2 * math.acos(cosine)
         if distance > DISTANCE_TOLERANCE:
             self.good //= 2
             self.last_reject = "distance"
-        elif 2 * math.acos(cosine) > ANGLE_TOLERANCE:
+            self.last_reject_detail = "%.3f m (门限 %.2f)" % (distance, DISTANCE_TOLERANCE)
+        elif angle > ANGLE_TOLERANCE:
             self.good //= 2
             self.last_reject = "angle"
+            self.last_reject_detail = "%.1f° (门限 %.1f°)" % (
+                math.degrees(angle), math.degrees(ANGLE_TOLERANCE))
         else:
             self.good = min(self.good + 1, MAX_GOOD_PAIRS)
             self.last_good = self.clock()
             self.last_reject = "none"
+            self.last_reject_detail = ""
 
     def _invalid_reason(self, ros_now, stamp):
         if self.map is None:
@@ -145,4 +160,10 @@ class MapGuard:
         stamp = self.map[0] if self.map else 0.
         reason = self._invalid_reason(ros_now, stamp)
         return dict(map_coordinates_valid=not reason, map_odom_stamp=stamp,
-                    map_reason=reason, map_last_reject=self.last_reject)
+                    map_reason=reason, map_last_reject=self.last_reject,
+                    map_last_reject_detail=self.last_reject_detail,
+                    map_last_reset=self.last_reset,
+                    map_good=self.good,
+                    map_pending=len(self.pending),
+                    map_planner=len(self.planner),
+                    map_good_age=round(self.clock() - self.last_good, 3) if self.last_good else -1.)
