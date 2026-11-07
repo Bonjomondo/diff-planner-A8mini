@@ -11,6 +11,8 @@ import time
 MAX_FRAME_BYTES = 65536
 MAX_WAYPOINTS = 200
 UINT32_MAX = 4294967295
+# 5 Hz 避免异步位置流与 0.5 秒地图时间校验恰好碰到边界。
+TELEMETRY_INTERVAL_SEC = 0.2
 
 
 class ProtocolError(ValueError):
@@ -222,13 +224,13 @@ class GatewayHandler(socketserver.BaseRequestHandler):
                 self.send(dict(type='error', protocol=2, reason=str(error)[:300]))
 
     def handle(self):
-        self.request.settimeout(0.2)
+        self.request.settimeout(0.1)
         lines = LineBuffer()
         last_telemetry = 0.0
         try:
             while True:
                 now = time.monotonic()
-                if now - last_telemetry >= 0.5:
+                if now - last_telemetry >= TELEMETRY_INTERVAL_SEC:
                     self.send(self.server.backend.telemetry())
                     last_telemetry = now
                 try:

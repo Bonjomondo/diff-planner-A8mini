@@ -4,6 +4,7 @@ import json
 import socket
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -139,6 +140,14 @@ class SocketTest(unittest.TestCase):
             frame = json.loads(stream.readline())
             if frame['type'] != 'telemetry':
                 return frame
+
+    def test_telemetry_refreshes_faster_than_half_second_map_gate(self):
+        peer, stream = self.connect()
+        peer.settimeout(2.)
+        started = time.monotonic()
+        frames = [json.loads(stream.readline()) for _ in range(3)]
+        self.assertTrue(all(frame['type'] == 'telemetry' for frame in frames))
+        self.assertLess(time.monotonic() - started, 1.2)
 
     def test_upload_ack_fragmented_commands_and_multiple_clients(self):
         peer, stream = self.connect()
