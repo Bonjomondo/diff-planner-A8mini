@@ -2,6 +2,7 @@
 """TCP -> ROS service -> real mission executor, with mock flight/planner topics."""
 import json
 import socket
+import subprocess
 import time
 import unittest
 import uuid
@@ -167,6 +168,38 @@ class RemoteIntegrationTest(unittest.TestCase):
         self.assertTrue(self.stops)
         self.assertFalse(self.takeoff_land)
         self.assertFalse(self.command('start', mission='route-2')['accepted'])
+
+        # 故障产生的 stop 必须保留，未落地解锁时不能清理。
+        self.assertFalse(self.command('clear', mission='', revision=0)['accepted'])
+        self.airborne = False
+        rospy.sleep(.3)
+        self.assertTrue(self.command('clear', mission='', revision=0)['accepted'])
+
+        # 模拟初始化重启轨迹服务器：旧 stop 不得重新闩锁新进程。
+        ready = []
+        ready_sub = rospy.Subscriber('/drone_0_traj_server/output_ready', Bool,
+                                     lambda message: ready.append(message.data))
+        child = None
+        try:
+            child = subprocess.Popen(['rosrun', 'diff_planner', 'traj_server',
+                                      '__name:=drone_0_traj_server'])
+            self.until(lambda: True in ready, timeout=8)
+            # 清理后产生的新 stop 必须继续生效，且重启后仍能收到。
+            land = rospy.Publisher('/mission/land', Empty, queue_size=1)
+            self.until(lambda: land.get_num_connections() > 0)
+            land.publish(Empty())
+            self.until(lambda: ready and not ready[-1])
+            child.terminate(); child.wait(timeout=5); child = None
+            ready.clear()
+            child = subprocess.Popen(['rosrun', 'diff_planner', 'traj_server',
+                                      '__name:=drone_0_traj_server'])
+            self.until(lambda: len(ready) >= 3)
+            rospy.sleep(.3)  # 等待新订阅者接收 latched stop。
+            self.assertFalse(ready[-1])
+        finally:
+            if child is not None:
+                child.terminate(); child.wait(timeout=5)
+            ready_sub.unregister()
 
 
 if __name__ == '__main__':

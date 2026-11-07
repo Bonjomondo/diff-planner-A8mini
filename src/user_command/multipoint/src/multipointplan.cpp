@@ -762,7 +762,11 @@ private:
             automatic_landing_ = false;
             uploaded_automatic_ = false;
             state_ = FINISHED;
-            // 同时解除 traj_server 的 stop 闩锁；它自己还会再查一次
+            // 清除上一轮降落/故障留下的 latched stop；否则重启后的轨迹服务器
+            // 会重新收到旧停止指令。后续新的 stop 仍使用 latch 保护重启场景。
+            planning_stop_pub_.shutdown();
+            planning_stop_pub_ = nh_.advertise<std_msgs::Empty>("/planning/stop", 1, true);
+            // 同时解除当前 traj_server 的 stop 闩锁；它自己还会再查一次
             // 未解锁 + 在地面，空中收到会拒绝。
             planning_resume_pub_.publish(std_msgs::Empty());
             publishRemoteStatus();
