@@ -1,0 +1,15 @@
+<launch>
+  <arg name="source" default="rtsp://192.168.144.25:8554/main.264"/>
+  <arg name="credentials_file" default=""/>
+  <arg name="frame_id" default="siyi_a8_mini_optical_frame"/>
+  <arg name="max_fps" default="0.0"/>
+  <arg name="file_loop" default="false"/>
+  <node pkg="siyi_a8_mini_node" type="image_node.py"
+        name="siyi_a8_mini" output="screen">
+    <param name="source" value="$(arg source)"/>
+    <param name="credentials_file" value="$(arg credentials_file)"/>
+    <param name="frame_id" value="$(arg frame_id)"/>
+    <param name="max_fps" value="$(arg max_fps)"/>
+    <param name="file_loop" value="$(arg file_loop)"/>
+  </node>
+</launch>

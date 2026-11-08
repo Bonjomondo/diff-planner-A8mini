@@ -1,0 +1,16 @@
+<launch>
+    <arg name="tag_topic" default="/tag_detections" />
+    <!-- <arg name="odom_topic" default="/laserMapping/odometry" /> -->
+    <arg name="odom_topic" default="/ekf/ekf_odom" />
+
+    <node pkg="gimbal_landing" type="gimbal_landing" name="gimbal_landing" output="screen">
+        <remap from="~tag_topic" to="$(arg tag_topic)"/>
+        <remap from="~odom" to="$(arg odom_topic)"/>
+
+        <param name="gimbal_ip" value="192.168.144.25" />
+        <param name="gimbal_port" value="37260" />
+        <param name="landing_active_topic" value="/landing_camera/landing_active" />
+        <param name="landing_service" value="/landing_camera/set_landing" />
+        <param name="status_topic" value="/landing_camera/status" />
+    </node>
+</launch>

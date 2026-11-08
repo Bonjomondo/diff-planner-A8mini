@@ -155,7 +155,7 @@ check_launches || exit 1
 # Visualization is optional and must never be part of the critical flight group.
 UAV_START_RVIZ="${UAV_START_RVIZ:-$([[ "${MISSION_SOURCE}" == "remote" ]] && echo false || echo true)}"
 if [[ "${UAV_START_RVIZ}" == "true" ]]; then
-  roslaunch diff_planner exp_rviz.launch rviz_args:="${UAV_RVIZ_ARGS:-}" &
+  # roslaunch diff_planner exp_rviz.launch rviz_args:="${UAV_RVIZ_ARGS:-}" &
   echo "[startup] Optional RViz launched independently; its exit will not stop flight."
 else
   echo "[startup] Headless mode: RViz disabled."
