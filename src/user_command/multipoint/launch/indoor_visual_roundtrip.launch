@@ -1,0 +1,8 @@
+<launch>
+  <!-- This launch is separate so ordinary roundtrip remains available. -->
+  <param name="/multipointplan/precision_landing_enabled" value="true" />
+  <include file="$(find siyi_a8_mini_node)/launch/image.launch" />
+  <include file="$(find apriltag_ros)/launch/continuous_detection.launch" />
+  <include file="$(find gimbal_landing)/launch/landing.launch" />
+  <include file="$(find multipoint)/launch/indoor_roundtrip.launch" />
+</launch>
