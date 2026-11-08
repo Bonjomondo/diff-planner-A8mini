@@ -140,6 +140,18 @@ check_launches || exit 1
 start_launch px4ctrl run_ctrl_lio.launch
 sleep 3
 check_launches || exit 1
+
+# SIYI A8 Mini Camera + AprilTag Landing
+start_launch siyi_a8_mini_node image.launch
+sleep 2
+check_launches || exit 1
+start_launch apriltag_ros continuous_detection.launch
+sleep 2
+check_launches || exit 1
+start_launch gimbal_landing landing.launch
+sleep 2
+check_launches || exit 1
+
 start_launch multipoint multipointplan_exp_lio.launch \
   mission_source:="${MISSION_SOURCE}" \
   start_gimbal_node:="${A8MINI_START_GIMBAL_NODE}" \
