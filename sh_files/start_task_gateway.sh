@@ -18,7 +18,7 @@ export AGRI_MAPPING_PROFILE="${AGRI_MAPPING_PROFILE:-$WORKSPACE/config/mapping_p
 [[ -f "$AGRI_MAPPING_PROFILE" ]] || { echo 'Aircraft mapping profile is missing.' >&2; exit 1; }
 # 2026-11-08：旧实现只看 ROS 注册，进程已死但注册残留时会永久拒绝启动。
 # 改为按进程判定，注册残留只在日志里提示。
-if pgrep -f 'gcs_gateway_node\.py|multipointplan' >/dev/null 2>&1; then
+if pgrep -x multipointplan >/dev/null 2>&1 || pgrep -f 'devel/lib/multipoint/gcs_gateway_node\.py' >/dev/null 2>&1; then
     echo 'A mission adapter is already running; no duplicate instance started.' >&2
     exit 1
 fi
