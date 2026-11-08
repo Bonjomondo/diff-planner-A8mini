@@ -20,7 +20,8 @@ class GuardTests(unittest.TestCase):
         self.now += 1
         self.assertFalse(guard.snapshot(101.)['map_coordinates_valid'])
         self.assertFalse(self.samples(shift=1).snapshot(100.)['map_coordinates_valid'])
-        self.assertFalse(self.samples(quat=(0,0,1,0)).snapshot(100.)['map_coordinates_valid'])
+        # 2026-11-08 起姿态差不判失效，只记录数值
+        self.assertTrue(self.samples(quat=(0,0,1,0)).snapshot(100.)['map_coordinates_valid'])
     def test_restart_or_bad_frame_revokes_verification(self):
         guard = self.samples()
         guard.observe('map', 99., 'world', (1,2,1), (0,0,0,1))
@@ -28,6 +29,15 @@ class GuardTests(unittest.TestCase):
         guard = self.samples()
         guard.observe('map', 100., 'other', (1,2,1), (0,0,0,1))
         self.assertFalse(guard.snapshot(100.)['map_coordinates_valid'])
+    def test_attitude_difference_does_not_invalidate(self):
+        """姿态差不再参与判定：30° 偏差仍应视为坐标有效。"""
+        half = math.sin(math.radians(15))
+        cos = math.cos(math.radians(15))
+        guard = self.samples(quat=(0, 0, half, cos))
+        report = guard.snapshot(100.)
+        self.assertTrue(report['map_coordinates_valid'])
+        self.assertGreater(report['map_last_angle'], 29.0)
+
     def test_fence_strict_bounds(self):
         b = [-2,-2,.3,2,2,2]
         self.assertTrue(valid_bounds(b))

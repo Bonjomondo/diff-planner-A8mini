@@ -10,9 +10,8 @@ import time
 
 # 两条流允许的最大配对时间差（秒）；沿用既有门限。
 PAIR_TOLERANCE = .05
-# 位置 / 姿态门限与连续合格对数，同样沿用既有值。
+# 位置门限与连续合格对数沿用既有值；姿态角门限已按现场要求移除（见 _evaluate）。
 DISTANCE_TOLERANCE = .15
-ANGLE_TOLERANCE = math.radians(5)
 # 判定阈值：连续合格对数低于它即判无效。
 MIN_GOOD_PAIRS = 10
 # 失败时的衰减方式：从"清零"改为"减半"（漏桶）。孤立的一帧毛刺只会让计数
@@ -49,6 +48,8 @@ class MapGuard:
         # 最近一次把连续计数清零的原因（成功配对不覆盖），用于定位周期性掉闸。
         self.last_reset = ''
         self.last_reject = "none"
+        # 最近一次配对的姿态差（度）；仅记录，不参与判定。
+        self.last_angle_deg = 0.0
         self.sequences = {}
 
     def observe(self, source, stamp, frame, position, orientation, sequence=None):
@@ -122,16 +123,13 @@ class MapGuard:
             return                      # 没有可配对样本：不改变计数，也不判失败
         distance = sum((a - b) ** 2 for a, b in zip(candidate[1], map_sample[1])) ** .5
         cosine = min(1., abs(sum(a * b for a, b in zip(candidate[2], map_sample[2]))))
-        angle = 2 * math.acos(cosine)
+        self.last_angle_deg = math.degrees(2 * math.acos(cosine))
+        # 姿态角门限已按现场要求移除（2026-11-08）：LIO/EKF 的姿态差不再参与
+        # map_coordinates_valid 判定，只记录数值供现场观察；距离与新鲜度门限不变。
         if distance > DISTANCE_TOLERANCE:
             self.good //= 2
             self.last_reject = "distance"
             self.last_reject_detail = "%.3f m (门限 %.2f)" % (distance, DISTANCE_TOLERANCE)
-        elif angle > ANGLE_TOLERANCE:
-            self.good //= 2
-            self.last_reject = "angle"
-            self.last_reject_detail = "%.1f° (门限 %.1f°)" % (
-                math.degrees(angle), math.degrees(ANGLE_TOLERANCE))
         else:
             self.good = min(self.good + 1, MAX_GOOD_PAIRS)
             self.last_good = self.clock()
@@ -163,7 +161,7 @@ class MapGuard:
                     map_reason=reason, map_last_reject=self.last_reject,
                     map_last_reject_detail=self.last_reject_detail,
                     map_last_reset=self.last_reset,
-                    map_good=self.good,
+                    map_good=self.good, map_last_angle=round(self.last_angle_deg, 2),
                     map_pending=len(self.pending),
                     map_planner=len(self.planner),
                     map_good_age=round(self.clock() - self.last_good, 3) if self.last_good else -1.)
