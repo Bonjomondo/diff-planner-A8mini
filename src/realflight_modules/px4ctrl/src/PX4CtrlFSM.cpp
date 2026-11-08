@@ -1,6 +1,8 @@
 #include "PX4CtrlFSM.h"
 #include "thrust_estimation_guard.h"
 #include <uav_utils/converters.h>
+#include <algorithm>
+#include <cmath>
 
 using namespace std;
 using namespace uav_utils;
@@ -9,6 +11,7 @@ PX4CtrlFSM::PX4CtrlFSM(Parameter_t &param_, Controller &controller_) : param(par
 {
 	state = MANUAL_CTRL;
 	hover_pose.setZero();
+    gimbal_land_status = "IDLE";
 }
 
 /* 
@@ -312,14 +315,73 @@ void PX4CtrlFSM::process()
 				ROS_INFO("\033[32m[px4ctrl] AUTO_HOVER(L2) --> CMD_CTRL(L3)\033[32m");
 			}
 		}
-		else if (takeoff_land_data.triggered && takeoff_land_data.takeoff_land_cmd == quadrotor_msgs::TakeoffLand::LAND)
-		{
+        else if (takeoff_land_data.triggered && takeoff_land_data.takeoff_land_cmd == quadrotor_msgs::TakeoffLand::LAND)
+        {
+            if (param.takeoff_land.enable_apriltag)
+            {
+                if (gimbal_land_status == "IDLE")
+                {
+                    // Reset yaw limiter for a new landing sequence
+                    apriltag_yaw_initialized = false;
 
-			state = AUTO_LAND;
-			set_start_pose_for_takeoff_land(odom_data);
+                    /* trigger gimbal land command */
+                    std_msgs::Bool set_land_msg;
+                    set_land_msg.data = true;
+                    gimbal_set_land_pub.publish(set_land_msg);
+                }
+            }
+            else
+            {
+                /* go to land state directly when apriltag is not enabled */
+                state = AUTO_LAND;
+                set_start_pose_for_takeoff_land(odom_data);
+                ROS_INFO("\033[32m[px4ctrl] AUTO_HOVER(L2) --> AUTO_LAND\033[32m");
+            }
+        }
+        else if (param.takeoff_land.enable_apriltag && land_pose_is_received(now_time) && rc_data.is_command_mode)
+        {
+            /* go to april tag oriented center */
+            des = get_hover_des();
+            des.p.x() = land_pose_data.p_des.x();
+            des.p.y() = land_pose_data.p_des.y();
 
-			ROS_INFO("\033[32m[px4ctrl] AUTO_HOVER(L2) --> AUTO_LAND\033[32m");
-		}
+            // ===== Yaw rate limiter =====
+            constexpr double max_yaw_rate = 20.0 * M_PI / 180.0; // 20 deg/s
+            if (!apriltag_yaw_initialized)
+            {
+                // Initialize from current yaw
+                apriltag_yaw_cmd = des.yaw;
+                apriltag_yaw_last_time = now_time;
+                apriltag_yaw_initialized = true;
+            }
+
+            double dt = (now_time - apriltag_yaw_last_time).toSec();
+            apriltag_yaw_last_time = now_time;
+            // Avoid a large jump after a scheduling pause
+            dt = std::max(0.0, std::min(dt, 0.05));
+            // Shortest angular distance
+            double yaw_error = atan2(
+                    sin(land_pose_data.yaw_des - apriltag_yaw_cmd),
+                    cos(land_pose_data.yaw_des - apriltag_yaw_cmd));
+
+            // Limit yaw change
+            double max_step = max_yaw_rate * dt;
+
+            double yaw_step = std::max(
+                    -max_step,
+                    std::min(max_step, yaw_error));
+
+            apriltag_yaw_cmd += yaw_step;
+            des.yaw = apriltag_yaw_cmd;
+            /* des.yaw = land_pose_data.yaw_des; */
+
+            if (gimbal_land_status == "LANDING")
+            {
+                state = AUTO_LAND;
+                set_start_pose_for_takeoff_land(odom_data);
+                ROS_INFO("\033[32m[px4ctrl] AUTO_HOVER(L2) --> AUTO_LAND\033[32m");
+            }
+        }
 		else
 		{
 			set_hov_with_rc();
@@ -628,6 +690,11 @@ Desired_State_t PX4CtrlFSM::get_takeoff_land_des(const double speed)
 	// takeoff_land.last_set_cmd_time = now;
 
 	// takeoff_land.start_pose(2) += speed * delta_t;
+    if (land_pose_is_received(now))
+    {
+        takeoff_land.start_pose.head<2>() = land_pose_data.p_des;
+        takeoff_land.start_pose(3) = land_pose_data.yaw_des;
+    }
 
 	Desired_State_t des;
 	des.p = takeoff_land.start_pose.head<3>() + Eigen::Vector3d(0, 0, speed * delta_t);
@@ -831,4 +898,13 @@ void PX4CtrlFSM::reboot_FCU()
 
 	// if (param.print_dbg)
 	// 	printf("reboot result=%d(uint8_t), success=%d(uint8_t)\n", reboot_srv.response.result, reboot_srv.response.success);
+}
+
+bool PX4CtrlFSM::land_pose_is_received(const ros::Time &now_time)
+{
+    return (now_time - land_pose_data.rcv_stamp).toSec() < 0.1;
+}
+void PX4CtrlFSM::gimbalLandStatus_cb(std_msgs::StringConstPtr pMsg)
+{
+    gimbal_land_status = pMsg->data;
 }

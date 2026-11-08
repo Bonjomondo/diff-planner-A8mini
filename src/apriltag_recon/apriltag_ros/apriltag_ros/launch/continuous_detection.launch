@@ -1,0 +1,24 @@
+<launch>
+  <!-- configure camera input -->
+  <arg name="queue_size" default="1" />
+  <arg name="camera_topic" default="/siyi_a8_mini/image_raw" />
+
+  <!-- apriltag_ros continuous detection node -->
+  <node pkg="apriltag_ros" type="apriltag_ros_continuous_node" name="apriltag_ros_continuous_node" output="screen">
+    <!-- Remap topics from those used in code to those on the ROS network -->
+    <remap from="image_rect" to="$(arg camera_topic)" />
+
+    <param name="publish_tag_detections_image" type="bool" value="true" /><!-- default: false -->
+    <param name="queue_size" type="int" value="$(arg queue_size)" />
+
+    <!-- Camera intrinsic parameters -->
+    <param name="fx" value="652.7934615847107" />
+    <param name="fy" value="653.9480389077635" />
+    <param name="cx" value="307.1288710375904" />
+    <param name="cy" value="258.7823279214385" />
+
+    <!-- load parameters (incl. tag family, tags, etc.) -->
+    <rosparam command="load" file="$(find apriltag_ros)/config/settings.yaml"/>
+    <rosparam command="load" file="$(find apriltag_ros)/config/tags.yaml"/>
+  </node>
+</launch>

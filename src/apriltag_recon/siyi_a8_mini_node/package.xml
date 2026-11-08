@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>siyi_a8_mini_node</name>
+  <version>0.1.0</version>
+  <description>Publish a guarded SIYI A8 mini RTSP stream as a ROS image.</description>
+  <maintainer email="maintainer@example.invalid">Local maintainer</maintainer>
+  <license>Unspecified</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+</package>

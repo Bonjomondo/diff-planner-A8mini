@@ -53,6 +53,7 @@ public:
 	{
 		bool enable;
 		bool enable_auto_arm;
+        bool enable_apriltag;
         bool require_explicit_takeoff = false;
         bool hold_attitude_during_spool = false;
 		bool no_RC;

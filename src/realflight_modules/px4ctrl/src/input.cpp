@@ -320,3 +320,19 @@ void Takeoff_Land_Data_t::feed(quadrotor_msgs::TakeoffLandConstPtr pMsg)
     triggered = true;
     takeoff_land_cmd = pMsg->takeoff_land_cmd;
 }
+
+ApriltagLandPose_Data_t::ApriltagLandPose_Data_t()
+{
+    p_des << 0, 0;
+    yaw_des = 0;
+    rcv_stamp = ros::Time(0);
+}
+
+void ApriltagLandPose_Data_t::feed(geometry_msgs::PointConstPtr pMsg)
+{
+    rcv_stamp = ros::Time::now();
+
+    p_des.x() = pMsg->x;
+    p_des.y() = pMsg->y;
+    yaw_des = pMsg->z;
+}

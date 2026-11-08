@@ -9,6 +9,8 @@
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/CommandLong.h>
 #include <mavros_msgs/CommandBool.h>
+#include <std_msgs/String.h>
+#include <std_msgs/Bool.h>
 
 #include "input.h"
 // #include "ThrustCurve.h"
@@ -28,6 +30,15 @@ struct AutoTakeoffLand_t
 class PX4CtrlFSM
 {
 public:
+    ros::Publisher gimbal_set_land_pub;
+    std::string gimbal_land_status;
+    ApriltagLandPose_Data_t land_pose_data;
+    bool land_pose_is_received(const ros::Time &now_time);
+    void gimbalLandStatus_cb(std_msgs::StringConstPtr pMsg);
+    bool apriltag_yaw_initialized = false;
+    double apriltag_yaw_cmd = 0.0;
+    ros::Time apriltag_yaw_last_time;
+
 	Parameter_t &param;
 
 	RC_Data_t rc_data;

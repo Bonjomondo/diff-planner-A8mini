@@ -147,4 +147,17 @@ public:
   void feed(quadrotor_msgs::TakeoffLandConstPtr pMsg);
 };
 
+class ApriltagLandPose_Data_t
+{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    Eigen::Vector2d p_des;
+    double yaw_des;
+    ros::Time rcv_stamp;
+    ApriltagLandPose_Data_t();
+
+    void feed(geometry_msgs::PointConstPtr pMsg);
+};
+
+
 #endif
