@@ -16,9 +16,14 @@ export ROS_MASTER_URI=http://127.0.0.1:11311
 export ROS_IP=127.0.0.1
 export AGRI_MAPPING_PROFILE="${AGRI_MAPPING_PROFILE:-$WORKSPACE/config/mapping_profiles/$(id -un).yaml}"
 [[ -f "$AGRI_MAPPING_PROFILE" ]] || { echo 'Aircraft mapping profile is missing.' >&2; exit 1; }
-if timeout 4 rosnode list 2>/dev/null | grep -E '^/(multipointplan|gcs_gateway)$' >/dev/null; then
+# 2026-11-08：旧实现只看 ROS 注册，进程已死但注册残留时会永久拒绝启动。
+# 改为按进程判定，注册残留只在日志里提示。
+if pgrep -f 'gcs_gateway_node\.py|multipointplan' >/dev/null 2>&1; then
     echo 'A mission adapter is already running; no duplicate instance started.' >&2
     exit 1
+fi
+if timeout 4 rosnode list 2>/dev/null | grep -E '^/(multipointplan|gcs_gateway)$' >/dev/null; then
+    echo 'Note: stale ROS registration found (no live process); starting anyway.' >&2
 fi
 cd "$WORKSPACE"
 if [[ "${AGRI_PRECISION_LANDING:-0}" == "1" ]]; then
