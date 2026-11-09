@@ -412,7 +412,11 @@ void PX4CtrlFSM::process()
 		else if (!rc_data.is_command_mode || !cmd_is_received(now_time))
 		{
 			state = AUTO_HOVER;
-			set_hov_with_odom();
+			// set_hov_with_odom();
+			hover_pose.head<3>() = cmd_data.p;
+			hover_pose(3) = get_yaw_from_quaternion(odom_data.q);
+			last_set_hover_pose_time = ros::Time::now();
+
 			des = get_hover_des();
 			ROS_INFO("[px4ctrl] From CMD_CTRL(L3) to AUTO_HOVER(L2)!");
 		}
@@ -693,7 +697,7 @@ Desired_State_t PX4CtrlFSM::get_takeoff_land_des(const double speed)
     if (land_pose_is_received(now))
     {
         takeoff_land.start_pose.head<2>() = land_pose_data.p_des;
-        takeoff_land.start_pose(3) = land_pose_data.yaw_des;
+        // takeoff_land.start_pose(3) = land_pose_data.yaw_des;
     }
 
 	Desired_State_t des;
