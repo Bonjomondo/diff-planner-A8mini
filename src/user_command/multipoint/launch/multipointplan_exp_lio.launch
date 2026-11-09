@@ -15,6 +15,7 @@
     <arg name="goal_frame_id" default="world" />
     <!-- preset flies the YAML waypoints directly; clicked requires RViz Publish Point first. -->
     <arg name="mission_source" default="preset" />
+    <arg name="start_gateway" default="true" />
     <!-- remote accepts protocol 2 routes; uploads never trigger takeoff. -->
     <arg name="gcs_bind_host" default="127.0.0.1" />
     <arg name="gcs_port" default="8765" />
@@ -102,8 +103,10 @@
         <arg name="yaml_path" value="$(arg yaml_path)" />
         <arg name="detection_config" value="$(arg detection_config)" />
     </include>
-    <include if="$(eval arg('mission_source') == 'remote')" file="$(find multipoint)/launch/gcs_gateway.launch">
-        <arg name="bind_host" value="$(arg gcs_bind_host)" />
-        <arg name="port" value="$(arg gcs_port)" />
-    </include>
+    <group if="$(arg start_gateway)">
+        <include if="$(eval arg('mission_source') == 'remote')" file="$(find multipoint)/launch/gcs_gateway.launch">
+            <arg name="bind_host" value="$(arg gcs_bind_host)" />
+            <arg name="port" value="$(arg gcs_port)" />
+        </include>
+    </group>
 </launch>

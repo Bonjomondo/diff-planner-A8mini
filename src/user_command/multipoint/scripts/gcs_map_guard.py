@@ -10,7 +10,7 @@ import time
 
 # 两条流允许的最大配对时间差（秒）；沿用既有门限。
 PAIR_TOLERANCE = .05
-# 位置门限与连续合格对数沿用既有值；姿态角门限已按现场要求移除（见 _evaluate）。
+# 位置差超过 0.15 m 时记录诊断信息，不影响地图门。
 DISTANCE_TOLERANCE = .15
 # 判定阈值：连续合格对数低于它即判无效。
 MIN_GOOD_PAIRS = 10
@@ -127,14 +127,14 @@ class MapGuard:
         # 姿态角门限已按现场要求移除（2026-11-08）：LIO/EKF 的姿态差不再参与
         # map_coordinates_valid 判定，只记录数值供现场观察；距离与新鲜度门限不变。
         if distance > DISTANCE_TOLERANCE:
-            self.good //= 2
             self.last_reject = "distance"
             self.last_reject_detail = "%.3f m (门限 %.2f)" % (distance, DISTANCE_TOLERANCE)
         else:
-            self.good = min(self.good + 1, MAX_GOOD_PAIRS)
-            self.last_good = self.clock()
             self.last_reject = "none"
             self.last_reject_detail = ""
+        # 位姿偏差仅供诊断；配对成功即可刷新地图门。
+        self.good = min(self.good + 1, MAX_GOOD_PAIRS)
+        self.last_good = self.clock()
 
     def _invalid_reason(self, ros_now, stamp):
         if self.map is None:

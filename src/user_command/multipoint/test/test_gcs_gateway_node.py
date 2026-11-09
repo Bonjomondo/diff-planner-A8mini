@@ -133,7 +133,7 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(request.ground_origin.z, .1)
         self.assertEqual(request.operation, 'upload')
 
-    def test_initialize_passes_height_only_after_clear_accepted(self):
+    def test_initialize_passes_height_to_async_worker(self):
         response = Message(accepted=True, reason='Accepted', mission=self.message)
         self.backend.proxy = Mock(return_value=response)
         self.backend.initializer.start = Mock(return_value=(True, 'started'))
@@ -141,13 +141,26 @@ class AdapterTest(unittest.TestCase):
         command.update(operation='initialize', bounds=[-1., -1., -.1, 1., 1., 2.],
                        project_dir='/home/nv/project', takeoff_height=.8)
         self.assertTrue(self.backend.command(command)[0])
-        self.assertEqual(self.backend.proxy.call_args[0][0].operation, 'clear')
+        self.backend.proxy.assert_not_called()
         self.backend.initializer.start.assert_called_once_with(command['bounds'], '/home/nv/project', .8)
         self.assertTrue(self.backend.telemetry()['init_height_supported'])
-        self.backend.initializer.start.reset_mock()
+        self.backend._clear_executor_for_initialization()
+        self.assertEqual(self.backend.proxy.call_args[0][0].operation, 'clear')
         response.accepted = False
-        self.assertFalse(self.backend.command(command)[0])
-        self.backend.initializer.start.assert_not_called()
+        with self.assertRaises(RuntimeError):
+            self.backend._clear_executor_for_initialization()
+
+    def test_old_fence_and_start_rejected_until_recalibration(self):
+        self.backend.initializer.phase = 'awaiting_calibration'
+        self.backend.on_fence(Message(data=[-1, -1, 0, 1, 1, 2]))
+        self.assertEqual(self.backend.fence, [])
+        self.backend.proxy = Mock()
+        command = self.command()
+        command['operation'] = 'start'
+        accepted, reason, _ = self.backend.command(command)
+        self.assertFalse(accepted)
+        self.assertIn('确认', reason)
+        self.backend.proxy.assert_not_called()
 
     def test_stale_and_unknown_service_results(self):
         self.backend.proxy = Mock(side_effect=RosError('lost reply'))
@@ -205,6 +218,68 @@ class ControllerHeightTest(unittest.TestCase):
         self.assertFalse(self.init._ensure_controller(.8))
         self.stop.assert_not_called()
         self.spawn.assert_not_called()
+
+
+class FullReinitializationTest(unittest.TestCase):
+    def setUp(self):
+        self.init = MODULE.Initializer()
+        self.init._set = Mock()
+        self.init._stop_launchers = Mock()
+        self.init._ensure_controller = Mock(return_value=True)
+        self.init._wait_message = Mock(return_value=True)
+        self.globals = MODULE.Initializer._restart_all.__globals__
+
+    def test_armed_aircraft_is_rejected_before_any_stop(self):
+        ros = self.globals['rospy']
+        with patch.object(ros, 'wait_for_message', side_effect=[
+                Message(connected=True, armed=True), Message(landed_state=1)], create=True):
+            with self.assertRaisesRegex(RuntimeError, '落地并上锁'):
+                self.init._restart_all('/workspace', .7)
+        self.init._stop_launchers.assert_not_called()
+
+    def test_restart_waits_for_new_map_calibration_before_planner(self):
+        self.init._require_ground = Mock()
+        self.init._ensure_mavros = Mock()
+        calls = []
+        node_lists = iter(['/multipointplan\n/gimbal_landing\n', ''])
+        def run(args, **kwargs):
+            calls.append(args)
+            if args == ['rosnode', 'list']:
+                return types.SimpleNamespace(returncode=0, stdout=next(node_lists))
+            return types.SimpleNamespace(returncode=0, stdout='/multipointplan\n/gimbal_landing\n')
+        ros = self.globals['rospy']
+        with patch.object(ros, 'get_param', return_value=True, create=True), \
+             patch.dict(self.globals, {'running': Mock(side_effect=lambda p: [9] if p.startswith('rosbag record') else []), 'spawn': Mock()}), \
+             patch.object(self.globals['subprocess'], 'run', side_effect=run), \
+             patch.object(self.globals['os'].path, 'isfile', return_value=True), \
+             patch.object(self.globals['os'], 'makedirs'):
+            self.init._restart_all('/workspace', .7)
+            started = self.globals['spawn'].call_args_list
+        self.assertTrue(any('mapping_mid360.launch' in str(c) for c in self.init._stop_launchers.call_args_list))
+        self.assertTrue(any('mavros' in str(c) for c in self.init._stop_launchers.call_args_list))
+        self.assertTrue(any(a[0][:3] == ['roslaunch', 'multipoint', 'reinitialized_components.launch'] for a, _ in started))
+        self.assertFalse(any('planner.launch' in str(a) for a, _ in started))
+        self.assertEqual(self.init._set.call_args_list[-1].args[0], 'awaiting_calibration')
+        self.assertIn(['rosnode', 'kill', '/multipointplan'], calls)
+        self.assertNotIn(['rosnode', 'kill', '/gcs_gateway'], calls)
+
+    def test_rejected_clear_never_restarts_services(self):
+        self.init._prepare_ground_services = Mock()
+        self.init._require_ground = Mock()
+        self.init.clear_executor = Mock(side_effect=RuntimeError('clear rejected'))
+        self.init._restart_all = Mock()
+        self.init._run([], '/workspace', .7)
+        self.init._restart_all.assert_not_called()
+        self.assertEqual(self.init._set.call_args.args[0], 'failed')
+
+    def test_confirm_new_bounds_starts_planner_without_resetting_map_again(self):
+        self.init._require_ground = Mock()
+        self.init._restart_planner = Mock(return_value=True)
+        self.init._wait_bool = Mock(return_value=True)
+        self.init._finish_calibration([-1, -1, 0, 1, 1, 2], '/workspace')
+        self.init._restart_planner.assert_called_once()
+        self.init._stop_launchers.assert_not_called()
+        self.assertEqual(self.init._set.call_args_list[-1].args[0], 'ready')
 
 
 

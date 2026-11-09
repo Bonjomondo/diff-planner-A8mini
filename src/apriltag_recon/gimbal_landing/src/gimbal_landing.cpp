@@ -313,77 +313,77 @@ void SIYI_ROS_SDK::process(void)
 
     switch (g_state)
     {
-        case IDLE:
+    case IDLE:
+    {
+        if (landing_requested)
+        {
+            g_gimbal.setMode(SiyiGimbalUdp::FPV_MODE);
+	    ros::Duration(0.1).sleep();   // 等待 100ms
+            // camera center-and-down
+            if (g_gimbal.sendOneKeyPosition(2))
             {
-                if (landing_requested)
-                {
-                    // camera center-and-down
-                    if (g_gimbal.sendOneKeyPosition(2))
-                    {
-                        g_state = MOVING_DOWN;
-                        publishStatus("MOVING_DOWN");
-                    }
-                }
-                else
-                    publishStatus("IDLE");
-
-                break;
+                g_state = MOVING_DOWN;
+                publishStatus("MOVING_DOWN");
             }
+        }
+        else
+            publishStatus("IDLE");
 
-        case MOVING_DOWN:
-            {
-                if (g_gimbal.hasFreshAttitude(now) && g_gimbal.pitch_deg_ <= -90)
-                {
-                    g_state = MOVE_LANDING_POS;
-                    g_gimbal.setMode(SiyiGimbalUdp::FOLLOW_MODE);
-                    publishStatus("MOVE_LANDING_POS");
-                    ROS_INFO("Let drone go to aprilTag center");
-                }
+        break;
+    }
+    // 云台往下转
+    case MOVING_DOWN:
+    {
+        if (g_gimbal.hasFreshAttitude(now) && g_gimbal.pitch_deg_ <= -90 && std::abs(g_gimbal.yaw_deg_) <= 0.0001)
+        {
+            g_state = MOVE_LANDING_POS;
+            publishStatus("MOVE_LANDING_POS");
+            ROS_INFO("Let drone go to aprilTag center");
+        }
 
-                break;
-            }
+        break;
+    }
 
-        case MOVE_LANDING_POS:
-            {
-                Eigen::Vector2d e = p.head<2>() - land_target.head<2>();
-                double e_p = e.norm();
-                // Current body yaw in world frame
-                double yaw_current = atan2(R_b2w(1, 0), R_b2w(0, 0));
-                double des_yaw = land_target.z();
-                double yaw_error =
-                    atan2(sin(des_yaw - yaw_current), cos(des_yaw - yaw_current));
-                double e_yaw = std::abs(yaw_error);
-                constexpr double yaw_tol = 1.0 * M_PI / 180.0;
-                ROS_WARN("e_x: %.2f, e_y: %.2f, yaw: %.2f",
-                         e.x(),
-                         e.y(),
-                         e_yaw / yaw_tol);
-                if (e_p < 0.05 && e_yaw < yaw_tol && v.norm() < 0.05)
-                {
-                    g_state = LANDING;
-                    is_updated = false;
-                    publishStatus("LANDING");
-                    ROS_INFO("Drone is at the place. Ready to land!");
-                }
-                pubLandPose(land_target);
-                break;
-            }
+    case MOVE_LANDING_POS:
+    {
+        Eigen::Vector2d e = p.head<2>() - land_target.head<2>();
+        double e_p = e.norm();
+        // Current body yaw in world frame
+        double yaw_current = atan2(R_b2w(1, 0), R_b2w(0, 0));
+        double des_yaw = land_target.z();
+        double yaw_error =
+            atan2(sin(des_yaw - yaw_current), cos(des_yaw - yaw_current));
+        double e_yaw = std::abs(yaw_error);
+        constexpr double yaw_tol = 1.0 * M_PI / 180.0;
+        ROS_WARN("e_x: %.2f, e_y: %.2f, yaw: %.2f",
+                 e.x(),
+                 e.y(),
+                 e_yaw / yaw_tol);
+        if (e_p < 0.1 && e_yaw < yaw_tol && v.norm() < 0.1)
+        {
+            g_state = LANDING;
+            is_updated = false;
+            publishStatus("LANDING");
+            ROS_INFO("Drone is at the place. Ready to land!");
+        }
+        pubLandPose(land_target);
+        break;
+    }
 
-        case LANDING:
-            pubLandPose(land_pose);
-            if (land_state == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND ||
-                (v.norm() < 0.01 && p.z() < 0.05))
-            {
-                g_state = IDLE;
-                publishStatus("IDLE");
+    case LANDING:
+        pubLandPose(land_pose);
+        if (land_state == mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND ||
+            (v.norm() < 0.01 && p.z() < 0.05))
+        {
+            g_state = IDLE;
+            publishStatus("IDLE");
 
-                landing_requested = false;
-                g_landing_requested = false;
-                g_gimbal.setMode(SiyiGimbalUdp::LOCK_MODE);
-                g_gimbal.sendOneKeyPosition(1);
-                ROS_INFO("Landing stopped; one-key gimbal center commanded.");
-            }
-            break;
+            landing_requested = false;
+            g_landing_requested = false;
+            g_gimbal.sendOneKeyPosition(1);
+            ROS_INFO("Landing stopped; one-key gimbal center commanded.");
+        }
+        break;
     }
 }
 
@@ -403,7 +403,13 @@ void SIYI_ROS_SDK::tagCallback(const apriltag_ros::AprilTagDetectionArray::Const
         p_t2c.z() = det.pose.pose.pose.position.z;
 
         Eigen::Matrix3d R_t2c = q_t2c.toRotationMatrix();
-        Eigen::Vector3d target = (p + R_b2w * R_c2b * p_t2c);
+
+        // Virtual target point in Tag frame
+        Eigen::Vector3d p_q_t(0.0, 0.08, 0.0); // 8cm
+	const Eigen::Vector3d t_b2c(0.08, 0.0, 0.0); // 8cm
+        Eigen::Vector3d p_q_c = p_t2c + R_t2c * p_q_t;
+        Eigen::Vector3d target = (p + R_b2w * R_c2b * p_q_c);
+
         Eigen::Matrix3d R_t2w = R_b2w * R_c2b * R_t2c;
         Eigen::Vector3d tag_w_y = R_t2w.col(1);
         double yaw_target = atan2(tag_w_y.y(), tag_w_y.x());

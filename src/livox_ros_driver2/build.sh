@@ -31,9 +31,9 @@ echo "ROS version is: "$ROS_VERSION
 
 # clear `build/` folder.
 # TODO: Do not clear these folders, if the last build is based on the same ROS version.
-rm -rf ../../build/
-rm -rf ../../devel/
-rm -rf ../../install/
+rm -rf ~/diff-planner_lio/build/
+rm -rf ~/diff-planner_lio/devel/
+rm -rf ~/diff-planner_lio/install/
 # clear src/CMakeLists.txt if it exists.
 if [ -f ../CMakeLists.txt ]; then
     rm -f ../CMakeLists.txt
@@ -58,7 +58,7 @@ fi
 # build
 pushd `pwd` > /dev/null
 if [ $ROS_VERSION = ${VERSION_ROS1} ]; then
-    cd ../../
+    cd ~/diff-planner_lio
     catkin_make -DROS_EDITION=${VERSION_ROS1}
 elif [ $ROS_VERSION = ${VERSION_ROS2} ]; then
     cd ../../

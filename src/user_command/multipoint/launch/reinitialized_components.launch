@@ -1,0 +1,19 @@
+<launch>
+  <!-- The existing task gateway and ROS master remain alive. -->
+  <arg name="precision_landing" default="false" />
+  <group if="$(arg precision_landing)">
+    <include file="$(find siyi_a8_mini_node)/launch/image.launch" />
+    <include file="$(find apriltag_ros)/launch/continuous_detection.launch" />
+    <include file="$(find gimbal_landing)/launch/landing.launch" />
+  </group>
+  <include file="$(find multipoint)/launch/multipointplan_exp_lio.launch">
+    <arg name="mission_source" value="remote" />
+    <arg name="start_gateway" value="false" />
+    <arg name="start_gimbal_node" value="false" />
+    <arg name="start_detection" value="false" />
+    <arg name="enable_rc" value="false" />
+    <arg name="start_plan" value="0" />
+    <arg name="back_plan" value="0" />
+    <arg name="next_distance" value="0.2" />
+  </include>
+</launch>

@@ -19,9 +19,15 @@ class GuardTests(unittest.TestCase):
         self.assertTrue(guard.snapshot(100.)['map_coordinates_valid'])
         self.now += 1
         self.assertFalse(guard.snapshot(101.)['map_coordinates_valid'])
-        self.assertFalse(self.samples(shift=1).snapshot(100.)['map_coordinates_valid'])
+        self.assertTrue(self.samples(shift=1).snapshot(100.)['map_coordinates_valid'])
         # 2026-11-08 起姿态差不判失效，只记录数值
         self.assertTrue(self.samples(quat=(0,0,1,0)).snapshot(100.)['map_coordinates_valid'])
+    def test_position_threshold_50_cm(self):
+        self.assertTrue(self.samples(shift=0.49).snapshot(100.)['map_coordinates_valid'])
+        report = self.samples(shift=0.51).snapshot(100.)
+        self.assertTrue(report['map_coordinates_valid'])
+        self.assertEqual(report['map_last_reject'], 'distance')
+
     def test_restart_or_bad_frame_revokes_verification(self):
         guard = self.samples()
         guard.observe('map', 99., 'world', (1,2,1), (0,0,0,1))
@@ -108,10 +114,10 @@ class GuardTests(unittest.TestCase):
         shifted = MapGuard(clock=lambda: 100.)
         for i in range(12):
             t = 99.8 + i * .01
-            shifted.observe('planner', t, 'world', (1.5, 2, 1), (0, 0, 0, 1))
+            shifted.observe('planner', t, 'world', (1.6, 2, 1), (0, 0, 0, 1))
             shifted.observe('map', t, 'world', (1, 2, 1), (0, 0, 0, 1))
         report = shifted.snapshot(100.)
-        self.assertFalse(report['map_coordinates_valid'])
+        self.assertTrue(report['map_coordinates_valid'])
         self.assertEqual(report['map_last_reject'], 'distance')
 
     def test_bounds_accept_numpy_scalars(self):
@@ -127,7 +133,7 @@ class GuardTests(unittest.TestCase):
 
 
     def test_leaky_counter_survives_isolated_glitch(self):
-        """孤立一帧异常只让计数减半（漏桶），不再直接清零。"""
+        """孤立位置偏差只记录诊断，配对计数继续增长。"""
         now = [100.]
         guard = MapGuard(clock=lambda: now[0])
         for i in range(30):
@@ -136,13 +142,13 @@ class GuardTests(unittest.TestCase):
             guard.observe('map', stamp, 'world', (1, 2, 1), (0, 0, 0, 1))
         self.assertGreaterEqual(guard.good, 10)
         before = guard.good
-        guard.observe('planner', 100.0, 'world', (1.5, 2, 1), (0, 0, 0, 1))
+        guard.observe('planner', 100.0, 'world', (1.6, 2, 1), (0, 0, 0, 1))
         guard.observe('map', 100.0, 'world', (1, 2, 1), (0, 0, 0, 1))
-        self.assertEqual(guard.good, before // 2)
+        self.assertEqual(guard.good, before + 1)
         self.assertTrue(guard.snapshot(100.01)['map_coordinates_valid'])
 
     def test_leaky_counter_still_detects_sustained_mismatch(self):
-        """持续不一致仍然会在若干帧内跌到阈值以下。"""
+        """持续位置偏差不关闭地图门，但保留诊断。"""
         now = [100.]
         guard = MapGuard(clock=lambda: now[0])
         for i in range(30):
@@ -151,10 +157,11 @@ class GuardTests(unittest.TestCase):
             guard.observe('map', stamp, 'world', (1, 2, 1), (0, 0, 0, 1))
         for i in range(10):
             stamp = 100.0 + i * .01
-            guard.observe('planner', stamp, 'world', (1.5, 2, 1), (0, 0, 0, 1))
+            guard.observe('planner', stamp, 'world', (1.6, 2, 1), (0, 0, 0, 1))
             guard.observe('map', stamp, 'world', (1, 2, 1), (0, 0, 0, 1))
-        self.assertLess(guard.good, 10)
-        self.assertFalse(guard.snapshot(100.2)['map_coordinates_valid'])
+        self.assertGreaterEqual(guard.good, 10)
+        self.assertTrue(guard.snapshot(100.2)['map_coordinates_valid'])
+        self.assertEqual(guard.snapshot(100.2)['map_last_reject'], 'distance')
 
 
 if __name__ == '__main__': unittest.main()

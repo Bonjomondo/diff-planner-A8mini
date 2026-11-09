@@ -2,13 +2,14 @@
 """任务初始化的机载编排：按依赖顺序把飞行前置链 bring-up 到位。
 
 设计原则：
-1. 幂等——已经在跑的进程不重复启动；网关自己所在的 multipoint 绝不重启。
+1. 地面初始化重启飞行链路；任务网关与 ROS master 保持运行。
 2. 按依赖顺序执行，每一步等"就绪信号"而不是固定 sleep。
 3. 异步——初始化立即返回，进度写入 phase/detail,由遥测上报给地面站。
 4. 失败即停——某一步超时就中止，不启动依赖它的后续步骤。
 """
 import os
 import math
+import json
 import signal
 import subprocess
 import threading
@@ -18,9 +19,13 @@ import rospy
 from mavros_msgs.msg import State, ExtendedState
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float64
+from multipoint.msg import MissionStatus
 
 # 录制话题：与现场手工命令保持一致
 BAG_TOPICS = [
+    '/tag_detections', '/landing_camera/landing_pose', '/landing_camera/status',
+    '/landing_camera/set_landing', '/debugPx4ctrl', '/mavros/imu/data',
+    '/mavros/setpoint_raw/attitude', '/mavros/setpoint_raw/target_attitude',
     '/mission/remote/status', '/mavros/state', '/mavros/extended_state', '/mavros/rc/in',
     '/mavros/battery', '/ekf/ekf_odom', '/laserMapping/odometry', '/px4ctrl/state',
     '/px4ctrl/mission_ready', '/px4ctrl/takeoff_ready', '/px4ctrl/automatic_control_ok',
@@ -52,12 +57,13 @@ def spawn(args, log_path):
 class Initializer:
     """把飞行前置链拉到就绪状态；进度通过 properties 暴露给遥测。"""
 
-    def __init__(self):
+    def __init__(self, clear_executor=None):
         self.lock = threading.Lock()
         self.phase = 'idle'
         self.detail = ''
         self.ok = False
         self.thread = None
+        self.clear_executor = clear_executor
 
     # ── 对外接口 ────────────────────────────────────────────────
     def snapshot(self):
@@ -70,12 +76,13 @@ class Initializer:
 
     def start(self, bounds, project_dir, takeoff_height=None):
         with self.lock:
-            if self.phase not in ('idle', 'ready', 'failed'):
+            if self.phase not in ('idle', 'ready', 'failed', 'awaiting_calibration'):
                 return False, '初始化正在进行中'
+            resume = self.phase == 'awaiting_calibration'
             self.phase = 'starting'
             self.detail = '准备中'
             self.ok = False
-        self.thread = threading.Thread(target=self._run, args=(bounds, project_dir, takeoff_height),
+        self.thread = threading.Thread(target=self._run, args=(bounds, project_dir, takeoff_height, resume),
                                        daemon=True)
         self.thread.start()
         return True, '已开始初始化'
@@ -104,11 +111,183 @@ class Initializer:
                 return True
         return False
 
-    def _run(self, bounds, project_dir, takeoff_height):
+    def _run(self, bounds, project_dir, takeoff_height, resume=False):
         try:
-            self._sequence(bounds, project_dir, takeoff_height)
+            self._prepare_ground_services()
+            self._require_ground()
+            if self.clear_executor is not None:
+                self.clear_executor()
+            if resume:
+                self._finish_calibration(bounds, project_dir)
+            else:
+                self._restart_all(project_dir, takeoff_height)
         except Exception as error:      # noqa: BLE001 - 任何异常都要落到 failed
             self._set('failed', '初始化异常：%s' % str(error)[:160])
+
+    def _stop_launchers(self, pattern, name, timeout=15.):
+        """Stop only the named launchers; do not kill unrelated user processes."""
+        pids = running(pattern)
+        for pid in pids:
+            if pid == os.getpid():
+                raise RuntimeError('拒绝停止任务网关自身')
+            try:
+                os.kill(pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass
+        deadline = time.monotonic() + timeout
+        while running(pattern) and time.monotonic() < deadline:
+            time.sleep(.2)
+        if running(pattern):
+            raise RuntimeError('%s 未正常退出，请检查进程' % name)
+
+    def _require_ground(self):
+        try:
+            state = rospy.wait_for_message('/mavros/state', State, timeout=3.)
+            landed = rospy.wait_for_message('/mavros/extended_state', ExtendedState, timeout=3.)
+        except rospy.ROSException:
+            raise RuntimeError('无法确认飞控已落地并上锁')
+        if not state.connected or state.armed or landed.landed_state != ExtendedState.LANDED_STATE_ON_GROUND:
+            raise RuntimeError('飞控未确认落地并上锁，禁止重启')
+
+    def _prepare_ground_services(self):
+        """Start missing passive status publishers before the ground interlock."""
+        self._ensure_mavros()
+        self._require_ground()
+        if not self._wait_message('/mission/remote/status', MissionStatus, 2.):
+            if running('devel/lib/multipoint/multipointplan'):
+                raise RuntimeError('任务执行器正在运行但没有状态，未重复启动')
+            spawn(['roslaunch', 'multipoint', 'reinitialized_components.launch',
+                   'precision_landing:=false'], '/tmp/reinitialized_components.log')
+            if not self._wait_message('/mission/remote/status', MissionStatus, 25.):
+                raise RuntimeError('任务执行器未发布状态')
+
+    def _ensure_mavros(self):
+        self._set('mavros', '正在检查飞控连接')
+        try:
+            state = rospy.wait_for_message('/mavros/state', State, timeout=2.)
+        except rospy.ROSException:
+            state = None
+        if state is None and not running('mavros_node'):
+            workspace = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+            helper = os.path.join(workspace, 'tools', 'prepare_mapping_profile.py')
+            output = os.path.expanduser('~/.local/state/agri-gcs/mapping-start/profiles')
+            result = subprocess.run(['/usr/bin/python3', helper, '--output-dir', output],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, timeout=20., check=True)
+            with open(os.path.join(result.stdout.strip(), 'profile.json'), encoding='utf-8') as handle:
+                fcu_url = json.load(handle)['fcu_url']
+            spawn(['roslaunch', 'mavros', 'px4.launch', 'gcs_url:=', 'fcu_url:=' + fcu_url],
+                  '/tmp/mavros.init.log')
+        deadline = time.monotonic() + 25.
+        while (state is None or not state.connected) and time.monotonic() < deadline:
+            try:
+                state = rospy.wait_for_message('/mavros/state', State, timeout=2.)
+            except rospy.ROSException:
+                state = None
+        if state is None or not state.connected:
+            raise RuntimeError('飞控连接未恢复，未重启飞行服务')
+
+    def _restart_all(self, project_dir, takeoff_height):
+        self._require_ground()
+        if not os.path.isabs(project_dir):
+            raise RuntimeError('项目目录必须是绝对路径')
+        # Scripts and binaries must belong to this same workspace, not an arbitrary
+        # path provided by the client.
+        workspace = os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+        mapping_script = os.path.join(workspace, 'sh_files', 'start_mapping_only.sh')
+        if not os.path.isfile(mapping_script):
+            raise RuntimeError('找不到建图启动脚本：%s' % mapping_script)
+        precision = bool(rospy.get_param('/multipointplan/precision_landing_enabled', False))
+        if takeoff_height is None:
+            try:
+                takeoff_height = rospy.wait_for_message('/px4ctrl/takeoff_height', Float64, timeout=2.).data
+            except rospy.ROSException:
+                takeoff_height = float(rospy.get_param('~init_takeoff_height', .5))
+
+        self._set('restart', '正在停止旧录包和飞行服务')
+        self._stop_launchers('rosbag record.*roundtrip_', '旧录包')
+        self._stop_launchers('roslaunch.*planner.launch', '规划器')
+        self._stop_launchers('roslaunch.*run_ctrl_indoor_automatic.launch', '飞行控制器')
+        self._stop_launchers('roslaunch.*ekf_lidar.launch', 'EKF')
+        self._stop_launchers('roslaunch.*reinitialized_components.launch', '任务组件')
+        # The original roslaunch also owns the gateway; stop only its other ROS
+        # nodes. The launcher itself and /gcs_gateway must remain alive.
+        nodes = ['/multipointplan', '/siyi_a8_mini', '/apriltag_ros_continuous_node', '/gimbal_landing']
+        listed = subprocess.run(['rosnode', 'list'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                text=True, timeout=5., check=True).stdout.splitlines()
+        for node in nodes:
+            if node in listed:
+                subprocess.run(['rosnode', 'kill', node], stdout=subprocess.DEVNULL,
+                               stderr=subprocess.PIPE, text=True, timeout=10., check=True)
+        deadline = time.monotonic() + 10.
+        while time.monotonic() < deadline:
+            active = subprocess.run(['rosnode', 'list'], stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True, timeout=5., check=True).stdout.splitlines()
+            if not any(node in active for node in nodes):
+                break
+            time.sleep(.2)
+        else:
+            raise RuntimeError('旧任务或视觉节点未正常退出')
+        self._require_ground()
+        self._stop_launchers('roslaunch.*mapping_mid360.launch', '雷达建图')
+        self._stop_launchers('roslaunch.*mavros.*px4.launch', 'MAVROS')
+        # Never silently reuse an independently launched flight component.
+        # Its owner must be identified before it can be stopped safely.
+        for pattern, name in [('px4ctrl_node', '飞行控制器'),
+                              ('run_mapping_online', '雷达建图'),
+                              ('livox_ros_driver2_node', '雷达驱动'),
+                              ('mavros_node', 'MAVROS')]:
+            if running(pattern):
+                raise RuntimeError(name + '仍在运行，启动方式无法确认，请检查后重试')
+
+        self._set('mapping', '正在重新连接飞控并启动雷达建图')
+        result = subprocess.run(['/bin/bash', mapping_script], stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, text=True, timeout=110.)
+        if result.returncode:
+            raise RuntimeError('建图重启失败：' + result.stdout[-500:])
+        # Some mapping profiles do not use MAVROS IMU and therefore do not
+        # start MAVROS. Restore it before any flight component is started.
+        self._ensure_mavros()
+        self._require_ground()
+        try:
+            subprocess.run(RC_RATE_CMD, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=8.)
+        except (OSError, subprocess.SubprocessError):
+            rospy.logwarn('mavcmd 配置遥控速率失败，继续执行')
+        self._set('ekf', '正在重新启动 EKF')
+        spawn(['roslaunch', 'ekf', 'ekf_lidar.launch'], '/tmp/ekf.launch.log')
+        if not self._wait_message('/ekf/ekf_odom', Odometry, 25.):
+            raise RuntimeError('EKF 未在 25 秒内输出里程计')
+        self._set('px4ctrl', '正在重新启动飞行控制器')
+        if not self._ensure_controller(takeoff_height):
+            return
+        self._set('components', '正在重新启动任务和二维码组件')
+        spawn(['roslaunch', 'multipoint', 'reinitialized_components.launch',
+               'precision_landing:=' + ('true' if precision else 'false')], '/tmp/reinitialized_components.log')
+        self._set('bag', '正在开始新的飞行录包')
+        log_dir = os.path.expanduser('~/flight_logs')
+        os.makedirs(log_dir, exist_ok=True)
+        bag = os.path.join(log_dir, 'roundtrip_%s.bag' % time.strftime('%Y%m%d_%H%M%S'))
+        spawn(['rosbag', 'record', '-O', bag] + BAG_TOPICS, '/tmp/rosbag.log')
+        if not self._wait_message('/mission/remote/status', MissionStatus, 25.):
+            raise RuntimeError('任务执行器未重新发布状态')
+        deadline = time.monotonic() + 5.
+        while not running('rosbag record.*roundtrip_') and time.monotonic() < deadline:
+            time.sleep(.2)
+        if not running('rosbag record.*roundtrip_'):
+            raise RuntimeError('新的 rosbag 未启动，请检查 /tmp/rosbag.log')
+        self._set('awaiting_calibration', '服务已重启，请刷新新地图位置并重新确认围栏与起降点')
+
+    def _finish_calibration(self, bounds, project_dir):
+        self._require_ground()
+        self._set('planner', '正在按重新确认的围栏启动规划器')
+        if not self._restart_planner(bounds, project_dir):
+            return
+        if not self._wait_bool('/drone_0_traj_server/output_ready', True, 30.):
+            raise RuntimeError('规划器 30 秒内未输出轨迹')
+        if not self._wait_bool('/indoor_mission/map_ready', True, 30.):
+            raise RuntimeError('地图坐标校验 30 秒内未通过')
+        self._set('ready', '初始化完成，请重新标定起降点', ok=True)
 
     def _sequence(self, bounds, project_dir, takeoff_height=None):
         # 1) 飞控链路必须在

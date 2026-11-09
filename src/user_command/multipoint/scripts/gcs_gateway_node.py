@@ -6,6 +6,7 @@ import signal
 import subprocess
 import threading
 import time
+import uuid
 import sys
 from pathlib import Path
 
@@ -38,7 +39,7 @@ class RosBackend:
     def __init__(self):
         self.lock = threading.Lock()
         # 任务初始化：按依赖顺序把飞行前置链拉到就绪（后台线程）。
-        self.initializer = Initializer()
+        self.initializer = Initializer(clear_executor=self._clear_executor_for_initialization)
         self.status = None
         self.status_time = self.state_time = self.battery_time = 0.0
         self.state = State()
@@ -76,6 +77,9 @@ class RosBackend:
 
     def on_fence(self, msg):
         with self.lock:
+            if self.initializer.phase in ('starting', 'mavros', 'restart', 'mapping', 'ekf',
+                                          'px4ctrl', 'components', 'bag', 'awaiting_calibration'):
+                return
             self.fence = list(msg.data) if valid_bounds(msg.data) else []
 
     def on_preflight(self, source, msg):
@@ -118,6 +122,9 @@ class RosBackend:
         with self.lock:
             gate = self.map_gate()
             reason = gate['map_gate_reason']
+            if gate['map_last_reject'] == 'distance':
+                rospy.logwarn_throttle(2.0, 'LIO/EKF position difference: %s; diagnostic only',
+                                       gate.get('map_last_reject_detail', ''))
             if reason and reason != self.map_gate_reason:
                 detail = gate.get('map_last_reject_detail') or ''
                 reset = gate.get('map_last_reset') or 'none'
@@ -179,12 +186,24 @@ class RosBackend:
                         **self.reported_map_gate())
 
     def command(self, command):
-        # initialize = 先做与 clear 相同的地面复位，再按新围栏重启规划器。
-        pending_init = None
+        if command['operation'] == 'initialize' and self.initializer.phase not in (
+                'idle', 'ready', 'failed', 'awaiting_calibration'):
+            return False, '初始化正在进行中', self.telemetry()['mission']
+        if command['operation'] in ('upload', 'start', 'update') and (
+                self.initializer.busy() or self.initializer.phase == 'failed'):
+            return False, '初始化或新地图围栏确认尚未完成', self.telemetry()['mission']
+        # Accept the asynchronous request; the worker establishes passive FCU
+        # status, verifies ground/disarmed, then asks the executor to clear.
         if command['operation'] == 'initialize':
-            pending_init = (command.get('bounds'), command.get('project_dir', ''),
-                            command.get('takeoff_height'))
-            command = dict(command, operation='clear', mission_id='', revision=0)
+            with self.lock:
+                ok, message = self.initializer.start(command.get('bounds'),
+                                                     command.get('project_dir', ''),
+                                                     command.get('takeoff_height'))
+                if ok:
+                    self.fence = []
+                    self.map_route = None
+                    self.map_route_points = []
+            return ok, message, self.telemetry()['mission']
         with self.lock:
             stale = time.monotonic() - self.status_time > 1.0
             guarded = command.get('require_map_alignment', False)
@@ -235,9 +254,6 @@ class RosBackend:
         try:
             rospy.wait_for_service('/mission/remote/command', timeout=1.0)
             response = self.proxy(request)
-            if response.accepted and pending_init is not None:
-                ok, message = self.initializer.start(*pending_init)
-                return ok, message, status_dict(response.mission)
             if response.accepted and guarded and command['operation'] in ('upload', 'update'):
                 with self.lock:
                     self.map_route = identity
@@ -246,6 +262,16 @@ class RosBackend:
             return response.accepted, response.reason, status_dict(response.mission)
         except (rospy.ROSException, rospy.ServiceException) as error:
             return False, 'ROS command result unknown: ' + str(error)[:200], self.telemetry()['mission']
+
+    def _clear_executor_for_initialization(self):
+        # Ground state is checked before this callback and again by the executor.
+        rospy.wait_for_service('/mission/remote/command', timeout=5.)
+        request = MissionCommandRequest()
+        request.request_id = str(uuid.uuid4())
+        request.operation = 'clear'
+        response = self.proxy(request)
+        if not response.accepted:
+            raise RuntimeError('任务执行器拒绝地面复位：' + response.reason)
 
 
 def main():

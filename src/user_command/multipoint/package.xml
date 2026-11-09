@@ -17,6 +17,7 @@
   <depend>quadrotor_msgs</depend>
   <depend>roscpp</depend>
   <depend>rospy</depend>
+  <exec_depend>rosnode</exec_depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>tf</depend>
